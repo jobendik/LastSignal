@@ -159,6 +159,10 @@ export class InputSystem {
         this.game.damageCore(10);
         e.preventDefault();
         break;
+      case "KeyH":
+        this.game.core.showHeatmap = !this.game.core.showHeatmap;
+        e.preventDefault();
+        break;
     }
   }
 

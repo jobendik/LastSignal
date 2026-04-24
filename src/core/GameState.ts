@@ -75,7 +75,10 @@ export interface GameCoreState {
     showPaths: boolean;
   };
   shake: number;
+  shakeDir: { x: number; y: number }; // normalized direction of last impact
+  shakeRot: number;                   // rotational shake amplitude (radians)
   slowMo: number; // seconds of slow-motion
+  showHeatmap: boolean;               // live enemy-density heat overlay (H key)
 }
 
 export function createEmptyStats(): RunStats {

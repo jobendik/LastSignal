@@ -18,6 +18,7 @@ export class ProjectileSystem {
       // Drop the oldest projectile to avoid unbounded growth.
       this.list.shift();
     }
+    p.maxLife = p.life;
     this.list.push(p);
   }
 
@@ -43,6 +44,9 @@ export class ProjectileSystem {
         dir = p.lastDir;
       }
       p.lastDir = dir;
+      // Record trail position before moving.
+      p.trail.push(p.pos.clone());
+      if (p.trail.length > 6) p.trail.shift();
       p.pos = p.pos.add(dir.mult(p.speed * dt));
 
       // Collision with target (direct hit) or world.

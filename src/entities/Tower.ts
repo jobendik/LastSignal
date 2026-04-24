@@ -4,6 +4,7 @@ import type {
   TowerType,
   TowerFlag,
   TowerMod,
+  TargetMode,
 } from "../core/Types";
 import { towerDefinitions, towerSpecializations } from "../data/towers";
 import { TILE_SIZE, UPGRADE_COST_BASE_MUL } from "../core/Config";
@@ -26,6 +27,7 @@ export class Tower {
   specId: string | null = null;
   flags: Partial<Record<TowerFlag, boolean>> = {};
   mods: TowerMod[] = [];
+  targetMode: TargetMode = "closest_to_core";
 
   constructor(type: TowerType, c: number, r: number, buildCost: number) {
     const def = towerDefinitions[type];

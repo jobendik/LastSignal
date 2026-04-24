@@ -2,6 +2,7 @@ import type { Game } from "../core/Game";
 import { towerSpecializations } from "../data/towers";
 import { el, clear } from "./dom";
 import type { Tower } from "../entities/Tower";
+import type { TargetMode } from "../core/Types";
 
 /** Right-side panel shown when a tower is selected. */
 export class TowerPanel {
@@ -44,6 +45,25 @@ export class TowerPanel {
       }),
       el("div", { class: "ls-tp-kills", text: `Kills: ${t.kills}` }),
     );
+
+    // Targeting mode selector (not for eco towers).
+    if (!t.isEco) {
+      const modes: { id: TargetMode; label: string; title: string }[] = [
+        { id: "closest_to_core", label: "NEAR", title: "Closest to core (default)" },
+        { id: "weakest",         label: "WEAK", title: "Lowest HP enemy" },
+        { id: "strongest",       label: "STRG", title: "Highest HP enemy" },
+        { id: "fastest",         label: "FAST", title: "Fastest enemy" },
+      ];
+      const modeRow = el("div", { class: "ls-tp-target-row" });
+      modeRow.append(el("span", { class: "ls-hud-label", text: "TARGET" }));
+      for (const m of modes) {
+        const btn = el("button", { class: "ls-btn ls-btn-ghost ls-tp-target-btn" + (t.targetMode === m.id ? " active" : ""), text: m.label });
+        btn.title = m.title;
+        btn.onclick = () => { t.targetMode = m.id; this.refresh(); };
+        modeRow.append(btn);
+      }
+      this.el.append(modeRow);
+    }
 
     const actions = el("div", { class: "ls-tp-actions" });
     const upg = el("button", { class: "ls-btn", text: `UPGRADE (${t.upgradeCost}CR)` });

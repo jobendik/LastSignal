@@ -88,7 +88,7 @@ export class EnemySystem {
       // Check breach (near the core).
       const distToCore = e.pos.dist(this.game.grid.corePos);
       if (distToCore < 20) {
-        this.game.damageCore(e.breach, e.type);
+        this.game.damageCore(e.breach, e.type, e.pos.x, e.pos.y);
         this.onDeath(e, false);
         continue;
       }
@@ -104,7 +104,10 @@ export class EnemySystem {
   damage(e: Enemy, amount: number, src: DamageSource | null): void {
     if (!e.active) return;
     if (e.isPhased && e.ability === "phase") {
-      // Phase Disruptor bypass happens inside TowerSystem, not here.
+      // Show PHASED indicator on attempted hit.
+      if (this.game.core.settings.showDamageNumbers) {
+        this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - e.size - 4, "PHASED", "#9c27b0", 0.7, 10);
+      }
       return;
     }
     // Vulnerability multiplier: from stasis "vulnerabilityPulse" global.
@@ -112,14 +115,26 @@ export class EnemySystem {
     e.damage(amount * slowedMul, src);
 
     if (this.game.core.settings.showDamageNumbers && amount >= 1) {
-      this.game.particles.spawnFloatingText(
-        e.pos.x,
-        e.pos.y - e.size - 4,
-        Math.round(amount),
-        "#ffffff",
-        0.6,
-        11
-      );
+      const finalAmt = Math.round(amount * slowedMul);
+      // Tier by damage relative to enemy max HP.
+      const pct = amount / e.maxHp;
+      let color: string;
+      let size: number;
+      let life: number;
+      if (e.isBoss && pct > 0.03) {
+        // Boss crits: large red numbers.
+        color = "#ff5252"; size = 18; life = 0.9;
+      } else if (pct > 0.12 || finalAmt > 40) {
+        // Heavy hit: orange.
+        color = "#ff9800"; size = 15; life = 0.75;
+      } else if (pct > 0.05 || finalAmt > 15) {
+        // Medium hit: yellow.
+        color = "#ffeb3b"; size = 12; life = 0.65;
+      } else {
+        // Small hit: white.
+        color = "#ffffff"; size = 10; life = 0.55;
+      }
+      this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - e.size - 4, finalAmt, color, life, size);
     }
 
     if (src?.type === "tower") {

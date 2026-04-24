@@ -91,6 +91,130 @@ export class AudioSystem {
     }
   }
 
+  // ---- SFX: per-tower procedural sounds ----
+
+  sfxTowerFire(type: string): void {
+    switch (type) {
+      case "tesla":    this.sfxTesla(); break;
+      case "railgun":  this.sfxRailgun(); break;
+      case "mortar":   this.sfxMortar(); break;
+      case "flamer":   this.sfxFlamer(); break;
+      case "stasis":   this.sfxStasis(); break;
+      case "blaster":  this.sfxShoot(1.35, 0.14); break;
+      case "barrier":  break; // barrier is silent on pulse
+      default:         this.sfxShoot(1, 0.17); break;
+    }
+  }
+
+  sfxTesla(): void {
+    if (!this.ready()) return;
+    const now = this.ctx!.currentTime;
+    // Sharp electric crack: burst of noise + high-pitch oscillator.
+    const bufSize = Math.max(1, Math.floor(this.ctx!.sampleRate * 0.05));
+    const buf = this.ctx!.createBuffer(1, bufSize, this.ctx!.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+    const noise = this.ctx!.createBufferSource();
+    noise.buffer = buf;
+    const flt = this.ctx!.createBiquadFilter();
+    flt.type = "bandpass";
+    flt.frequency.value = 3200;
+    flt.Q.value = 1.2;
+    const gain = this.ctx!.createGain();
+    gain.gain.setValueAtTime(0.45, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    noise.connect(flt); flt.connect(gain); gain.connect(this.sfxGain!);
+    noise.start(now);
+    // Add a sharp high ping.
+    const osc = this.ctx!.createOscillator();
+    const og = this.ctx!.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(2200, now);
+    osc.frequency.exponentialRampToValueAtTime(400, now + 0.07);
+    og.gain.setValueAtTime(0.18, now);
+    og.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    osc.connect(og); og.connect(this.sfxGain!);
+    osc.start(now); osc.stop(now + 0.09);
+  }
+
+  sfxRailgun(): void {
+    if (!this.ready()) return;
+    const now = this.ctx!.currentTime;
+    // Deep crack + high snap.
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(80, now);
+    osc.frequency.exponentialRampToValueAtTime(30, now + 0.18);
+    gain.gain.setValueAtTime(0.55, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+    osc.connect(gain); gain.connect(this.sfxGain!);
+    osc.start(now); osc.stop(now + 0.24);
+    // High transient click for snap.
+    const osc2 = this.ctx!.createOscillator();
+    const g2 = this.ctx!.createGain();
+    osc2.type = "square";
+    osc2.frequency.setValueAtTime(1800, now);
+    osc2.frequency.exponentialRampToValueAtTime(300, now + 0.04);
+    g2.gain.setValueAtTime(0.3, now);
+    g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+    osc2.connect(g2); g2.connect(this.sfxGain!);
+    osc2.start(now); osc2.stop(now + 0.06);
+  }
+
+  sfxMortar(): void {
+    if (!this.ready()) return;
+    const now = this.ctx!.currentTime;
+    // Deep low-frequency thump.
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(90, now);
+    osc.frequency.exponentialRampToValueAtTime(25, now + 0.28);
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+    osc.connect(gain); gain.connect(this.sfxGain!);
+    osc.start(now); osc.stop(now + 0.32);
+  }
+
+  sfxFlamer(): void {
+    if (!this.ready()) return;
+    const now = this.ctx!.currentTime;
+    // Hissing roar: filtered noise with low-pass sweep.
+    const bufSize = Math.max(1, Math.floor(this.ctx!.sampleRate * 0.12));
+    const buf = this.ctx!.createBuffer(1, bufSize, this.ctx!.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+    const noise = this.ctx!.createBufferSource();
+    noise.buffer = buf;
+    const flt = this.ctx!.createBiquadFilter();
+    flt.type = "lowpass";
+    flt.frequency.setValueAtTime(800, now);
+    flt.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+    const gain = this.ctx!.createGain();
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    noise.connect(flt); flt.connect(gain); gain.connect(this.sfxGain!);
+    noise.start(now);
+  }
+
+  sfxStasis(): void {
+    if (!this.ready()) return;
+    const now = this.ctx!.currentTime;
+    // Crystalline ascending chime.
+    const freqs = [880, 1320, 1760];
+    freqs.forEach((f, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(f, now + i * 0.04);
+      gain.gain.setValueAtTime(0.1, now + i * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.04 + 0.18);
+      osc.connect(gain); gain.connect(this.sfxGain!);
+      osc.start(now + i * 0.04); osc.stop(now + i * 0.04 + 0.2);
+    });
+  }
+
   // ---- SFX: procedural helpers ----
 
   sfxShoot(pitch = 1, volume = 0.2): void {

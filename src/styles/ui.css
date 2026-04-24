@@ -152,8 +152,51 @@
 .ls-speed { min-width: 32px; text-align: center; color: #66fcf1; }
 .ls-core-bar { position: relative; width: 160px; height: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(102,252,241,0.3); }
 .ls-core-fill { height: 100%; background: #4caf50; transition: width 0.2s ease; }
+
+/* Segmented core bar */
+.ls-core-bar-segmented {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  width: 164px;
+}
+.ls-core-segment {
+  flex: 1;
+  height: 10px;
+  background: #4caf50;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  border: 1px solid rgba(0,0,0,0.3);
+}
+.ls-core-segment.dim {
+  background: rgba(255,255,255,0.07) !important;
+  box-shadow: none !important;
+}
+/* Critical pulse animation */
+@keyframes ls-core-critical {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.ls-core-bar-segmented.critical .ls-core-segment:not(.dim) {
+  animation: ls-core-critical 0.7s ease-in-out infinite;
+}
 .ls-start-wave { background: rgba(255, 179, 0, 0.1); border-color: #ffb300; color: #ffb300; }
 .ls-start-wave:hover { background: rgba(255, 179, 0, 0.25); }
+
+/* Critical core overlay: pulsing red border on full screen */
+.ls-critical-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 60px rgba(244, 67, 54, 0.35);
+  z-index: 45;
+  animation: ls-critical-pulse 0.65s ease-in-out infinite;
+}
+.ls-critical-overlay.visible { display: block; }
+@keyframes ls-critical-pulse {
+  0%, 100% { box-shadow: inset 0 0 60px rgba(244, 67, 54, 0.35); }
+  50%       { box-shadow: inset 0 0 100px rgba(244, 67, 54, 0.65); }
+}
 
 /* Codex alert */
 .ls-codex-alert {
@@ -278,6 +321,26 @@
 .ls-tp-spec-name { font-size: 11px; color: #ff9800; letter-spacing: 1px; }
 .ls-tp-spec-desc { font-size: 10px; color: #c5c6c7; margin-top: 2px; }
 .ls-tp-spec-applied { font-size: 10px; color: #ff9800; border-top: 1px solid rgba(255,152,0,0.3); padding-top: 4px; margin-top: 4px; }
+
+/* Targeting mode selector */
+.ls-tp-target-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.ls-tp-target-btn {
+  padding: 3px 6px !important;
+  font-size: 9px !important;
+  letter-spacing: 1px !important;
+}
+.ls-tp-target-btn.active {
+  background: rgba(102, 252, 241, 0.18) !important;
+  border-color: #66fcf1 !important;
+  color: #66fcf1 !important;
+  box-shadow: 0 0 6px rgba(102, 252, 241, 0.3);
+}
 
 /* ===== Wave preview ===== */
 .ls-wave-preview {

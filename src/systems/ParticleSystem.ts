@@ -97,28 +97,66 @@ export class ParticleSystem {
   }
 
   spawnLightning(points: { x: number; y: number }[], color: string): void {
-    // Segment jagged points.
-    const jagged: { x: number; y: number }[] = [];
-    for (let i = 0; i < points.length - 1; i++) {
-      const a = points[i]!;
-      const b = points[i + 1]!;
-      jagged.push({ x: a.x, y: a.y });
-      const dist = Math.hypot(b.x - a.x, b.y - a.y);
-      const segs = Math.max(2, Math.floor(dist / 18));
-      for (let j = 1; j < segs; j++) {
-        const t = j / segs;
-        jagged.push({
-          x: a.x + (b.x - a.x) * t + rnd(-6, 6),
-          y: a.y + (b.y - a.y) * t + rnd(-6, 6),
-        });
+    const subdivide = (pts: { x: number; y: number }[], disp: number): { x: number; y: number }[] => {
+      const out: { x: number; y: number }[] = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i]!;
+        const b = pts[i + 1]!;
+        out.push({ x: a.x, y: a.y });
+        const dist = Math.hypot(b.x - a.x, b.y - a.y);
+        const segs = Math.max(3, Math.floor(dist / 8));
+        for (let j = 1; j < segs; j++) {
+          const t = j / segs;
+          out.push({
+            x: a.x + (b.x - a.x) * t + rnd(-disp, disp),
+            y: a.y + (b.y - a.y) * t + rnd(-disp, disp),
+          });
+        }
       }
+      out.push(pts[pts.length - 1]!);
+      return out;
+    };
+
+    // Two-pass subdivision for finer jaggedness.
+    const pass1 = subdivide(points, 8);
+    const jagged = subdivide(pass1, 4);
+
+    // Optional branch from a midpoint.
+    const branches: { x: number; y: number }[][] = [];
+    if (jagged.length > 4 && Math.random() < 0.55) {
+      const midIdx = Math.floor(jagged.length * rnd(0.3, 0.6));
+      const mid = jagged[midIdx]!;
+      const end = jagged[jagged.length - 1]!;
+      const bx = mid.x + rnd(-12, 12);
+      const by = mid.y + rnd(-12, 12);
+      branches.push(subdivide([mid, { x: (mid.x + end.x) / 2 + bx * 0.4, y: (mid.y + end.y) / 2 + by * 0.4 }], 5));
     }
-    jagged.push(points[points.length - 1]!);
+
     this.lightning.push({ points: jagged, color, life: 0.2, maxLife: 0.2, active: true });
+    for (const b of branches) {
+      this.lightning.push({ points: b, color, life: 0.15, maxLife: 0.15, active: true });
+    }
   }
 
   spawnDamageZone(x: number, y: number, radius: number, dps: number, life: number, color?: string): void {
     this.zones.push(new DamageZone(x, y, radius, dps, life, color));
+  }
+
+  spawnFlameJet(x: number, y: number, angle: number, range: number, coneHalf: number): void {
+    if (this.particles.length > PARTICLE_CAP) return;
+    const flameColors = ["#ff6e40", "#ff9100", "#ffb300", "#ff3d00", "#ff6e40"];
+    const count = 7;
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length >= PARTICLE_CAP) break;
+      const spread = rnd(-coneHalf, coneHalf);
+      const a = angle + spread;
+      const speed = rnd(range * 0.6, range * 1.1);
+      const life = rnd(0.06, 0.13);
+      const color = flameColors[Math.floor(Math.random() * flameColors.length)]!;
+      const p = new Particle(x, y, color, { angle: a, speed, life, size: rnd(3, 6) });
+      p.gravity = 20;
+      this.particles.push(p);
+    }
   }
 
   update(dt: number): void {

@@ -29,6 +29,7 @@ export class Projectile {
   ownerType: TowerType | "drone" | "other";
   active = true;
   life = 2.5;
+  maxLife = 2.5;
   lastDir = new Vector2(1, 0);
   trail: Vector2[] = [];
   mark = false;

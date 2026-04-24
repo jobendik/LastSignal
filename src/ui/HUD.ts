@@ -6,7 +6,8 @@ export class HUD {
   el: HTMLElement;
   private creditsEl = el("span", { text: "0" });
   private coreEl = el("span", { text: "100" });
-  private coreBarFill = el("div", { class: "ls-core-fill" });
+  private coreSegments: HTMLElement[] = [];
+  private coreBarEl = el("div", { class: "ls-core-bar-segmented" });
   private waveEl = el("span", { text: "0/0" });
   private statusEl = el("span", { class: "ls-hud-status", text: "" });
   private speedEl = el("span", { text: "1x" });
@@ -21,6 +22,7 @@ export class HUD {
   private countdownValue = el("span", { class: "ls-wave-countdown-value", text: "--" });
   private countdownBar = el("div", { class: "ls-wave-countdown-bar" });
   private countdownFill = el("div", { class: "ls-wave-countdown-fill" });
+  private criticalOverlay = el("div", { class: "ls-critical-overlay" });
   private rafId = 0;
 
   constructor(private readonly game: Game) {
@@ -40,11 +42,18 @@ export class HUD {
   }
 
   private build(): void {
+    // Build 10 core integrity segments.
+    for (let i = 0; i < 10; i++) {
+      const seg = el("div", { class: "ls-core-segment" });
+      this.coreSegments.push(seg);
+      this.coreBarEl.append(seg);
+    }
+
     const left = el("div", { class: "ls-hud-left" });
     left.append(
       el("span", { class: "ls-hud-label", text: "CR" }), this.creditsEl,
       el("span", { class: "ls-hud-label", text: "CORE" }),
-      el("div", { class: "ls-core-bar" }, [this.coreBarFill]),
+      this.coreBarEl,
       this.coreEl,
       el("span", { class: "ls-hud-label", text: "WAVE" }), this.waveEl,
       this.statusEl,
@@ -75,7 +84,7 @@ export class HUD {
     this.countdownBar.append(this.countdownFill);
     this.countdownEl.append(this.countdownLabel, this.countdownValue, this.countdownBar);
 
-    this.el.append(left, right, this.countdownEl, this.codexAlert, this.bossBar);
+    this.el.append(left, right, this.countdownEl, this.codexAlert, this.bossBar, this.criticalOverlay);
 
     this.game.bus.on("codex:new", (id: unknown) => this.showCodexAlert(String(id)));
     this.game.bus.on("codex:alertDismissed", () => this.hideCodexAlert());
@@ -109,14 +118,30 @@ export class HUD {
     this.creditsEl.textContent = `${c.credits}`;
     this.coreEl.textContent = `${Math.max(0, Math.ceil(c.coreIntegrity))}/${c.coreMax}`;
     const pct = Math.max(0, Math.min(1, c.coreIntegrity / c.coreMax));
-    this.coreBarFill.style.width = `${(pct * 100).toFixed(1)}%`;
-    this.coreBarFill.style.background = pct < 0.3 ? "#f44336" : pct < 0.6 ? "#ffb300" : "#4caf50";
+    // Update 10 segments: segments light up left-to-right based on HP%.
+    const litCount = Math.ceil(pct * 10);
+    const isCritical = pct < 0.3;
+    const segColor = pct < 0.3 ? "#f44336" : pct < 0.6 ? "#ffb300" : "#4caf50";
+    this.coreBarEl.classList.toggle("critical", isCritical);
+    for (let i = 0; i < 10; i++) {
+      const seg = this.coreSegments[i]!;
+      if (i < litCount) {
+        seg.style.background = segColor;
+        seg.style.boxShadow = isCritical ? `0 0 4px ${segColor}` : "";
+        seg.classList.remove("dim");
+      } else {
+        seg.style.background = "";
+        seg.style.boxShadow = "";
+        seg.classList.add("dim");
+      }
+    }
 
     const wave = this.game.waves.nextWaveDef;
     this.waveEl.textContent = `${Math.min(c.waveIndex + 1, this.game.waves.totalWaves)}/${this.game.waves.totalWaves}`;
     this.statusEl.textContent = wave ? wave.name : (this.game.state === "VICTORY" ? "VICTORY" : "");
     this.speedEl.textContent = `${c.speed}x`;
     this.startWaveBtn.style.display = this.game.state === "PLANNING" && this.game.waves.hasMoreWaves ? "" : "none";
+    this.criticalOverlay.classList.toggle("visible", pct < 0.15);
 
     // Boss bar.
     const boss = this.game.enemies.list.find((e) => e.isBoss && e.active);

@@ -39,6 +39,9 @@ export type TowerType =
   | "flamer"
   | "barrier";
 
+/** How a tower selects its next target. */
+export type TargetMode = "closest_to_core" | "weakest" | "strongest" | "fastest";
+
 export type DamageType = "kinetic" | "energy" | "explosive" | "chain" | "none";
 export type StatusEffect = "none" | "slow" | "splash" | "chain" | "mark";
 

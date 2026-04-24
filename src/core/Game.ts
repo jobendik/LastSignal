@@ -105,7 +105,10 @@ export class Game {
       paused: false,
       debug: { show: false, showFlow: false, showPaths: false },
       shake: 0,
+      shakeDir: { x: 0, y: 0 },
+      shakeRot: 0,
       slowMo: 0,
+      showHeatmap: false,
     };
 
     // Wire systems that need `this`.
@@ -243,14 +246,22 @@ export class Game {
     this.bus.emit("upgrade:applied", u);
   }
 
-  damageCore(amount: number, byType?: EnemyType): void {
+  damageCore(amount: number, byType?: EnemyType, fromX?: number, fromY?: number): void {
     this.core.coreIntegrity -= amount;
     this.core.stats.coreDamageTaken += amount;
     if (byType) {
       this.core.stats.damageByEnemyType[byType] =
         (this.core.stats.damageByEnemyType[byType] ?? 0) + amount;
     }
-    this.core.shake = Math.min(18, this.core.shake + Math.min(10, amount / 4));
+    const shakeAmt = Math.min(10, amount / 4);
+    this.core.shake = Math.min(18, this.core.shake + shakeAmt);
+    this.core.shakeRot = Math.min(0.04, this.core.shakeRot + shakeAmt * 0.003);
+    if (fromX != null && fromY != null) {
+      const cx = this.grid.corePos.x;
+      const cy = this.grid.corePos.y;
+      const len = Math.hypot(fromX - cx, fromY - cy) || 1;
+      this.core.shakeDir = { x: (fromX - cx) / len, y: (fromY - cy) / len };
+    }
     this.audio.sfxCoreHit();
     this.bus.emit("core:damaged", { amount, by: byType });
     if (this.core.coreIntegrity <= 0) {
@@ -317,6 +328,7 @@ export class Game {
 
     // Always-on updates (UI, shake decay, slow-mo etc.)
     if (this.core.shake > 0) this.core.shake = Math.max(0, this.core.shake - dt * 30);
+    if (this.core.shakeRot > 0) this.core.shakeRot = Math.max(0, this.core.shakeRot - dt * 8);
     if (this.core.slowMo > 0) {
       this.core.slowMo -= dt;
       this.time.timeScale = 0.35;

@@ -223,21 +223,38 @@ export class TowerSystem {
   private findTarget(t: Tower, range: number): Enemy | null {
     let best: Enemy | null = null;
     let bestScore = Infinity;
+    const mode = t.targetMode;
+
     for (const e of this.game.enemies.list) {
       if (!e.active) continue;
-      // Phased enemies are skipped unless Tesla has Phase Disruptor.
       if (e.isPhased && e.ability === "phase" && !(t.type === "tesla" && t.flags.phaseDisruptor)) continue;
       const d = e.pos.dist(t.pos);
       if (d > range) continue;
-      const distToCore = this.game.grid.getDistAtWorld(e.pos.x, e.pos.y);
-      const score = distToCore * 1000 + d;
+
+      let score: number;
+      switch (mode) {
+        case "weakest":
+          score = e.hp / e.maxHp; // lowest HP% first
+          break;
+        case "strongest":
+          score = -(e.hp / e.maxHp); // highest HP% first
+          break;
+        case "fastest":
+          score = -e.currentSpeed; // highest speed first
+          break;
+        default: { // closest_to_core
+          const distToCore = this.game.grid.getDistAtWorld(e.pos.x, e.pos.y);
+          score = distToCore * 1000 + d;
+          break;
+        }
+      }
       if (score < bestScore) { bestScore = score; best = e; }
     }
     return best;
   }
 
   private fire(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
-    this.game.audio.sfxShoot(t.type === "blaster" ? 1.3 : t.type === "tesla" ? 0.9 : 1);
+    this.game.audio.sfxTowerFire(t.type);
 
     switch (t.type) {
       case "pulse": this.firePulse(t, target, stats); break;
@@ -281,7 +298,6 @@ export class TowerSystem {
   }
 
   private fireFlamer(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
-    // Apply continuous damage to all enemies inside a small cone.
     const ang = Math.atan2(target.pos.y - t.pos.y, target.pos.x - t.pos.x);
     for (const e of this.game.enemies.list) {
       if (!e.active) continue;
@@ -293,9 +309,7 @@ export class TowerSystem {
       this.game.enemies.damage(e, stats.damage, { type: "tower", towerType: "flamer" });
       if (t.flags.burningGround) e.applySlow(0.4, 0.85);
     }
-    this.game.particles.spawnBeam(
-      t.pos.x, t.pos.y, target.pos.x, target.pos.y, t.def.color, 0.08
-    );
+    this.game.particles.spawnFlameJet(t.pos.x, t.pos.y, ang, stats.range, 0.6);
   }
 
   private updateBarrier(t: Tower, dt: number): void {
