@@ -43,4 +43,46 @@ export const codexEntries: Record<EnemyType, CodexEntry> = {
     counters: ["Everything. Mass towers, drones, and upgrades."],
     tip: "Expect escort waves and tower shutdowns. Keep the core above 50%.",
   },
+  sprinter: {
+    enemyId: "sprinter",
+    threatHeadline: "Ultra-fast courier — negligible HP.",
+    counters: ["Stasis", "Blaster", "Barrier slow"],
+    tip: "Slow them and they die to anything. Unslowed, they'll run past everything.",
+  },
+  juggernaut: {
+    enemyId: "juggernaut",
+    threatHeadline: "Heavily armored siege unit.",
+    counters: ["Railgun", "Armor-piercer", "Mortar inside Stasis"],
+    tip: "Burst them with Railgun or chew through with armor-piercer Blaster.",
+  },
+  shielder: {
+    enemyId: "shielder",
+    threatHeadline: "Projects a bubble — slows incoming damage.",
+    counters: ["Sustained fire", "Tesla chain", "Mortar splash"],
+    tip: "Ignore it while the bubble is up — focus elsewhere, clean up after.",
+  },
+  splitter: {
+    enemyId: "splitter",
+    threatHeadline: "Fission on death — spawns Grunts.",
+    counters: ["Splash damage", "Stasis kill zone"],
+    tip: "Kill them deep in your grid so the halves die before reaching the core.",
+  },
+  jammer: {
+    enemyId: "jammer",
+    threatHeadline: "Disrupts tower fire rate in a small aura.",
+    counters: ["Snipe with Railgun", "Blaster burst", "Focus fire"],
+    tip: "Kill on sight. Jammers neuter entire tower clusters while they live.",
+  },
+  swarm: {
+    enemyId: "swarm",
+    threatHeadline: "Disposable micro-drone — low HP, high count.",
+    counters: ["Flamer", "Blaster", "Tesla"],
+    tip: "Wide AoE melts them. Don't waste Mortar shots on individual swarm units.",
+  },
+  overlord: {
+    enemyId: "overlord",
+    threatHeadline: "Mid-run elite boss — escorts swarm units.",
+    counters: ["Tesla chain", "Stasis + focus fire", "Barrier"],
+    tip: "Break its escort first. The Overlord itself is slow — punish it.",
+  },
 };

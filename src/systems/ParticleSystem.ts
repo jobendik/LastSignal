@@ -35,6 +35,16 @@ export interface BeamFX {
   active: boolean;
 }
 
+export interface MuzzleFlashFX {
+  x: number;
+  y: number;
+  angle: number;
+  color: string;
+  life: number;
+  maxLife: number;
+  active: boolean;
+}
+
 export class ParticleSystem {
   particles: Particle[] = [];
   floatingText: FloatingText[] = [];
@@ -42,6 +52,7 @@ export class ParticleSystem {
   lightning: LightningFX[] = [];
   rings: BlastRingFX[] = [];
   beams: BeamFX[] = [];
+  muzzleFlashes: MuzzleFlashFX[] = [];
 
   constructor(private readonly game: Game) {}
 
@@ -52,6 +63,11 @@ export class ParticleSystem {
     this.lightning.length = 0;
     this.rings.length = 0;
     this.beams.length = 0;
+    this.muzzleFlashes.length = 0;
+  }
+
+  spawnMuzzleFlash(x: number, y: number, angle: number, color: string): void {
+    this.muzzleFlashes.push({ x, y, angle, color, life: 0.08, maxLife: 0.08, active: true });
   }
 
   spawnBurst(x: number, y: number, color: string, count: number, opts: { speed?: number; life?: number; size?: number } = {}): void {
@@ -167,5 +183,12 @@ export class ParticleSystem {
       if (l.life <= 0) l.active = false;
     }
     this.lightning = this.lightning.filter((l) => l.active);
+
+    // Muzzle flashes.
+    for (const m of this.muzzleFlashes) {
+      m.life -= dt;
+      if (m.life <= 0) m.active = false;
+    }
+    this.muzzleFlashes = this.muzzleFlashes.filter((m) => m.active);
   }
 }

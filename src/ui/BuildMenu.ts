@@ -21,7 +21,10 @@ export class BuildMenu {
     clear(this.el);
     this.el.append(el("div", { class: "ls-build-title", text: "TOWERS" }));
     const towerList = el("div", { class: "ls-tower-list" });
+    const metaUnlocks = new Set(this.game.meta.aggregate().unlockedTowers);
+    const gatedTowers = new Set(["railgun", "flamer", "barrier"]);
     for (const type of towerOrder) {
+      if (gatedTowers.has(type) && !metaUnlocks.has(type)) continue;
       const def = towerDefinitions[type];
       const cost = this.game.towers.buildCost(type);
       const active = this.game.input.selectedTowerType === type;

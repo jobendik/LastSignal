@@ -374,3 +374,150 @@
 .ls-codex-threat { color: #ff5252; font-size: 11px; margin-top: 4px; }
 .ls-codex-counters { color: #4caf50; font-size: 11px; }
 .ls-codex-tip { color: #ffb300; font-size: 11px; }
+
+/* ===== Difficulty picker (SectorSelect) ===== */
+.ls-diff-picker { margin: 12px 0 16px; width: 100%; max-width: 720px; }
+.ls-diff-label {
+  font-size: 11px; letter-spacing: 4px; color: #8a9099;
+  margin-bottom: 6px; text-align: center;
+}
+.ls-diff-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ls-diff-chip {
+  background: rgba(10, 14, 20, 0.7);
+  border: 1px solid rgba(102, 252, 241, 0.25);
+  color: #c5c6c7;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.1s ease;
+}
+.ls-diff-chip:hover { transform: translateY(-1px); }
+.ls-diff-chip.active {
+  background: rgba(102, 252, 241, 0.08);
+  box-shadow: 0 0 12px rgba(102, 252, 241, 0.35);
+}
+.ls-diff-name { font-size: 14px; letter-spacing: 2px; }
+.ls-diff-desc { font-size: 11px; color: #8a9099; margin-top: 4px; }
+
+.ls-sector-buttons {
+  display: flex; gap: 10px; justify-content: center; margin-top: 14px;
+}
+
+/* ===== Endless toggle ===== */
+.ls-endless-row {
+  margin-top: 12px; display: flex; gap: 10px;
+  align-items: center; justify-content: center;
+}
+.ls-btn-endless {
+  background: rgba(156, 39, 176, 0.12);
+  border-color: #ab47bc;
+  color: #ce93d8;
+}
+.ls-endless-note { font-size: 12px; color: #8a9099; }
+
+/* ===== Meta / Research panel ===== */
+.ls-meta-panel {
+  position: absolute;
+  inset: 8%;
+  flex-direction: column;
+  background: rgba(4, 7, 12, 0.96);
+  border: 1px solid rgba(102, 252, 241, 0.25);
+  padding: 18px 22px;
+  overflow-y: auto;
+  z-index: 110;
+  gap: 12px;
+}
+.ls-meta-header { text-align: center; }
+.ls-meta-points {
+  margin-top: 6px;
+  color: #ffeb3b;
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+.ls-meta-tier { display: flex; flex-direction: column; gap: 6px; }
+.ls-meta-tier-label {
+  color: #66fcf1; letter-spacing: 4px; font-size: 11px;
+}
+.ls-meta-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+.ls-meta-card {
+  background: rgba(10, 14, 20, 0.7);
+  border: 1px solid rgba(102, 252, 241, 0.2);
+  color: #c5c6c7;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.1s ease;
+}
+.ls-meta-card.available {
+  border-color: #ffeb3b; box-shadow: 0 0 10px rgba(255, 235, 59, 0.2);
+}
+.ls-meta-card.unlocked {
+  border-color: #4caf50; color: #8a9099; cursor: default;
+}
+.ls-meta-card.locked { opacity: 0.5; cursor: not-allowed; }
+.ls-meta-card-name { font-size: 13px; letter-spacing: 2px; }
+.ls-meta-card-desc { font-size: 11px; color: #8a9099; margin-top: 3px; }
+.ls-meta-card-meta {
+  font-size: 10px; color: #66fcf1; margin-top: 6px; letter-spacing: 1px;
+}
+
+/* ===== Achievement toast ===== */
+.ls-achievement-toast {
+  position: absolute;
+  top: 72px; right: -360px;
+  background: rgba(12, 18, 26, 0.96);
+  border: 1px solid #ffeb3b;
+  padding: 10px 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 320px;
+  box-shadow: 0 4px 20px rgba(255, 235, 59, 0.2);
+  transition: right 0.35s ease;
+  z-index: 130;
+  pointer-events: none;
+}
+.ls-achievement-toast.visible { right: 20px; }
+.ls-achievement-icon {
+  font-size: 30px; color: #ffeb3b; width: 38px; text-align: center;
+}
+.ls-achievement-body { display: flex; flex-direction: column; gap: 2px; }
+.ls-achievement-title {
+  font-size: 10px; letter-spacing: 4px; color: #ffeb3b;
+}
+.ls-achievement-name { font-size: 15px; letter-spacing: 2px; }
+.ls-achievement-desc { font-size: 11px; color: #8a9099; }
+.ls-achievement-reward {
+  margin-top: 3px; font-size: 11px; color: #4caf50;
+}
+
+/* ===== Wave countdown ===== */
+.ls-wave-countdown {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid rgba(102, 252, 241, 0.35);
+  background: rgba(10, 14, 20, 0.75);
+  border-radius: 2px;
+  margin-left: 12px;
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+.ls-wave-countdown.visible { display: inline-flex; }
+.ls-wave-countdown-label { color: #8a9099; }
+.ls-wave-countdown-value { color: #66fcf1; min-width: 24px; }
+.ls-wave-countdown-bar {
+  width: 90px; height: 4px;
+  background: rgba(102, 252, 241, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.ls-wave-countdown-fill {
+  height: 100%; width: 100%;
+  background: #66fcf1;
+  transition: width 0.1s linear, background 0.2s ease;
+}

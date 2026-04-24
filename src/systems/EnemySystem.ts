@@ -17,7 +17,13 @@ export class EnemySystem {
 
   spawn(type: EnemyType, x: number, y: number, hpScale = 1): Enemy {
     const def = enemyDefinitions[type];
-    const enemy = new Enemy(type, x, y, def.hp * hpScale);
+    const diff = this.game.difficulty.def;
+    const endless = this.game.endless;
+    const endlessHp = endless.active ? endless.hpScale : 1;
+    const endlessSpeed = endless.active ? endless.speedScale : 1;
+    const finalHp = def.hp * hpScale * diff.enemyHpMul * endlessHp;
+    const enemy = new Enemy(type, x, y, finalHp);
+    enemy.baseSpeed = def.speed * diff.enemySpeedMul * endlessSpeed;
     enemy.phaseVisibilityBonus = this.game.core.upgrades.phantomVisibleBonus;
     this.list.push(enemy);
     this.game.codex.onEncounter(type);
@@ -254,6 +260,8 @@ export class EnemySystem {
         this.game.particles.spawnRing(e.pos.x, e.pos.y, 160, "#ff5252");
         this.game.bus.emit("boss:killed");
       }
+
+      this.game.bus.emit("enemy:killed", { type: e.type });
     }
   }
 }

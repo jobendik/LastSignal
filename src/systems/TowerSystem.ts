@@ -124,6 +124,12 @@ export class TowerSystem {
         continue;
       }
 
+      // Barrier: passive slow pulse in range; zero direct damage.
+      if (t.type === "barrier") {
+        this.updateBarrier(t, dt);
+        continue;
+      }
+
       // Fire-rate modifier.
       let fireRateMul = up.towerFireRateMul;
       if (lowCoreActive) fireRateMul *= up.lowCoreFireRateMul;
@@ -238,8 +244,73 @@ export class TowerSystem {
       case "blaster": this.fireBlaster(t, target, stats); break;
       case "mortar": this.fireMortar(t, target, stats); break;
       case "tesla": this.fireTesla(t, target, stats); break;
+      case "railgun": this.fireRailgun(t, target, stats); break;
+      case "flamer": this.fireFlamer(t, target, stats); break;
       default: break;
     }
+
+    // Muzzle flash particle — purely visual, drawn by RenderSystem.
+    const ang = Math.atan2(target.pos.y - t.pos.y, target.pos.x - t.pos.x);
+    this.game.particles.spawnMuzzleFlash(t.pos.x, t.pos.y, ang, t.def.color);
+  }
+
+  private fireRailgun(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
+    // Instant hit ray + big beam.
+    const dmg = stats.damage;
+    this.game.enemies.damage(target, dmg, { type: "tower", towerType: "railgun" });
+    this.game.particles.spawnBeam(
+      t.pos.x, t.pos.y, target.pos.x, target.pos.y, t.def.color, 0.22
+    );
+    if (t.flags.armorPiercer) {
+      for (const e of this.game.enemies.list) {
+        if (e === target || !e.active) continue;
+        // Pierce any enemy roughly along the line between t and target (simple distance check).
+        const dx = target.pos.x - t.pos.x;
+        const dy = target.pos.y - t.pos.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len;
+        const ny = dx / len;
+        const px = e.pos.x - t.pos.x;
+        const py = e.pos.y - t.pos.y;
+        const along = (px * dx + py * dy) / (len * len);
+        if (along < 0 || along > 1.05) continue;
+        const perp = Math.abs(px * nx + py * ny);
+        if (perp < 10) this.game.enemies.damage(e, dmg * 0.5, { type: "tower", towerType: "railgun" });
+      }
+    }
+  }
+
+  private fireFlamer(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
+    // Apply continuous damage to all enemies inside a small cone.
+    const ang = Math.atan2(target.pos.y - t.pos.y, target.pos.x - t.pos.x);
+    for (const e of this.game.enemies.list) {
+      if (!e.active) continue;
+      const d = e.pos.dist(t.pos);
+      if (d > stats.range) continue;
+      const ea = Math.atan2(e.pos.y - t.pos.y, e.pos.x - t.pos.x);
+      let delta = Math.abs(((ea - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      if (delta > 0.6) continue;
+      this.game.enemies.damage(e, stats.damage, { type: "tower", towerType: "flamer" });
+      if (t.flags.burningGround) e.applySlow(0.4, 0.85);
+    }
+    this.game.particles.spawnBeam(
+      t.pos.x, t.pos.y, target.pos.x, target.pos.y, t.def.color, 0.08
+    );
+  }
+
+  private updateBarrier(t: Tower, dt: number): void {
+    const stats = this.effectiveStats(t);
+    t.timer -= dt;
+    if (t.timer > 0) return;
+    t.timer = stats.cooldown;
+    // Slow all enemies within the barrier aura; very gentle.
+    for (const e of this.game.enemies.list) {
+      if (!e.active) continue;
+      if (e.pos.dist(t.pos) <= stats.range) {
+        e.applySlow(0.6, t.flags.cryoField ? 0.7 : 0.85);
+      }
+    }
+    this.game.particles.spawnRing(t.pos.x, t.pos.y, stats.range, t.def.color);
   }
 
   private firePulse(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
