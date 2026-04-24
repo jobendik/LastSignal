@@ -1,0 +1,17 @@
+{
+  "name": "last-signal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LAST SIGNAL — tactical sci-fi roguelite tower defense built with Vite + TypeScript + Canvas 2D.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.5.4",
+    "vite": "5.4.10"
+  }
+}
