@@ -12,6 +12,10 @@ export const defaultSettings: GameSettings = {
   reducedFlashing: false,
   showDamageNumbers: true,
   colorblind: false,
+  crtEffect: true,
+  autoStartWave: false,
+  planningCountdown: 25,
+  showTutorial: true,
 };
 
 export const defaultProfile: PersistedProfile = {
@@ -19,6 +23,14 @@ export const defaultProfile: PersistedProfile = {
   bestWaveReached: 0,
   bestCoreRemaining: 0,
   codexSeen: [],
+  research: 0,
+  unlockedNodes: [],
+  achievementsUnlocked: [],
+  endlessBestWave: {},
+  totalRuns: 0,
+  totalVictories: 0,
+  tutorialSeen: false,
+  preferredDifficulty: "operative",
 };
 
 export class PersistenceSystem {
@@ -44,17 +56,32 @@ export class PersistenceSystem {
   loadProfile(): PersistedProfile {
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      if (!raw) return { ...defaultProfile, codexSeen: [] };
+      if (!raw) return { ...defaultProfile, codexSeen: [], unlockedNodes: [], achievementsUnlocked: [], endlessBestWave: {} };
       const parsed = JSON.parse(raw) as Partial<PersistedProfile>;
-      return { ...defaultProfile, ...parsed, codexSeen: parsed.codexSeen ?? [] };
+      return {
+        ...defaultProfile,
+        ...parsed,
+        codexSeen: parsed.codexSeen ?? [],
+        unlockedNodes: parsed.unlockedNodes ?? [],
+        achievementsUnlocked: parsed.achievementsUnlocked ?? [],
+        endlessBestWave: parsed.endlessBestWave ?? {},
+      };
     } catch {
-      return { ...defaultProfile, codexSeen: [] };
+      return { ...defaultProfile, codexSeen: [], unlockedNodes: [], achievementsUnlocked: [], endlessBestWave: {} };
     }
   }
 
   saveProfile(p: PersistedProfile): void {
     try {
       localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  wipeProfile(): void {
+    try {
+      localStorage.removeItem(PROFILE_KEY);
     } catch {
       /* ignore */
     }

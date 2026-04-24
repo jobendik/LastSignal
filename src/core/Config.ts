@@ -11,9 +11,9 @@ export const MAX_DT = 1 / 30; // cap delta-time to avoid spiral-of-death
 export const SPEED_MULTIPLIERS = [1, 2, 3] as const;
 export type SpeedMultiplier = (typeof SPEED_MULTIPLIERS)[number];
 
-export const PARTICLE_CAP = 500;
-export const PROJECTILE_CAP = 400;
-export const FLOATING_TEXT_CAP = 120;
+export const PARTICLE_CAP = 600;
+export const PROJECTILE_CAP = 500;
+export const FLOATING_TEXT_CAP = 150;
 
 export const STARTING_DRONE_COST = 90;
 export const DRONE_COST_SCALING = 1.35;
@@ -27,6 +27,8 @@ export const SELL_REFUND_DEFAULT = 0.5;
 
 export const REWARD_WAVES = new Set<number>([2, 4, 6, 8, 10, 12, 14]); // wave indices (1-based) that grant reward choice
 
+export const DEFAULT_PLANNING_SECONDS = 25;
+
 export const COLOR = {
   accent: "#66fcf1",
   accentDim: "#45a29e",
@@ -38,4 +40,7 @@ export const COLOR = {
   gridStrong: "rgba(102, 252, 241, 0.18)",
   core: "#66fcf1",
   text: "#c5c6c7",
+  legendary: "#ffc107",
+  rare: "#2196f3",
+  common: "#9e9e9e",
 };

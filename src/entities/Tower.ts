@@ -26,6 +26,12 @@ export class Tower {
   specId: string | null = null;
   flags: Partial<Record<TowerFlag, boolean>> = {};
   mods: TowerMod[] = [];
+  /** Flamethrower "flame on" visual state. */
+  flameActive = 0;
+  /** Railgun charge visual (0..1 during cooldown). */
+  chargeProgress = 0;
+  /** Muzzle flash visual timer (seconds remaining). */
+  muzzleFlash = 0;
 
   constructor(type: TowerType, c: number, r: number, buildCost: number) {
     const def = towerDefinitions[type];
@@ -54,6 +60,9 @@ export class Tower {
     splashRadius: number;
     chainMax: number;
     income: number;
+    pierce: number;
+    coneArc: number;
+    auraRadius: number;
   } {
     const levelMul = 1 + (this.level - 1) * 0.35;
     let range = this.def.range;
@@ -62,6 +71,9 @@ export class Tower {
     let splashRadius = this.def.splashRadius ?? 0;
     let chainMax = (this.def.chainMax ?? 0) + Math.floor((this.level - 1) * 0.75);
     let income = (this.def.income ?? 0) * levelMul;
+    let pierce = this.def.pierce ?? 0;
+    let coneArc = this.def.coneArc ?? 0;
+    let auraRadius = this.def.auraRadius ?? 0;
 
     for (const m of this.mods) {
       if (m.rangeMul) range *= m.rangeMul;
@@ -72,8 +84,11 @@ export class Tower {
       if (m.splashRadiusMul) splashRadius *= m.splashRadiusMul;
       if (m.chainMaxAdd) chainMax += m.chainMaxAdd;
       if (m.incomeMul) income *= m.incomeMul;
+      if (m.pierceAdd) pierce += m.pierceAdd;
+      if (m.coneArcMul) coneArc *= m.coneArcMul;
+      if (m.auraRadiusMul) auraRadius *= m.auraRadiusMul;
     }
-    return { range, damage, cooldown, splashRadius, chainMax, income };
+    return { range, damage, cooldown, splashRadius, chainMax, income, pierce, coneArc, auraRadius };
   }
 
   get upgradeCost(): number {

@@ -3,16 +3,21 @@ import type { GameSettings } from "../core/Types";
 /**
  * Procedural Web Audio system. Must be unlocked on first user gesture
  * (browsers block AudioContext creation until then).
+ *
+ * All SFX are synthesized in real time; replace with sample playback later
+ * when real assets arrive by calling the matching sfxXxx method.
  */
 export class AudioSystem {
   ctx: AudioContext | null = null;
   master: GainNode | null = null;
   musicGain: GainNode | null = null;
   sfxGain: GainNode | null = null;
-  bgmOsc: OscillatorNode | null = null;
+  bgmNodes: OscillatorNode[] = [];
   initialized = false;
   muted = false;
   private settings: GameSettings | null = null;
+  private lastShotAt = 0;
+  private musicIntensity = 0; // 0..1, ramps during combat
 
   init(): void {
     if (this.initialized) return;
@@ -54,113 +59,186 @@ export class AudioSystem {
     }
   }
 
+  /** Layered ambient loop: sub-bass + drone + pad. */
   startMusic(): void {
-    if (!this.initialized || !this.ctx || !this.musicGain || this.bgmOsc) return;
+    if (!this.initialized || !this.ctx || !this.musicGain || this.bgmNodes.length > 0) return;
     const ctx = this.ctx;
-    const osc = ctx.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.value = 55;
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.08;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 4;
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc.frequency);
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 260;
-    filter.Q.value = 3;
-    const g = ctx.createGain();
-    g.gain.value = 0.55;
-    osc.connect(filter);
-    filter.connect(g);
-    g.connect(this.musicGain);
-    osc.start();
-    lfo.start();
-    this.bgmOsc = osc;
+
+    // Sub-bass layer.
+    const sub = ctx.createOscillator();
+    sub.type = "sawtooth";
+    sub.frequency.value = 55;
+    const subLfo = ctx.createOscillator();
+    subLfo.frequency.value = 0.08;
+    const subLfoGain = ctx.createGain();
+    subLfoGain.gain.value = 4;
+    subLfo.connect(subLfoGain);
+    subLfoGain.connect(sub.frequency);
+    const subFilter = ctx.createBiquadFilter();
+    subFilter.type = "lowpass";
+    subFilter.frequency.value = 220;
+    subFilter.Q.value = 3;
+    const subG = ctx.createGain();
+    subG.gain.value = 0.5;
+    sub.connect(subFilter);
+    subFilter.connect(subG);
+    subG.connect(this.musicGain);
+    sub.start();
+    subLfo.start();
+
+    // Pad layer.
+    const pad = ctx.createOscillator();
+    pad.type = "sine";
+    pad.frequency.value = 220;
+    const padG = ctx.createGain();
+    padG.gain.value = 0.08;
+    pad.connect(padG);
+    padG.connect(this.musicGain);
+    pad.start();
+
+    // Shimmer layer (modulated triangle higher up).
+    const shimmer = ctx.createOscillator();
+    shimmer.type = "triangle";
+    shimmer.frequency.value = 440;
+    const shimmerLfo = ctx.createOscillator();
+    shimmerLfo.frequency.value = 0.3;
+    const shimmerLfoGain = ctx.createGain();
+    shimmerLfoGain.gain.value = 8;
+    shimmerLfo.connect(shimmerLfoGain);
+    shimmerLfoGain.connect(shimmer.frequency);
+    const shimmerG = ctx.createGain();
+    shimmerG.gain.value = 0.05;
+    shimmer.connect(shimmerG);
+    shimmerG.connect(this.musicGain);
+    shimmer.start();
+    shimmerLfo.start();
+
+    this.bgmNodes = [sub, subLfo, pad, shimmer, shimmerLfo];
   }
 
   stopMusic(): void {
-    if (this.bgmOsc) {
+    for (const node of this.bgmNodes) {
       try {
-        this.bgmOsc.stop();
+        node.stop();
       } catch {
         /* ignore */
       }
-      this.bgmOsc = null;
     }
+    this.bgmNodes = [];
   }
 
   // ---- SFX: procedural helpers ----
 
-  sfxShoot(pitch = 1, volume = 0.2): void {
+  private tone(
+    freq: number,
+    endFreq: number,
+    duration: number,
+    volume = 0.2,
+    type: OscillatorType = "square"
+  ): void {
     if (!this.ready()) return;
     const now = this.ctx!.currentTime;
     const osc = this.ctx!.createOscillator();
     const gain = this.ctx!.createGain();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(900 * pitch, now);
-    osc.frequency.exponentialRampToValueAtTime(200 * pitch, now + 0.06);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, endFreq), now + duration);
     gain.gain.setValueAtTime(volume, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     osc.connect(gain);
     gain.connect(this.sfxGain!);
     osc.start(now);
-    osc.stop(now + 0.12);
+    osc.stop(now + duration + 0.02);
+  }
+
+  private noise(duration: number, volume: number, lpStart: number, lpEnd: number): void {
+    if (!this.ready()) return;
+    const now = this.ctx!.currentTime;
+    const bufferSize = Math.max(1, Math.floor(this.ctx!.sampleRate * duration));
+    const buffer = this.ctx!.createBuffer(1, bufferSize, this.ctx!.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = this.ctx!.createBufferSource();
+    src.buffer = buffer;
+    const filter = this.ctx!.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(lpStart, now);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(10, lpEnd), now + duration);
+    const gain = this.ctx!.createGain();
+    gain.gain.setValueAtTime(volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain!);
+    src.start(now);
+  }
+
+  /** Tower-specific shoot variants. */
+  sfxShoot(pitch = 1, volume = 0.18): void {
+    // Throttle if firing very fast to avoid click storm.
+    if (!this.ready()) return;
+    const now = this.ctx!.currentTime;
+    if (now - this.lastShotAt < 0.012) return;
+    this.lastShotAt = now;
+    this.tone(900 * pitch, 200 * pitch, 0.08, volume, "square");
+  }
+
+  sfxTowerFire(kind: string): void {
+    switch (kind) {
+      case "pulse":
+        this.tone(680, 240, 0.08, 0.14, "square");
+        break;
+      case "blaster":
+        this.tone(1100, 380, 0.05, 0.1, "square");
+        break;
+      case "mortar":
+        this.tone(140, 80, 0.18, 0.25, "sawtooth");
+        this.noise(0.12, 0.15, 800, 120);
+        break;
+      case "tesla":
+        this.tone(1600, 400, 0.1, 0.12, "sawtooth");
+        this.noise(0.08, 0.1, 3000, 600);
+        break;
+      case "railgun":
+        this.tone(260, 40, 0.3, 0.3, "sawtooth");
+        this.noise(0.15, 0.15, 2200, 180);
+        break;
+      case "flamethrower":
+        this.noise(0.12, 0.08, 1800, 400);
+        break;
+      case "shield":
+        this.tone(500, 700, 0.12, 0.1, "triangle");
+        break;
+      default:
+        this.sfxShoot(1, 0.14);
+    }
   }
 
   sfxExplosion(volume = 0.4): void {
-    if (!this.ready()) return;
-    const now = this.ctx!.currentTime;
-    const bufferSize = Math.max(1, Math.floor(this.ctx!.sampleRate * 0.35));
-    const buffer = this.ctx!.createBuffer(1, bufferSize, this.ctx!.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
-    const noise = this.ctx!.createBufferSource();
-    noise.buffer = buffer;
-    const filter = this.ctx!.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(1200, now);
-    filter.frequency.exponentialRampToValueAtTime(60, now + 0.3);
-    const gain = this.ctx!.createGain();
-    gain.gain.setValueAtTime(volume, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.sfxGain!);
-    noise.start(now);
+    this.noise(0.35, volume, 1200, 60);
+    this.tone(120, 30, 0.25, volume * 0.4, "sawtooth");
   }
 
   sfxDeath(): void {
-    this.sfxShoot(0.5, 0.15);
+    this.tone(500, 100, 0.12, 0.1, "triangle");
   }
 
   sfxCoreHit(): void {
-    if (!this.ready()) return;
-    const now = this.ctx!.currentTime;
-    const osc = this.ctx!.createOscillator();
-    const gain = this.ctx!.createGain();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(180, now);
-    osc.frequency.exponentialRampToValueAtTime(60, now + 0.25);
-    gain.gain.setValueAtTime(0.35, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-    osc.connect(gain);
-    gain.connect(this.sfxGain!);
-    osc.start(now);
-    osc.stop(now + 0.32);
+    this.tone(180, 60, 0.25, 0.32, "triangle");
+    this.noise(0.18, 0.1, 600, 80);
   }
 
   sfxBuild(): void {
-    this.sfxShoot(1.4, 0.15);
+    this.tone(300, 800, 0.1, 0.16, "triangle");
   }
 
   sfxUpgrade(): void {
-    this.sfxShoot(1.8, 0.2);
+    this.tone(500, 1100, 0.12, 0.18, "triangle");
+    this.tone(800, 1400, 0.1, 0.1, "sine");
   }
 
   sfxSell(): void {
-    this.sfxShoot(0.7, 0.15);
+    this.tone(800, 300, 0.12, 0.14, "triangle");
   }
 
   sfxWaveStart(): void {
@@ -177,6 +255,7 @@ export class AudioSystem {
     gain.connect(this.sfxGain!);
     osc.start(now);
     osc.stop(now + 0.42);
+    this.tone(220, 440, 0.2, 0.12, "sine");
   }
 
   sfxBossAlert(): void {
@@ -198,7 +277,8 @@ export class AudioSystem {
   }
 
   sfxReward(): void {
-    this.sfxShoot(2.2, 0.22);
+    this.tone(660, 990, 0.2, 0.18, "triangle");
+    this.tone(880, 1320, 0.18, 0.14, "sine");
   }
 
   sfxVictory(): void {
@@ -233,6 +313,34 @@ export class AudioSystem {
     gain.connect(this.sfxGain!);
     osc.start(now);
     osc.stop(now + 1.4);
+  }
+
+  sfxAchievement(): void {
+    this.tone(660, 990, 0.12, 0.14, "triangle");
+    this.tone(990, 1320, 0.12, 0.1, "sine");
+  }
+
+  sfxTick(): void {
+    this.tone(800, 800, 0.03, 0.06, "square");
+  }
+
+  sfxBurn(): void {
+    this.noise(0.06, 0.04, 2000, 600);
+  }
+
+  sfxShieldUp(): void {
+    this.tone(220, 600, 0.25, 0.12, "triangle");
+    this.tone(440, 880, 0.2, 0.08, "sine");
+  }
+
+  sfxSapperExplode(): void {
+    this.noise(0.25, 0.3, 1500, 80);
+    this.tone(180, 60, 0.18, 0.2, "sawtooth");
+  }
+
+  setMusicIntensity(intensity: number): void {
+    this.musicIntensity = Math.max(0, Math.min(1, intensity));
+    // Optional: modulate the shimmer gain based on intensity in future iterations.
   }
 
   private ready(): boolean {

@@ -14,7 +14,8 @@ export type GameStateId =
   | "REWARD_CHOICE"
   | "PAUSED"
   | "GAME_OVER"
-  | "VICTORY";
+  | "VICTORY"
+  | "META";
 
 // ---------- Cell / grid ----------
 export const CellKind = {
@@ -34,10 +35,13 @@ export type TowerType =
   | "stasis"
   | "mortar"
   | "tesla"
-  | "harvester";
+  | "harvester"
+  | "railgun"
+  | "flamethrower"
+  | "shield";
 
-export type DamageType = "kinetic" | "energy" | "explosive" | "chain" | "none";
-export type StatusEffect = "none" | "slow" | "splash" | "chain" | "mark";
+export type DamageType = "kinetic" | "energy" | "explosive" | "chain" | "fire" | "none";
+export type StatusEffect = "none" | "slow" | "splash" | "chain" | "mark" | "burn";
 
 export interface TowerDefinition {
   id: TowerType;
@@ -59,6 +63,14 @@ export interface TowerDefinition {
   income?: number;
   requiresCrystal?: boolean;
   hotkey?: string;
+  /** Meta-unlock requirement (node id). If absent, always available. */
+  unlockRequires?: string;
+  /** For flamethrower: cone arc in radians, and range of cone. */
+  coneArc?: number;
+  /** For shield: aura radius and aura effect. */
+  auraRadius?: number;
+  /** For railgun: pierces through multiple enemies in a straight line. */
+  pierce?: number;
 }
 
 export type TowerFlag =
@@ -77,7 +89,19 @@ export type TowerFlag =
   | "deepExtraction"
   | "crystalStabilizer"
   | "relayNode"
-  | "signalMarker";
+  | "signalMarker"
+  // Railgun specs
+  | "overcharge"
+  | "longbarrel"
+  | "markTarget"
+  // Flamethrower specs
+  | "ignitionBoost"
+  | "napalmPool"
+  | "heatWave"
+  // Shield specs
+  | "reactiveArmor"
+  | "regenPulse"
+  | "reflectField";
 
 export interface TowerMod {
   rangeMul?: number;
@@ -88,6 +112,9 @@ export interface TowerMod {
   splashRadiusMul?: number;
   chainMaxAdd?: number;
   incomeMul?: number;
+  pierceAdd?: number;
+  coneArcMul?: number;
+  auraRadiusMul?: number;
   flags?: Partial<Record<TowerFlag, boolean>>;
 }
 
@@ -113,9 +140,26 @@ export type EnemyType =
   | "weaver"
   | "phantom"
   | "carrier"
-  | "leviathan";
+  | "leviathan"
+  | "swarmling"
+  | "shielded"
+  | "sapper"
+  | "wraith"
+  | "titan"
+  | "corruptor"
+  | "harbinger";
 
-export type EnemyAbility = "none" | "heal" | "phase" | "spawn" | "boss";
+export type EnemyAbility =
+  | "none"
+  | "heal"
+  | "phase"
+  | "spawn"
+  | "boss"
+  | "shield"
+  | "explode"
+  | "corrupt"
+  | "titan"
+  | "split";
 
 export interface EnemyDefinition {
   id: EnemyType;
@@ -131,6 +175,15 @@ export interface EnemyDefinition {
   ability: EnemyAbility;
   isBoss?: boolean;
   armor?: number; // damage reduction 0..1
+  /** Optional: resistant to specific damage types (reduces by fraction). */
+  resist?: Partial<Record<DamageType, number>>;
+  /** For shielded: frontal shield HP that absorbs damage first. */
+  shieldHp?: number;
+  /** For sapper: explosion radius + damage to nearest tower. */
+  explodeRadius?: number;
+  explodeTowerDamage?: number;
+  /** For titan/harbinger: elite multiplier. */
+  elite?: boolean;
 }
 
 // ---------- Waves / sectors ----------
@@ -160,6 +213,8 @@ export interface WaveDefinition {
   /** Convenience flat list for UI + codex generation. */
   enemySummary?: { type: EnemyType; count: number }[];
   isBossWave?: boolean;
+  /** Time limit before wave auto-starts during planning (seconds). */
+  planningSeconds?: number;
 }
 
 export interface SpawnerDefinition {
@@ -180,6 +235,10 @@ export interface SectorDefinition {
   waves: WaveDefinition[];
   startingCredits: number;
   coreIntegrity: number;
+  /** Meta-unlock required (sector id of previous best or explicit unlock). */
+  unlockRequires?: number; // index of prior sector cleared
+  /** Environmental modifier (flavor). */
+  hazard?: "none" | "lowpower" | "nocrystals" | "fastenemies" | "doubleLanes";
 }
 
 // ---------- Upgrades ----------
@@ -199,16 +258,26 @@ export interface UpgradeEffect {
   specificTowerRangeMul?: { type: TowerType; mul: number };
   droneDamageAdd?: number;
   droneRangeAdd?: number;
+  droneFireRateMul?: number;
   harvesterIncomeMul?: number;
   slowedEnemyDamageMul?: number;
   teslaChainAdd?: number;
   mortarSplashMul?: number;
   phantomVisibleBonus?: number;
   coreIntegrityAdd?: number;
+  coreMaxAdd?: number;
   towerBuildCostMul?: number;
   sellRefundMul?: number;
   lowCoreFireRateMul?: number;
   lowCoreThreshold?: number;
+  // New
+  burnDamageMul?: number;
+  markedDamageMul?: number;
+  overkillCreditsMul?: number;
+  firstHitDamageMul?: number;
+  coreRegenPerWave?: number;
+  shieldedBonusDamageMul?: number;
+  startingCreditsAdd?: number;
 }
 
 export interface UpgradeDefinition {
@@ -217,10 +286,12 @@ export interface UpgradeDefinition {
   description: string;
   target: UpgradeTarget;
   effect: UpgradeEffect;
+  /** Rarity tier: common=1, rare=2, legendary=3. Affects color + weighting. */
+  rarity?: 1 | 2 | 3;
 }
 
 // ---------- Drones ----------
-export type DroneType = "hunter" | "scanner" | "guardian";
+export type DroneType = "hunter" | "scanner" | "guardian" | "strike";
 
 export interface DroneDefinition {
   id: DroneType;
@@ -233,6 +304,7 @@ export interface DroneDefinition {
   speed: number;
   color: string;
   role: string;
+  unlockRequires?: string;
 }
 
 // ---------- Codex ----------
@@ -240,6 +312,12 @@ export interface CodexEntry {
   enemyId: EnemyType;
   threatHeadline: string;
   counters: string[];
+  tip: string;
+}
+
+export interface TowerCodexEntry {
+  towerId: TowerType;
+  headline: string;
   tip: string;
 }
 
@@ -253,6 +331,10 @@ export interface GameSettings {
   reducedFlashing: boolean;
   showDamageNumbers: boolean;
   colorblind: boolean;
+  crtEffect: boolean;
+  autoStartWave: boolean;
+  planningCountdown: number; // seconds; 0 disables
+  showTutorial: boolean;
 }
 
 export interface RunStats {
@@ -265,6 +347,11 @@ export interface RunStats {
   startedAt: number;
   bestTowerType: TowerType | null;
   bestTowerLevel: number;
+  towersBuilt: number;
+  towersSold: number;
+  specsApplied: number;
+  wavesCleared: number;
+  upgradesChosen: number;
 }
 
 export interface PersistedProfile {
@@ -272,6 +359,64 @@ export interface PersistedProfile {
   bestWaveReached: number;
   bestCoreRemaining: number;
   codexSeen: EnemyType[];
+  research: number;
+  unlockedNodes: string[];
+  achievementsUnlocked: string[];
+  endlessBestWave: Record<string, number>;
+  totalRuns: number;
+  totalVictories: number;
+  tutorialSeen: boolean;
+  preferredDifficulty: DifficultyId;
+}
+
+// ---------- Difficulty ----------
+export type DifficultyId = "cadet" | "operative" | "veteran" | "nightmare";
+
+export interface DifficultyDefinition {
+  id: DifficultyId;
+  name: string;
+  description: string;
+  hpMul: number;
+  speedMul: number;
+  rewardMul: number;
+  coreIntegrityMul: number;
+  color: string;
+}
+
+// ---------- Achievements ----------
+export interface AchievementDefinition {
+  id: string;
+  name: string;
+  description: string;
+  secret?: boolean;
+  /** Research point grant on first unlock. */
+  research: number;
+}
+
+// ---------- Meta progression ----------
+export interface MetaNodeEffect {
+  startingCreditsAdd?: number;
+  coreMaxAdd?: number;
+  towerDamageMul?: number;
+  harvesterIncomeMul?: number;
+  droneDamageAdd?: number;
+  sellRefundAdd?: number;
+  unlocksTower?: TowerType;
+  unlocksDrone?: DroneType;
+  unlocksSector?: number;
+  unlocksEndless?: boolean;
+  unlocksDifficulty?: DifficultyId;
+  rewardChoiceExtra?: number;
+}
+
+export interface MetaNode {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  requires?: string[];
+  effect: MetaNodeEffect;
+  tier: number;
 }
 
 

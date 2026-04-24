@@ -97,6 +97,56 @@ export const towerDefinitions: Record<TowerType, TowerDefinition> = {
     requiresCrystal: true,
     hotkey: "6",
   },
+  railgun: {
+    id: "railgun",
+    name: "Railgun",
+    role: "Piercing sniper",
+    description:
+      "High-velocity slug punches straight through enemies in a line. Long range, slow rate.",
+    cost: 150,
+    range: 220,
+    damage: 28,
+    cooldown: 2.4,
+    color: "#ffd740",
+    damageType: "kinetic",
+    projectileSpeed: 900,
+    pierce: 2,
+    hotkey: "7",
+    unlockRequires: "unlock_railgun",
+  },
+  flamethrower: {
+    id: "flamethrower",
+    name: "Pyro Lance",
+    role: "Area burn",
+    description:
+      "Projects a cone of burning plasma. Short range, ignites enemies for sustained DoT.",
+    cost: 100,
+    range: 92,
+    damage: 1.3,
+    cooldown: 0.08,
+    color: "#ff7043",
+    damageType: "fire",
+    effect: "burn",
+    coneArc: Math.PI / 3,
+    hotkey: "8",
+    unlockRequires: "unlock_flame",
+  },
+  shield: {
+    id: "shield",
+    name: "Aegis Pylon",
+    role: "Defensive support",
+    description:
+      "Emits a protective aura. Enemies in the aura deal reduced breach damage and nearby towers gain damage.",
+    cost: 90,
+    range: 0,
+    damage: 0,
+    cooldown: 1,
+    color: "#80d8ff",
+    damageType: "none",
+    auraRadius: 128,
+    hotkey: "9",
+    unlockRequires: "unlock_shield",
+  },
 };
 
 export const towerOrder: TowerType[] = [
@@ -106,6 +156,9 @@ export const towerOrder: TowerType[] = [
   "mortar",
   "tesla",
   "harvester",
+  "railgun",
+  "flamethrower",
+  "shield",
 ];
 
 /**
@@ -248,6 +301,75 @@ export const towerSpecializations: Record<TowerType, SpecializationTree> = {
         name: "Relay Node",
         description: "Nearby towers gain +10% fire rate.",
         mod: { flags: { relayNode: true } },
+      },
+    ],
+  },
+  railgun: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "railgun_overcharge",
+        name: "Overcharge",
+        description: "+50% damage, -10% fire rate.",
+        mod: { damageMul: 1.5, cooldownMul: 1.1, flags: { overcharge: true } },
+      },
+      {
+        id: "railgun_longbarrel",
+        name: "Long Barrel",
+        description: "+30% range and +1 pierce.",
+        mod: { rangeMul: 1.3, pierceAdd: 1, flags: { longbarrel: true } },
+      },
+      {
+        id: "railgun_marktarget",
+        name: "Acquisition Lock",
+        description: "Marks hit targets — +30% damage from all sources.",
+        mod: { flags: { markTarget: true, signalMarker: true } },
+      },
+    ],
+  },
+  flamethrower: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "flame_ignition_boost",
+        name: "Ignition Boost",
+        description: "Burn damage increased by 60%.",
+        mod: { flags: { ignitionBoost: true } },
+      },
+      {
+        id: "flame_napalm_pool",
+        name: "Napalm Pool",
+        description: "Leaves a short burning pool at target site.",
+        mod: { flags: { napalmPool: true } },
+      },
+      {
+        id: "flame_heatwave",
+        name: "Heat Wave",
+        description: "Wider cone arc; covers flanks.",
+        mod: { coneArcMul: 1.45, flags: { heatWave: true } },
+      },
+    ],
+  },
+  shield: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "shield_reactive",
+        name: "Reactive Armor",
+        description: "Enemies within aura deal 50% less breach damage.",
+        mod: { flags: { reactiveArmor: true } },
+      },
+      {
+        id: "shield_regen",
+        name: "Regen Pulse",
+        description: "Pulse every wave end restores 5 Core Integrity per Aegis.",
+        mod: { flags: { regenPulse: true } },
+      },
+      {
+        id: "shield_reflect",
+        name: "Reflect Field",
+        description: "Sappers within aura detonate harmlessly; enemies flicker-stunned.",
+        mod: { flags: { reflectField: true } },
       },
     ],
   },

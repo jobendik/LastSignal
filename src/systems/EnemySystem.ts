@@ -17,11 +17,13 @@ export class EnemySystem {
 
   spawn(type: EnemyType, x: number, y: number, hpScale = 1): Enemy {
     const def = enemyDefinitions[type];
-    const enemy = new Enemy(type, x, y, def.hp * hpScale);
+    const diffMul = this.game.difficulty.hpScale(Boolean(def.isBoss), Boolean(def.elite));
+    const enemy = new Enemy(type, x, y, def.hp * hpScale * diffMul);
+    enemy.baseSpeed = def.speed * this.game.difficulty.speedScale();
     enemy.phaseVisibilityBonus = this.game.core.upgrades.phantomVisibleBonus;
     this.list.push(enemy);
     this.game.codex.onEncounter(type);
-    if (enemy.isBoss) {
+    if (enemy.isBoss || def.elite) {
       this.game.audio.sfxBossAlert();
       this.game.bus.emit("boss:spawned", enemy);
     }
@@ -35,6 +37,7 @@ export class EnemySystem {
     for (const e of this.list) {
       if (!e.active) continue;
       e.timer += dt;
+      if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt);
 
       // Phase toggling.
       if (e.ability === "phase") {
@@ -50,6 +53,20 @@ export class EnemySystem {
       }
       if (e.stunTimer > 0) e.stunTimer -= dt;
 
+      // Burn DoT.
+      if (e.burnTimer > 0) {
+        e.burnTimer -= dt;
+        const tickDamage = e.burnDps * dt * this.game.core.upgrades.burnDamageMul;
+        this.damage(e, tickDamage, { type: "other" });
+        if (Math.random() < 0.2) {
+          this.game.particles.spawnBurst(e.pos.x, e.pos.y, "#ff7043", 1, {
+            speed: 40,
+            life: 0.25,
+            size: 2,
+          });
+        }
+      }
+
       // Weaver heal pulse.
       if (e.ability === "heal") {
         e.healCooldown -= dt;
@@ -57,6 +74,16 @@ export class EnemySystem {
           e.healCooldown = 1.35;
           this.doHeal(e);
         }
+      }
+
+      // Sapper proximity detonation.
+      if (e.ability === "explode") {
+        this.updateSapper(e);
+      }
+
+      // Corruptor aura: slows nearby tower fire rate (stored as per-tower debuff).
+      if (e.ability === "corrupt") {
+        e.corruptRadius = 96 + Math.sin(e.timer * 2) * 6;
       }
 
       // Boss phase mechanics.
@@ -68,6 +95,8 @@ export class EnemySystem {
       const spd = e.currentSpeed;
       if (spd > 0) {
         const dir = this.game.grid.getVector(e.pos.x, e.pos.y);
+        e.faceX = dir.x;
+        e.faceY = dir.y;
         // Small wobble for visual variety (not used for phased or boss to keep them readable).
         if (!e.isBoss) {
           const wob = new Vector2(Math.cos(e.timer * 5) * 6, Math.sin(e.timer * 4) * 6);
@@ -82,7 +111,17 @@ export class EnemySystem {
       // Check breach (near the core).
       const distToCore = e.pos.dist(this.game.grid.corePos);
       if (distToCore < 20) {
-        this.game.damageCore(e.breach, e.type);
+        let breach = e.breach;
+        // Aegis Pylon reactive armor reduces breach damage.
+        if (this.hasNearbyReactiveShield(e)) breach *= 0.5;
+        // Guardian drone nearby core absorbs some damage.
+        for (const d of this.game.drones.list) {
+          if (d.type === "guardian" && d.pos.dist(e.pos) < 50) {
+            breach *= 0.7;
+            break;
+          }
+        }
+        this.game.damageCore(breach, e.type);
         this.onDeath(e, false);
         continue;
       }
@@ -95,21 +134,47 @@ export class EnemySystem {
     this.list = this.list.filter((e) => e.active);
   }
 
-  damage(e: Enemy, amount: number, src: DamageSource | null): void {
+  /** Convenience: returns true if given damage hits from behind the enemy. */
+  private isFromBack(e: Enemy, srcX: number, srcY: number): boolean {
+    const dx = srcX - e.pos.x;
+    const dy = srcY - e.pos.y;
+    const dot = dx * e.faceX + dy * e.faceY;
+    return dot < -0.1; // source is opposite to facing direction
+  }
+
+  damage(
+    e: Enemy,
+    amount: number,
+    src: DamageSource | null,
+    opts?: { fromX?: number; fromY?: number; bypassShield?: boolean }
+  ): void {
     if (!e.active) return;
     if (e.isPhased && e.ability === "phase") {
-      // Phase Disruptor bypass happens inside TowerSystem, not here.
       return;
     }
     // Vulnerability multiplier: from stasis "vulnerabilityPulse" global.
-    const slowedMul = e.slowTimer > 0 ? this.game.core.upgrades.slowedEnemyDamageMul : 1;
-    e.damage(amount * slowedMul, src);
+    const up = this.game.core.upgrades;
+    const slowedMul = e.slowTimer > 0 ? up.slowedEnemyDamageMul : 1;
+    // Marked damage multiplier.
+    const markedMul = e.signalMarked ? up.markedDamageMul : 1;
+    // First-hit bonus.
+    const firstHitMul = !e.hitOnce ? up.firstHitDamageMul : 1;
+    // Shielded enemy bonus.
+    const shieldedMul = e.type === "shielded" ? up.shieldedBonusDamageMul : 1;
 
-    if (this.game.core.settings.showDamageNumbers && amount >= 1) {
+    let final = amount * slowedMul * markedMul * firstHitMul * shieldedMul;
+
+    const fromBack = opts?.fromX != null && opts?.fromY != null
+      ? this.isFromBack(e, opts.fromX, opts.fromY)
+      : false;
+
+    e.damage(final, src, opts?.bypassShield ?? false, fromBack);
+
+    if (this.game.core.settings.showDamageNumbers && final >= 1) {
       this.game.particles.spawnFloatingText(
         e.pos.x,
         e.pos.y - e.size - 4,
-        Math.round(amount),
+        Math.round(final),
         "#ffffff",
         0.6,
         11
@@ -117,7 +182,7 @@ export class EnemySystem {
     }
 
     if (src?.type === "tower") {
-      this.game.stats.recordDamage(src.towerType, amount);
+      this.game.stats.recordDamage(src.towerType, final);
     }
   }
 
@@ -135,6 +200,46 @@ export class EnemySystem {
     if (healed > 0) {
       this.game.particles.spawnRing(weaver.pos.x, weaver.pos.y, 80, "#ff80ab");
     }
+  }
+
+  private updateSapper(e: Enemy): void {
+    // Detonate when close to any tower.
+    const radius = e.def.explodeRadius ?? 48;
+    let nearest = null;
+    let nd = Infinity;
+    for (const t of this.game.towers.list) {
+      const d = t.pos.dist(e.pos);
+      if (d < nd) { nd = d; nearest = t; }
+    }
+    // Reflect field: Aegis pylon nearby defuses sappers.
+    for (const t of this.game.towers.list) {
+      if (t.type === "shield" && t.flags.reflectField && t.pos.dist(e.pos) < (t.def.auraRadius ?? 128)) {
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, radius, "#80d8ff");
+        e.applyStun(0.6);
+        this.damage(e, e.hp + 10, { type: "other" }, { bypassShield: true });
+        this.game.audio.sfxShieldUp();
+        return;
+      }
+    }
+    if (nearest && nd < radius * 0.6) {
+      this.detonateSapper(e, nearest);
+    }
+  }
+
+  private detonateSapper(e: Enemy, nearTower: { pos: Vector2 } | null): void {
+    if (e.exploded) return;
+    e.exploded = true;
+    const radius = e.def.explodeRadius ?? 56;
+    this.game.particles.spawnRing(e.pos.x, e.pos.y, radius, "#ff6d00");
+    this.game.particles.spawnBurst(e.pos.x, e.pos.y, "#ff6d00", 20, { speed: 240, life: 0.6, size: 3 });
+    this.game.audio.sfxSapperExplode();
+    this.game.core.shake = Math.min(18, this.game.core.shake + 6);
+    // Disable the nearest tower briefly and deal shake damage to nearby towers.
+    if (nearTower) {
+      const t = this.game.towers.list.find((tt) => tt.pos === nearTower.pos) ?? null;
+      if (t) this.game.towers.disableTower(t, e.def.explodeTowerDamage ?? 2);
+    }
+    this.damage(e, e.hp + 10, { type: "other" }, { bypassShield: true });
   }
 
   private updateBossPhase(boss: Enemy, dt: number): void {
@@ -217,18 +322,31 @@ export class EnemySystem {
   }
 
   private corruptionPulse(boss: Enemy): void {
-    // Pushes a pulse outward that damages nothing but visually warns; costs 1 core integrity.
     this.game.particles.spawnRing(boss.pos.x, boss.pos.y, 140, "#b71c1c");
     this.game.damageCore(1, boss.type);
+  }
+
+  private hasNearbyReactiveShield(e: Enemy): boolean {
+    for (const t of this.game.towers.list) {
+      if (t.type !== "shield") continue;
+      if (!t.flags.reactiveArmor) continue;
+      if (t.pos.dist(e.pos) < (t.def.auraRadius ?? 128)) return true;
+    }
+    return false;
   }
 
   private onDeath(e: Enemy, killed: boolean): void {
     // killed = HP reached 0 from damage. Otherwise it was a breach.
     if (killed) {
       // Reward credits.
-      this.game.addCredits(e.reward);
-      this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 12, `+${e.reward}`, "#ffeb3b", 0.9, 12);
+      let reward = e.reward * this.game.difficulty.rewardScale();
+      // Overkill salvage bonus.
+      reward *= 1 + this.game.core.upgrades.overkillCreditsMul;
+      const rounded = Math.max(0, Math.round(reward));
+      this.game.addCredits(rounded);
+      this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 12, `+${rounded}`, "#ffeb3b", 0.9, 12);
       this.game.stats.recordKill(e.type);
+      this.game.bus.emit("enemy:killed", e);
       this.game.audio.sfxDeath();
 
       // Death burst.
@@ -248,12 +366,24 @@ export class EnemySystem {
         }
       }
 
+      // Corruptor death spawns swarmlings.
+      if (e.ability === "corrupt") {
+        for (let i = 0; i < 2; i++) {
+          const ang = rnd(0, Math.PI * 2);
+          const x = e.pos.x + Math.cos(ang) * 10;
+          const y = e.pos.y + Math.sin(ang) * 10;
+          this.spawn("swarmling", x, y);
+        }
+      }
+
       // Boss death: slow-mo + big ring.
-      if (e.isBoss) {
+      if (e.isBoss || e.def.elite) {
         this.game.core.slowMo = 1.5;
         this.game.particles.spawnRing(e.pos.x, e.pos.y, 160, "#ff5252");
-        this.game.bus.emit("boss:killed");
+        if (e.isBoss) this.game.bus.emit("boss:killed");
       }
+
+      // Sapper on-death doesn't explode (detonation is proximity-triggered).
     }
   }
 }

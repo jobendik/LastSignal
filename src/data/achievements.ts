@@ -1,0 +1,28 @@
+import type { AchievementDefinition } from "../core/Types";
+
+export const achievementDefinitions: AchievementDefinition[] = [
+  { id: "first_blood", name: "First Blood", description: "Destroy your first enemy.", research: 1 },
+  { id: "first_wave", name: "Holding Position", description: "Clear your first wave.", research: 1 },
+  { id: "first_sector", name: "Signal Held", description: "Clear Sector 1.", research: 5 },
+  { id: "sector_2", name: "Crystal Yield", description: "Clear Sector 2.", research: 5 },
+  { id: "sector_3", name: "Phantom Hunter", description: "Clear Sector 3.", research: 5 },
+  { id: "sector_4", name: "Bastion Breaker", description: "Clear Sector 4.", research: 8 },
+  { id: "sector_5", name: "Mirror Walker", description: "Clear Sector 5.", research: 8 },
+  { id: "sector_6", name: "Abyss Watcher", description: "Clear Sector 6.", research: 15 },
+  { id: "boss_killer", name: "Boss Killer", description: "Destroy the Leviathan.", research: 10 },
+  { id: "harbinger_slayer", name: "Harbinger Slayer", description: "Destroy the Harbinger.", research: 10 },
+  { id: "untouchable", name: "Untouchable", description: "Clear a sector without core damage.", research: 15 },
+  { id: "tower_baron", name: "Tower Baron", description: "Build 15 towers in one run.", research: 3 },
+  { id: "specialized", name: "Specialized", description: "Apply 6 tower specializations in one run.", research: 3 },
+  { id: "wealthy", name: "Wealthy", description: "Earn 2000 credits in one run.", research: 4 },
+  { id: "speedrunner", name: "Speedrunner", description: "Clear a sector on maximum game speed.", research: 5 },
+  { id: "veteran_clear", name: "Veteran Clear", description: "Clear a sector on Veteran.", research: 6 },
+  { id: "nightmare_clear", name: "Nightmare Clear", description: "Clear a sector on Nightmare.", research: 20 },
+  { id: "endless_10", name: "Endless 10", description: "Reach wave 10 in Endless mode.", research: 5 },
+  { id: "endless_25", name: "Endless 25", description: "Reach wave 25 in Endless mode.", research: 10 },
+  { id: "codex_full", name: "Signal Archivist", description: "Catalogue every enemy type.", research: 10 },
+  { id: "drone_swarm", name: "Drone Swarm", description: "Have 6 drones active at once.", research: 3 },
+  { id: "no_drone_win", name: "Solo Architect", description: "Clear a sector without buying a drone.", research: 7 },
+  { id: "harvester_tycoon", name: "Harvester Tycoon", description: "Build 5 harvesters in one run.", research: 3 },
+  { id: "flamewaver", name: "Flameweaver", description: "Get a 20+ kill combo with one flamethrower.", research: 5, secret: true },
+];

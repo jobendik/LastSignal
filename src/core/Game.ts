@@ -7,13 +7,13 @@ import {
   createEmptyUpgradeAggregate,
   type GameCoreState,
 } from "./GameState";
-import { MAX_DT, SPEED_MULTIPLIERS, VIEW_HEIGHT, VIEW_WIDTH } from "./Config";
+import { DEFAULT_PLANNING_SECONDS, MAX_DT, SPEED_MULTIPLIERS, VIEW_HEIGHT, VIEW_WIDTH } from "./Config";
 import type {
+  DifficultyId,
   EnemyType,
   GameStateId,
   SectorDefinition,
   SpeedMultiplier,
-  TowerType,
   UpgradeDefinition,
 } from "./Types";
 
@@ -34,6 +34,11 @@ import { CodexSystem } from "../systems/CodexSystem";
 import { PersistenceSystem } from "../systems/PersistenceSystem";
 import { SettingsSystem } from "../systems/SettingsSystem";
 import { StatsSystem } from "../systems/StatsSystem";
+import { DifficultySystem } from "../systems/DifficultySystem";
+import { MetaSystem } from "../systems/MetaSystem";
+import { AchievementSystem } from "../systems/AchievementSystem";
+import { EndlessSystem } from "../systems/EndlessSystem";
+import { TutorialSystem } from "../systems/TutorialSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
@@ -66,6 +71,11 @@ export class Game {
   render!: RenderSystem;
   input!: InputSystem;
   ui!: UIManager;
+  difficulty!: DifficultySystem;
+  meta!: MetaSystem;
+  achievements!: AchievementSystem;
+  endless!: EndlessSystem;
+  tutorial!: TutorialSystem;
 
   core: GameCoreState;
 
@@ -98,9 +108,15 @@ export class Game {
       debug: { show: false, showFlow: false, showPaths: false },
       shake: 0,
       slowMo: 0,
+      difficulty: loadedProfile.preferredDifficulty ?? "operative",
+      endless: false,
+      planningTimer: 0,
+      planningMax: 0,
     };
 
     // Wire systems that need `this`.
+    this.difficulty = new DifficultySystem(this);
+    this.meta = new MetaSystem(this);
     this.enemies = new EnemySystem(this);
     this.towers = new TowerSystem(this);
     this.projectiles = new ProjectileSystem(this);
@@ -112,6 +128,9 @@ export class Game {
     this.rewards = new RewardSystem(this);
     this.codex = new CodexSystem(this);
     this.stats = new StatsSystem(this);
+    this.achievements = new AchievementSystem(this);
+    this.endless = new EndlessSystem(this);
+    this.tutorial = new TutorialSystem(this);
     this.render = new RenderSystem(this);
     this.input = new InputSystem(this);
     this.ui = new UIManager(this);
@@ -148,17 +167,26 @@ export class Game {
 
   // ----- Lifecycle helpers called by UI -----
 
-  beginSector(sector: SectorDefinition): void {
+  beginSector(sector: SectorDefinition, options?: { difficulty?: DifficultyId; endless?: boolean }): void {
+    if (options?.difficulty) this.difficulty.setDifficulty(options.difficulty);
+    const endless = Boolean(options?.endless);
+    this.core.endless = endless;
+
     this.core.sector = sector;
-    this.core.credits = sector.startingCredits;
-    this.core.coreMax = sector.coreIntegrity;
-    this.core.coreIntegrity = sector.coreIntegrity;
+    const metaCredits = this.meta.startingCreditsBonus;
+    this.core.credits = Math.max(0, Math.round((sector.startingCredits + metaCredits) * 1));
+    const coreBoost = this.meta.coreMaxBonus;
+    const diffScale = this.difficulty.coreScale();
+    this.core.coreMax = Math.round((sector.coreIntegrity + coreBoost) * diffScale);
+    this.core.coreIntegrity = this.core.coreMax;
     this.core.waveIndex = 0;
     this.core.upgrades = createEmptyUpgradeAggregate();
     this.core.stats = createEmptyStats();
     this.core.shake = 0;
     this.core.slowMo = 0;
     this.core.speed = 1;
+    this.core.planningTimer = 0;
+    this.core.planningMax = 0;
     this.time.timeScale = 1;
 
     this.grid.loadSector(sector);
@@ -169,6 +197,15 @@ export class Game {
     this.drones.reset();
     this.waves.reset();
     this.codex.reset();
+    this.endless.reset();
+    this.tutorial.reset();
+    this.achievements.resetCombo();
+
+    // Endless: if we selected endless mode, extend the sector's waves now.
+    if (endless) {
+      const more = this.endless.generateNextBatch(sector.waves.length, 8);
+      sector.waves.push(...more);
+    }
 
     this.audio.init();
     this.audio.resume();
@@ -176,6 +213,8 @@ export class Game {
 
     this.setState("PLANNING");
     this.bus.emit("sector:started", sector);
+    this.core.profile.totalRuns++;
+    this.persistence.saveProfile(this.core.profile);
   }
 
   returnToMenu(): void {
@@ -215,7 +254,11 @@ export class Game {
         this.core.coreIntegrity + u.effect.coreIntegrityAdd
       );
     }
+    if (u.effect.coreMaxAdd) {
+      this.core.coreMax += u.effect.coreMaxAdd;
+    }
     this.bus.emit("upgrade:applied", u);
+    this.core.stats.upgradesChosen++;
   }
 
   damageCore(amount: number, byType?: EnemyType): void {
@@ -246,6 +289,9 @@ export class Game {
     this.audio.sfxLose();
     this.bus.emit("game:over");
     this.commitProfile();
+    // Grant research for run progress
+    const r = Math.min(5, Math.floor(this.core.stats.enemiesKilled / 40));
+    if (r > 0) this.meta.grantResearch(r, "Run reached end");
   }
 
   onVictory(): void {
@@ -254,13 +300,22 @@ export class Game {
     this.audio.sfxVictory();
     this.bus.emit("game:victory");
     this.commitProfile();
+    this.core.profile.totalVictories++;
+    // Research reward for victory
+    const base = 10 + (this.core.sector ? this.sectorIndex() * 2 : 0);
+    this.meta.grantResearch(base, "Sector cleared");
+    this.persistence.saveProfile(this.core.profile);
+  }
+
+  private sectorIndex(): number {
+    if (!this.core.sector) return 0;
+    return sectorDefinitions.findIndex((s) => s.id === this.core.sector!.id) + 1;
   }
 
   private commitProfile(): void {
     const p = this.core.profile;
     if (!this.core.sector) return;
-    const sectorIndex =
-      sectorDefinitions.findIndex((s) => s.id === this.core.sector!.id) + 1;
+    const sectorIndex = this.sectorIndex();
     if (this.state === "VICTORY") {
       p.bestSectorCleared = Math.max(p.bestSectorCleared, sectorIndex);
     }
@@ -269,6 +324,12 @@ export class Game {
       (this.core.coreIntegrity / this.core.coreMax) * 100
     );
     p.bestCoreRemaining = Math.max(p.bestCoreRemaining, corePct);
+
+    if (this.core.endless) {
+      const cur = p.endlessBestWave[this.core.sector.id] ?? 0;
+      p.endlessBestWave[this.core.sector.id] = Math.max(cur, this.core.waveIndex);
+    }
+
     this.persistence.saveProfile(p);
   }
 
@@ -284,6 +345,22 @@ export class Game {
       this.core.slowMo -= dt;
       this.time.timeScale = 0.35;
       if (this.core.slowMo <= 0) this.time.timeScale = this.core.speed;
+    }
+
+    // Planning countdown.
+    if (this.state === "PLANNING" && this.core.settings.autoStartWave && this.waves.hasMoreWaves) {
+      if (this.core.planningMax <= 0) {
+        const override = this.waves.nextWaveDef?.planningSeconds;
+        this.core.planningMax = override && override > 0 ? override : (this.core.settings.planningCountdown || DEFAULT_PLANNING_SECONDS);
+        this.core.planningTimer = this.core.planningMax;
+      } else {
+        this.core.planningTimer = Math.max(0, this.core.planningTimer - dt);
+        if (this.core.planningTimer <= 0) {
+          this.core.planningTimer = 0;
+          this.core.planningMax = 0;
+          this.waves.startWave(false);
+        }
+      }
     }
 
     // Only tick simulation during active wave / wave-complete / victory fanfare.
@@ -305,6 +382,7 @@ export class Game {
       // Tower visuals still animate a bit, drones idle, particles decay.
       this.drones.update(dt * 0.5);
       this.particles.update(dt);
+      this.tutorial.update(dt);
     } else if (this.state === "PAUSED") {
       // Freeze simulation; particles continue for ambient visual only.
       this.particles.update(dt * 0.2);

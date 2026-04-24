@@ -15,7 +15,6 @@ export class ProjectileSystem {
 
   spawn(p: Projectile): void {
     if (this.list.length >= PROJECTILE_CAP) {
-      // Drop the oldest projectile to avoid unbounded growth.
       this.list.shift();
     }
     this.list.push(p);
@@ -30,7 +29,6 @@ export class ProjectileSystem {
         continue;
       }
 
-      // Re-target if the target died.
       if (p.target && !p.target.active) {
         p.target = null;
       }
@@ -53,13 +51,11 @@ export class ProjectileSystem {
           p.active = false;
         }
       } else if (p.kind === "mortar") {
-        // Mortar keeps flying to the original target pos.
         if (p.pos.dist(p.targetPos) < 6) {
           this.onImpact(p, null);
           p.active = false;
         }
       } else {
-        // Bullet with no target — fade out quickly.
         p.life -= dt * 3;
       }
     }
@@ -70,10 +66,9 @@ export class ProjectileSystem {
     const impactX = p.targetPos.x;
     const impactY = p.targetPos.y;
 
-    // Splash damage or direct hit.
     if (p.splashRadius > 0) {
       this.game.particles.spawnRing(impactX, impactY, p.splashRadius, p.color);
-      this.game.particles.spawnBurst(impactX, impactY, p.color, 12, { speed: 180, life: 0.5, size: 3 });
+      this.game.particles.spawnBurst(impactX, impactY, p.color, 14, { speed: 200, life: 0.5, size: 3 });
       this.game.audio.sfxExplosion(0.35);
       for (const e of this.game.enemies.list) {
         if (!e.active) continue;
@@ -84,20 +79,22 @@ export class ProjectileSystem {
           let dmg = p.damage * falloff;
           dmg *= this.globalMul(p);
           if (p.armorBreak && e.def.armor) dmg *= 1.6;
-          this.game.enemies.damage(e, dmg, this.sourceFor(p));
+          this.game.enemies.damage(e, dmg, this.sourceFor(p), { fromX: impactX, fromY: impactY });
         }
       }
       if (p.burningGround) {
-        this.game.particles.spawnDamageZone(impactX, impactY, p.splashRadius * 0.7, p.damage * 0.4, 2.5);
+        this.game.particles.spawnDamageZone(impactX, impactY, p.splashRadius * 0.7, p.damage * 0.4, 2.5, "#ff7043");
       }
     } else if (direct) {
       let dmg = p.damage * this.globalMul(p);
-      if (p.armorPierce && (direct.type === "brute" || direct.type === "carrier")) dmg *= 1.6;
-      this.game.enemies.damage(direct, dmg, this.sourceFor(p));
+      if (p.armorPierce && (direct.type === "brute" || direct.type === "carrier" || direct.type === "titan")) dmg *= 1.6;
+      this.game.enemies.damage(direct, dmg, this.sourceFor(p), { fromX: p.pos.x - p.lastDir.x * 10, fromY: p.pos.y - p.lastDir.y * 10 });
       if (p.slowOnHit > 0) direct.applySlow(p.slowOnHit, p.slowStrength);
       if (p.stunChance > 0 && Math.random() < p.stunChance) direct.applyStun(0.6);
       if (p.mark) direct.signalMarked = true;
 
+      // Impact flash burst.
+      this.game.particles.spawnBurst(direct.pos.x, direct.pos.y, "#ffffff", 3, { speed: 80, life: 0.18, size: 2 });
       this.game.particles.spawnBurst(direct.pos.x, direct.pos.y, p.color, 5, { speed: 100, life: 0.3 });
     }
   }
@@ -105,23 +102,27 @@ export class ProjectileSystem {
   private sourceFor(p: Projectile): import("../entities/Enemy").DamageSource | null {
     if (p.ownerType === "drone") return { type: "drone" };
     if (p.ownerType === "other") return { type: "other" };
-    return { type: "tower", towerType: p.ownerType };
+    return { type: "tower", towerType: p.ownerType, damageType: p.owner.tower?.def.damageType };
   }
 
   private globalMul(p: Projectile): number {
     const up = this.game.core.upgrades;
     let mul = 1;
     if (p.owner.tower) {
-      mul *= up.towerDamageMul;
+      mul *= up.towerDamageMul * this.game.meta.towerDamageMul;
       const spec = up.specificTowerDamageMul[p.owner.tower.type];
       if (spec) mul *= spec;
+      // Shield pylon aura boost.
+      if (this.game.towers.hasShieldBuff(p.owner.tower)) mul *= 1.1;
     }
-    // Low-core circuit.
+    if (p.owner.isDrone) {
+      // Drones already include damage add in drone system.
+    }
     if (
       up.lowCoreFireRateMul > 1 &&
       this.game.core.coreIntegrity / this.game.core.coreMax <= up.lowCoreThreshold
     ) {
-      mul *= 1.15; // mild bonus damage alongside fire rate
+      mul *= 1.15;
     }
     return mul;
   }

@@ -58,6 +58,10 @@ export class WaveSystem {
       );
     }
 
+    // Reset planning timer
+    this.game.core.planningTimer = 0;
+    this.game.core.planningMax = 0;
+
     // Build pending groups.
     this.pending = [];
     for (const lane of wave.lanes) {
@@ -69,11 +73,10 @@ export class WaveSystem {
           type: g.type,
           remaining: g.count,
           interval: g.interval,
-          timer: timerOffset, // seconds until first spawn
+          timer: timerOffset,
           spawner,
           startDelay: timerOffset,
         });
-        // Stagger subsequent groups so they don't overlap unless interval is intentionally short.
         timerOffset += g.count * g.interval;
       }
     }
@@ -94,9 +97,34 @@ export class WaveSystem {
 
     this.game.addCredits(wave.rewardCredits);
     this.game.economy.onWaveComplete();
+
+    // Apply per-wave core regen (from upgrades) and Aegis regen pulse.
+    const regen = this.game.core.upgrades.coreRegenPerWave;
+    if (regen > 0) {
+      this.game.core.coreIntegrity = Math.min(this.game.core.coreMax, this.game.core.coreIntegrity + regen);
+      this.game.particles.spawnFloatingText(
+        this.game.grid.corePos.x,
+        this.game.grid.corePos.y - 24,
+        `+${regen}`,
+        "#4caf50"
+      );
+    }
+    for (const t of this.game.towers.list) {
+      if (t.type === "shield" && t.flags.regenPulse) {
+        this.game.core.coreIntegrity = Math.min(this.game.core.coreMax, this.game.core.coreIntegrity + 5);
+      }
+    }
+
+    this.game.core.stats.wavesCleared++;
     this.game.setState("WAVE_COMPLETE");
     this.game.audio.sfxReward();
     this.game.bus.emit("wave:complete", wave);
+
+    // Endless: extend waves on demand
+    if (this.game.core.endless) {
+      this.game.endless.extendIfNeeded();
+      this.game.bus.emit("endless:wave", this.game.core.waveIndex + 1);
+    }
 
     // Advance wave index.
     this.game.core.waveIndex++;
@@ -104,8 +132,7 @@ export class WaveSystem {
     setTimeout(() => {
       if (this.game.state !== "WAVE_COMPLETE") return;
       if (wave.rewardChoice) {
-        // Offer upgrade choices.
-        const choices = this.game.rewards.rollChoices(3);
+        const choices = this.game.rewards.rollChoices(3 + this.game.meta.rewardChoiceExtra);
         if (choices.length > 0) {
           this.game.setState("REWARD_CHOICE");
           return;
@@ -125,7 +152,6 @@ export class WaveSystem {
 
   update(dt: number): void {
     if (this.pending.length === 0) {
-      // Either all spawned or nothing queued.
       this.allSpawned = true;
       return;
     }
@@ -133,7 +159,6 @@ export class WaveSystem {
       g.timer -= dt;
       while (g.timer <= 0 && g.remaining > 0) {
         const s = g.spawner;
-        // Spawn near spawner tile, slight random offset.
         const x = s.c * 32 + 16;
         const y = s.r * 32 + 16;
         this.game.enemies.spawn(g.type, x, y);

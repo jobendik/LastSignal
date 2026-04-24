@@ -8,7 +8,7 @@ import { clamp, rnd } from "../core/Random";
 import { MAX_DRONES, STARTING_DRONE_COST, DRONE_COST_SCALING, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
 
 /**
- * Drone behavior. Hunter: seek-and-fire. Scanner: reveals phantoms. Guardian: orbits core.
+ * Drone behavior. Hunter/Strike: seek-and-fire. Scanner: reveals phantoms. Guardian: orbits core.
  */
 export class DroneSystem {
   list: Drone[] = [];
@@ -27,6 +27,8 @@ export class DroneSystem {
   }
 
   canBuy(type: DroneType): boolean {
+    const def = droneDefinitions[type];
+    if (def.unlockRequires && !this.game.meta.isDroneUnlocked(type)) return false;
     if (this.list.length >= MAX_DRONES) return false;
     return this.game.core.credits >= this.nextCost(type);
   }
@@ -45,7 +47,7 @@ export class DroneSystem {
   update(dt: number): void {
     for (const d of this.list) {
       d.timer -= dt;
-      if (d.type === "hunter") this.updateHunter(d, dt);
+      if (d.type === "hunter" || d.type === "strike") this.updateHunter(d, dt);
       else if (d.type === "scanner") this.updateScanner(d, dt);
       else if (d.type === "guardian") this.updateGuardian(d, dt);
 
@@ -75,7 +77,8 @@ export class DroneSystem {
       steer = this.seek(d, target.pos);
       if (min < d.range + this.game.core.upgrades.droneRangeAdd && d.timer <= 0) {
         this.fire(d, target);
-        d.timer = d.cooldown;
+        const fireRateMul = this.game.core.upgrades.droneFireRateMul;
+        d.timer = d.cooldown / fireRateMul;
       }
     } else {
       steer = this.wander(d);
@@ -89,20 +92,18 @@ export class DroneSystem {
   }
 
   private updateScanner(d: Drone, dt: number): void {
-    // Wander close to the active path area. Reveals phantoms by granting them visibility bonus briefly.
     const target = this.findPhantom();
     let steer;
     if (target) {
       steer = this.seek(d, target.pos);
       if (d.pos.dist(target.pos) < d.range + this.game.core.upgrades.droneRangeAdd) {
-        // Temporarily extend visibility on phantoms near the scanner.
         for (const e of this.game.enemies.list) {
           if (!e.active || e.ability !== "phase") continue;
           if (e.pos.dist(d.pos) < d.range) e.phaseVisibilityBonus = Math.max(e.phaseVisibilityBonus, 0.5);
         }
         if (d.timer <= 0) {
           this.game.particles.spawnRing(d.pos.x, d.pos.y, 26, d.color);
-          d.timer = d.cooldown;
+          d.timer = d.cooldown / this.game.core.upgrades.droneFireRateMul;
         }
       }
     } else {
@@ -115,7 +116,6 @@ export class DroneSystem {
   }
 
   private updateGuardian(d: Drone, dt: number): void {
-    // Orbit core.
     d.orbit += dt * 1.2;
     const core = this.game.grid.corePos;
     const targetPos = new Vector2(core.x + Math.cos(d.orbit) * 70, core.y + Math.sin(d.orbit) * 70);
@@ -124,7 +124,6 @@ export class DroneSystem {
     if (d.vel.mag() > d.maxSpeed) d.vel = d.vel.normalize().mult(d.maxSpeed);
     d.pos = d.pos.add(d.vel.mult(dt));
 
-    // Intercept enemies very close to core.
     let target = null as null | typeof this.game.enemies.list[number];
     let min = d.range;
     for (const e of this.game.enemies.list) {
@@ -137,7 +136,7 @@ export class DroneSystem {
     }
     if (target && d.timer <= 0) {
       this.fire(d, target);
-      d.timer = d.cooldown;
+      d.timer = d.cooldown / this.game.core.upgrades.droneFireRateMul;
     }
   }
 
@@ -184,8 +183,8 @@ export class DroneSystem {
   }
 
   private fire(d: Drone, target: NonNullable<ReturnType<DroneSystem["findPhantom"]>>): void {
-    let dmg = d.damage + this.game.core.upgrades.droneDamageAdd;
-    if (target.signalMarked) dmg *= 1.25;
+    let dmg = d.damage + this.game.core.upgrades.droneDamageAdd + this.game.meta.droneDamageAdd;
+    if (target.signalMarked) dmg *= this.game.core.upgrades.markedDamageMul;
     this.game.projectiles.spawn(
       new Projectile({
         pos: d.pos,

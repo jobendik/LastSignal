@@ -1,5 +1,5 @@
 import type { SectorDefinition, WaveDefinition, EnemyType } from "../core/Types";
-import { defaultWaves } from "./waves";
+import { advancedWaves, defaultWaves } from "./waves";
 
 /**
  * Layouts are 20 rows of 25 chars.
@@ -79,6 +79,78 @@ const sector3Layout = [
   "#.......................#",
 ];
 
+// Sector 4 — Iron Bastion: fortress layout with rock chokepoints and scarce crystals.
+const sector4Layout = [
+  "#########...#....########",
+  "#.......................#",
+  "#..C......#......C......#",
+  "#.........#..............",
+  "...#######.######........",
+  ".........................",
+  "...C..........C..........",
+  ".##.##...........##.##...",
+  ".........#XX#............",
+  "N........#XX#...........E",
+  ".........####............",
+  ".##.##...........##.##...",
+  "..........C..............",
+  "......................C..",
+  "...######.##########.....",
+  ".........................",
+  "#..........C............#",
+  "#..C.....................",
+  "#.......................#",
+  "##########.....##########",
+];
+
+// Sector 5 — Mirror Expanse: long open field, many spawners, many crystals.
+const sector5Layout = [
+  ".........................",
+  "C.C...C..C...C..C...C.C..",
+  ".........................",
+  "...####..............####",
+  ".........................",
+  ".....C...C....C...C......",
+  ".........................",
+  "...#.................#...",
+  ".........#XX#............",
+  "N........#XX#...........E",
+  ".........####............",
+  "...#.................#...",
+  ".........................",
+  ".....C...C....C...C......",
+  ".........................",
+  "####..............####...",
+  ".........................",
+  "C.C...C..C...C..C...C.C..",
+  ".........................",
+  ".........................",
+];
+
+// Sector 6 — The Abyss: chaotic, hazard-heavy final campaign sector.
+const sector6Layout = [
+  "#....#....#....#....#...#",
+  ".......................C.",
+  ".#...C.........C.....#...",
+  "..........#..............",
+  "...C..#..........#..C....",
+  ".........................",
+  ".#.....C.....C.......#...",
+  "...........###...........",
+  "..........#XX#...........",
+  "N.........#XX#..........E",
+  "...........###...........",
+  ".#...C.......C........C..",
+  ".........................",
+  "....#..........#.........",
+  "......C..............C...",
+  "..........#...........#..",
+  ".#.....C.........C...#...",
+  ".......................C.",
+  "..C.........C.....C......",
+  "#....#....#....#....#...#",
+];
+
 const defaultSpawners = [
   { id: "north", label: "North Gate", c: 12, r: 0 },
   { id: "south", label: "South Gate", c: 12, r: 19 },
@@ -128,6 +200,38 @@ function phantomHeavy(): WaveDefinition[] {
   return out;
 }
 
+// Sector 4: advanced waves 1-15, slightly reduced counts (fortress layout is tight).
+function bastionWaves(): WaveDefinition[] {
+  const out = cloneWaves(advancedWaves);
+  for (const w of out) {
+    for (const lane of w.lanes) {
+      for (const g of lane.enemies) {
+        g.count = Math.max(1, Math.floor(g.count * 0.9));
+      }
+    }
+  }
+  return out;
+}
+
+// Sector 5: wider-lane version with shielded/corrupt weighting.
+function mirrorWaves(): WaveDefinition[] {
+  return cloneWaves(advancedWaves);
+}
+
+// Sector 6: hardest campaign. Full advanced + endless-mode flavor.
+function abyssWaves(): WaveDefinition[] {
+  const out = cloneWaves(advancedWaves);
+  for (const w of out) {
+    for (const lane of w.lanes) {
+      for (const g of lane.enemies) {
+        g.count = Math.ceil(g.count * 1.2);
+      }
+    }
+    w.rewardCredits = Math.round(w.rewardCredits * 1.2);
+  }
+  return out;
+}
+
 export const sectorDefinitions: SectorDefinition[] = [
   {
     id: "sector_01_broken_relay",
@@ -164,5 +268,45 @@ export const sectorDefinitions: SectorDefinition[] = [
     waves: phantomHeavy(),
     startingCredits: 260,
     coreIntegrity: 100,
+  },
+  {
+    id: "sector_04_iron_bastion",
+    name: "Sector 4 — Iron Bastion",
+    description:
+      "A fortified compound. Sappers test your spread; shielded bulwarks demand chain damage. Unlocks new threats.",
+    accentColor: "#ffc107",
+    layout: sector4Layout,
+    spawners: defaultSpawners,
+    waves: bastionWaves(),
+    startingCredits: 280,
+    coreIntegrity: 110,
+    unlockRequires: 1,
+  },
+  {
+    id: "sector_05_mirror_expanse",
+    name: "Sector 5 — Mirror Expanse",
+    description:
+      "A wide, open field with many crystal nodes. Flanks matter. Corruptors will pressure fire rate.",
+    accentColor: "#ba68c8",
+    layout: sector5Layout,
+    spawners: defaultSpawners,
+    waves: mirrorWaves(),
+    startingCredits: 280,
+    coreIntegrity: 110,
+    unlockRequires: 2,
+  },
+  {
+    id: "sector_06_the_abyss",
+    name: "Sector 6 — The Abyss",
+    description:
+      "The deepest signal fracture. Titans, wraiths and a Harbinger. This is the end of the campaign.",
+    accentColor: "#ff1744",
+    layout: sector6Layout,
+    spawners: defaultSpawners,
+    waves: abyssWaves(),
+    startingCredits: 320,
+    coreIntegrity: 125,
+    unlockRequires: 3,
+    hazard: "fastenemies",
   },
 ];

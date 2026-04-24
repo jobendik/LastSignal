@@ -40,6 +40,20 @@ export const droneDefinitions: Record<DroneType, DroneDefinition> = {
     speed: 70,
     color: "#4caf50",
   },
+  strike: {
+    id: "strike",
+    name: "Strike Drone",
+    role: "Heavy hunter",
+    description:
+      "High-damage mobile turret. Slower but hits hard against elites and shielded units.",
+    cost: 170,
+    damage: 5,
+    range: 130,
+    cooldown: 0.9,
+    speed: 72,
+    color: "#ff5252",
+    unlockRequires: "unlock_strike",
+  },
 };
 
-export const droneOrder: DroneType[] = ["hunter", "scanner", "guardian"];
+export const droneOrder: DroneType[] = ["hunter", "scanner", "guardian", "strike"];

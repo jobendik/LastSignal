@@ -1,8 +1,9 @@
 import type { UpgradeDefinition } from "../core/Types";
 
 /**
- * Roguelite signal upgrades. At least 12. Effects are applied by UpgradeSystem
+ * Roguelite signal upgrades. Effects are applied by UpgradeSystem
  * via the game.upgradeState aggregate and sampled by Tower/Drone/Harvester logic.
+ * rarity: 1=common (bright), 2=rare (blue), 3=legendary (gold).
  */
 export const upgradeDefinitions: UpgradeDefinition[] = [
   {
@@ -11,6 +12,7 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "All towers fire 10% faster.",
     target: "global",
     effect: { towerFireRateMul: 1.1 },
+    rarity: 1,
   },
   {
     id: "drone_command_link",
@@ -18,6 +20,15 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Drones gain +1 damage and +20 range.",
     target: "drone",
     effect: { droneDamageAdd: 1, droneRangeAdd: 20 },
+    rarity: 1,
+  },
+  {
+    id: "drone_overclock",
+    name: "Drone Overclock",
+    description: "Drones fire 25% faster.",
+    target: "drone",
+    effect: { droneFireRateMul: 1.25 },
+    rarity: 2,
   },
   {
     id: "crystal_resonance",
@@ -25,6 +36,15 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Harvesters generate 25% more credits.",
     target: "economy",
     effect: { harvesterIncomeMul: 1.25 },
+    rarity: 1,
+  },
+  {
+    id: "deep_vein_tap",
+    name: "Deep-Vein Tap",
+    description: "Harvesters generate 50% more credits.",
+    target: "economy",
+    effect: { harvesterIncomeMul: 1.5 },
+    rarity: 3,
   },
   {
     id: "stasis_amplifier",
@@ -32,6 +52,7 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Slowed enemies take 20% more damage.",
     target: "stasis",
     effect: { slowedEnemyDamageMul: 1.2 },
+    rarity: 2,
   },
   {
     id: "emergency_core_shield",
@@ -39,6 +60,23 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Immediately restore 20 Core Integrity.",
     target: "core",
     effect: { coreIntegrityAdd: 20 },
+    rarity: 1,
+  },
+  {
+    id: "reinforced_core",
+    name: "Reinforced Core",
+    description: "+25 Maximum Core Integrity and full restore.",
+    target: "core",
+    effect: { coreMaxAdd: 25, coreIntegrityAdd: 25 },
+    rarity: 2,
+  },
+  {
+    id: "core_regen_array",
+    name: "Core Regen Array",
+    description: "Restore 8 Core Integrity at the end of each wave.",
+    target: "core",
+    effect: { coreRegenPerWave: 8 },
+    rarity: 2,
   },
   {
     id: "tesla_conductor",
@@ -46,6 +84,15 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Tesla chains jump one extra time.",
     target: "tesla",
     effect: { teslaChainAdd: 1 },
+    rarity: 1,
+  },
+  {
+    id: "tesla_overload",
+    name: "Tesla Overload",
+    description: "+2 chain jumps and +20% Tesla damage.",
+    target: "tesla",
+    effect: { teslaChainAdd: 2, specificTowerDamageMul: { type: "tesla", mul: 1.2 } },
+    rarity: 3,
   },
   {
     id: "mortar_payload",
@@ -53,6 +100,7 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Mortar splash radius increased by 20%.",
     target: "mortar",
     effect: { mortarSplashMul: 1.2 },
+    rarity: 1,
   },
   {
     id: "scanner_pulse",
@@ -60,6 +108,7 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Phased enemies are visible 40% longer.",
     target: "global",
     effect: { phantomVisibleBonus: 0.4 },
+    rarity: 2,
   },
   {
     id: "pulse_calibration",
@@ -70,6 +119,7 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
       specificTowerDamageMul: { type: "pulse", mul: 1.15 },
       specificTowerRangeMul: { type: "pulse", mul: 1.15 },
     },
+    rarity: 1,
   },
   {
     id: "rapid_construction",
@@ -77,6 +127,7 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "New towers cost 10% less.",
     target: "economy",
     effect: { towerBuildCostMul: 0.9 },
+    rarity: 1,
   },
   {
     id: "salvage_protocol",
@@ -84,14 +135,15 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Selling towers refunds 70% instead of 50%.",
     target: "economy",
     effect: { sellRefundMul: 0.7 },
+    rarity: 2,
   },
   {
     id: "last_stand_circuit",
     name: "Last Stand Circuit",
-    description:
-      "When core integrity drops below 25%, all towers fire 30% faster.",
+    description: "When core integrity drops below 25%, all towers fire 30% faster.",
     target: "global",
     effect: { lowCoreFireRateMul: 1.3, lowCoreThreshold: 0.25 },
+    rarity: 2,
   },
   {
     id: "focus_array",
@@ -99,6 +151,7 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Blaster damage +25%.",
     target: "blaster",
     effect: { specificTowerDamageMul: { type: "blaster", mul: 1.25 } },
+    rarity: 1,
   },
   {
     id: "heavy_munitions",
@@ -106,6 +159,7 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "Mortar damage +20%.",
     target: "mortar",
     effect: { specificTowerDamageMul: { type: "mortar", mul: 1.2 } },
+    rarity: 1,
   },
   {
     id: "global_range",
@@ -113,5 +167,86 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description: "All towers gain +6 range.",
     target: "global",
     effect: { towerRangeAdd: 6 },
+    rarity: 1,
+  },
+  {
+    id: "railgun_capacitor",
+    name: "Railgun Capacitor",
+    description: "Railguns deal 25% more damage.",
+    target: "railgun",
+    effect: { specificTowerDamageMul: { type: "railgun", mul: 1.25 } },
+    rarity: 2,
+  },
+  {
+    id: "pyro_accelerant",
+    name: "Pyro Accelerant",
+    description: "Burn damage from any source is 40% stronger.",
+    target: "flamethrower",
+    effect: { burnDamageMul: 1.4 },
+    rarity: 2,
+  },
+  {
+    id: "signal_lock",
+    name: "Signal Lock",
+    description: "Marked enemies take +15% extra damage (stacks).",
+    target: "global",
+    effect: { markedDamageMul: 1.15 },
+    rarity: 2,
+  },
+  {
+    id: "overkill_salvage",
+    name: "Overkill Salvage",
+    description: "Killing an enemy yields 50% bonus credits.",
+    target: "economy",
+    effect: { overkillCreditsMul: 0.5 },
+    rarity: 3,
+  },
+  {
+    id: "ambush_protocol",
+    name: "Ambush Protocol",
+    description: "First hit on an enemy deals double damage.",
+    target: "global",
+    effect: { firstHitDamageMul: 2 },
+    rarity: 3,
+  },
+  {
+    id: "shield_breaker",
+    name: "Shield Breaker",
+    description: "+40% damage to Shielded enemies.",
+    target: "global",
+    effect: { shieldedBonusDamageMul: 1.4 },
+    rarity: 2,
+  },
+  {
+    id: "global_damage",
+    name: "Signal Boost",
+    description: "All towers deal +10% damage.",
+    target: "global",
+    effect: { towerDamageMul: 1.1 },
+    rarity: 1,
+  },
+  {
+    id: "overclocked_arrays",
+    name: "Overclocked Arrays",
+    description: "All towers fire 18% faster.",
+    target: "global",
+    effect: { towerFireRateMul: 1.18 },
+    rarity: 2,
+  },
+  {
+    id: "economy_reroute",
+    name: "Economy Reroute",
+    description: "All towers cost 20% less.",
+    target: "economy",
+    effect: { towerBuildCostMul: 0.8 },
+    rarity: 3,
+  },
+  {
+    id: "signal_reinforcement",
+    name: "Signal Reinforcement",
+    description: "+15% tower damage, +4 range.",
+    target: "global",
+    effect: { towerDamageMul: 1.15, towerRangeAdd: 4 },
+    rarity: 3,
   },
 ];

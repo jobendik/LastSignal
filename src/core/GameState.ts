@@ -1,7 +1,16 @@
 import { EventBus } from "./EventBus";
 import { StateMachine } from "./StateMachine";
 import { Time } from "./Time";
-import type { GameSettings, PersistedProfile, RunStats, SectorDefinition, SpeedMultiplier, TowerType, UpgradeEffect } from "./Types";
+import type {
+  DifficultyId,
+  GameSettings,
+  PersistedProfile,
+  RunStats,
+  SectorDefinition,
+  SpeedMultiplier,
+  TowerType,
+  UpgradeEffect,
+} from "./Types";
 
 /** Aggregate upgrade state (accumulated effects from chosen signal upgrades). */
 export interface UpgradeAggregate {
@@ -13,6 +22,7 @@ export interface UpgradeAggregate {
   specificTowerRangeMul: Partial<Record<TowerType, number>>;
   droneDamageAdd: number;
   droneRangeAdd: number;
+  droneFireRateMul: number;
   harvesterIncomeMul: number;
   slowedEnemyDamageMul: number;
   teslaChainAdd: number;
@@ -22,6 +32,12 @@ export interface UpgradeAggregate {
   sellRefundMul: number;
   lowCoreFireRateMul: number;
   lowCoreThreshold: number;
+  burnDamageMul: number;
+  markedDamageMul: number;
+  overkillCreditsMul: number;
+  firstHitDamageMul: number;
+  coreRegenPerWave: number;
+  shieldedBonusDamageMul: number;
   appliedUpgradeIds: string[];
 }
 
@@ -35,6 +51,7 @@ export function createEmptyUpgradeAggregate(): UpgradeAggregate {
     specificTowerRangeMul: {},
     droneDamageAdd: 0,
     droneRangeAdd: 0,
+    droneFireRateMul: 1,
     harvesterIncomeMul: 1,
     slowedEnemyDamageMul: 1,
     teslaChainAdd: 0,
@@ -44,6 +61,12 @@ export function createEmptyUpgradeAggregate(): UpgradeAggregate {
     sellRefundMul: 0.5,
     lowCoreFireRateMul: 1,
     lowCoreThreshold: 0,
+    burnDamageMul: 1,
+    markedDamageMul: 1.25,
+    overkillCreditsMul: 0,
+    firstHitDamageMul: 1,
+    coreRegenPerWave: 0,
+    shieldedBonusDamageMul: 1,
     appliedUpgradeIds: [],
   };
 }
@@ -76,6 +99,10 @@ export interface GameCoreState {
   };
   shake: number;
   slowMo: number; // seconds of slow-motion
+  difficulty: DifficultyId;
+  endless: boolean;
+  planningTimer: number;
+  planningMax: number;
 }
 
 export function createEmptyStats(): RunStats {
@@ -89,6 +116,11 @@ export function createEmptyStats(): RunStats {
     startedAt: performance.now(),
     bestTowerType: null,
     bestTowerLevel: 0,
+    towersBuilt: 0,
+    towersSold: 0,
+    specsApplied: 0,
+    wavesCleared: 0,
+    upgradesChosen: 0,
   };
 }
 
@@ -113,6 +145,7 @@ export function applyUpgradeEffect(
   }
   if (effect.droneDamageAdd) agg.droneDamageAdd += effect.droneDamageAdd;
   if (effect.droneRangeAdd) agg.droneRangeAdd += effect.droneRangeAdd;
+  if (effect.droneFireRateMul) agg.droneFireRateMul *= effect.droneFireRateMul;
   if (effect.harvesterIncomeMul) agg.harvesterIncomeMul *= effect.harvesterIncomeMul;
   if (effect.slowedEnemyDamageMul) agg.slowedEnemyDamageMul *= effect.slowedEnemyDamageMul;
   if (effect.teslaChainAdd) agg.teslaChainAdd += effect.teslaChainAdd;
@@ -126,4 +159,10 @@ export function applyUpgradeEffect(
   if (effect.lowCoreThreshold != null) {
     agg.lowCoreThreshold = Math.max(agg.lowCoreThreshold, effect.lowCoreThreshold);
   }
+  if (effect.burnDamageMul) agg.burnDamageMul *= effect.burnDamageMul;
+  if (effect.markedDamageMul) agg.markedDamageMul *= effect.markedDamageMul;
+  if (effect.overkillCreditsMul) agg.overkillCreditsMul = Math.max(agg.overkillCreditsMul, effect.overkillCreditsMul);
+  if (effect.firstHitDamageMul) agg.firstHitDamageMul = Math.max(agg.firstHitDamageMul, effect.firstHitDamageMul);
+  if (effect.coreRegenPerWave) agg.coreRegenPerWave += effect.coreRegenPerWave;
+  if (effect.shieldedBonusDamageMul) agg.shieldedBonusDamageMul *= effect.shieldedBonusDamageMul;
 }
