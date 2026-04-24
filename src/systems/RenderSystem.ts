@@ -36,11 +36,74 @@ export class RenderSystem {
     this.drawProjectiles(ctx);
     this.drawBeams(ctx);
     this.drawLightning(ctx);
+    this.drawMuzzleFlashes(ctx);
     this.drawParticles(ctx);
     this.drawFloatingText(ctx);
     this.drawPlacementPreview(ctx);
     this.drawSelectionHighlights(ctx);
     if (this.game.core.debug.show) this.drawDebugOverlay(ctx);
+
+    // Reset shake before CRT so the overlay sits fixed on screen.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (!this.game.core.settings.reducedFlashing) this.drawCRTOverlay(ctx);
+  }
+
+  private drawCRTOverlay(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    // Scanlines.
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle = "#000";
+    for (let y = 0; y < VIEW_HEIGHT; y += 3) {
+      ctx.fillRect(0, y, VIEW_WIDTH, 1);
+    }
+    // Vignette.
+    ctx.globalAlpha = 1;
+    const vg = ctx.createRadialGradient(
+      VIEW_WIDTH / 2,
+      VIEW_HEIGHT / 2,
+      VIEW_WIDTH * 0.35,
+      VIEW_WIDTH / 2,
+      VIEW_HEIGHT / 2,
+      VIEW_WIDTH * 0.75
+    );
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, "rgba(0,0,0,0.55)");
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+    // Subtle phosphor flicker band.
+    const t = this.game.time.elapsed;
+    const bandY = (Math.sin(t * 0.7) * 0.5 + 0.5) * VIEW_HEIGHT;
+    ctx.globalAlpha = 0.04;
+    ctx.fillStyle = "#66fcf1";
+    ctx.fillRect(0, bandY, VIEW_WIDTH, 24);
+
+    ctx.restore();
+  }
+
+  private drawMuzzleFlashes(ctx: CanvasRenderingContext2D): void {
+    for (const m of this.game.particles.muzzleFlashes) {
+      const a = m.life / m.maxLife;
+      ctx.save();
+      ctx.translate(m.x, m.y);
+      ctx.rotate(m.angle);
+      ctx.globalAlpha = a;
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = m.color;
+      ctx.fillStyle = m.color;
+      ctx.beginPath();
+      ctx.moveTo(4, 0);
+      ctx.lineTo(22 * a + 10, -5 * a);
+      ctx.lineTo(22 * a + 10, 5 * a);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.globalAlpha = a * 0.9;
+      ctx.beginPath();
+      ctx.arc(6, 0, 4 * a + 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   private drawBackground(ctx: CanvasRenderingContext2D): void {
@@ -194,6 +257,36 @@ export class RenderSystem {
       ctx.fillRect(-6, -6, 12, 12);
       ctx.fillStyle = "#fff";
       ctx.fillRect(-2, -2, 4, 4);
+    } else if (t.type === "railgun") {
+      // Long thin rail with accent hub.
+      ctx.fillRect(-3 - (t.recoil || 0), -3, 22, 6);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(-2, -6, 6, 12);
+    } else if (t.type === "flamer") {
+      // Short stubby nozzle + flicker glow.
+      ctx.fillRect(-2 - (t.recoil || 0), -5, 12, 10);
+      const flick = 0.6 + Math.sin(this.game.time.elapsed * 24) * 0.25;
+      ctx.fillStyle = `rgba(255, 180, 60, ${flick.toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(10, 0, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (t.type === "barrier") {
+      // Hexagonal emitter with pulsing ring.
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const x = Math.cos(a) * 8;
+        const y = Math.sin(a) * 8;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = t.def.color;
+      ctx.globalAlpha = 0.4 + Math.sin(this.game.time.elapsed * 3) * 0.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     } else {
       ctx.fillRect(-3 - (t.recoil || 0), -7, 14, 14);
     }
@@ -293,6 +386,83 @@ export class RenderSystem {
           const r = e.size * (1 + Math.sin(e.timer * 2 + i) * 0.15);
           const x = Math.cos(a) * r;
           const y = Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        break;
+      case "sprinter":
+        // Forward-swept triangle with speed tail.
+        ctx.beginPath();
+        ctx.moveTo(e.size + 2, 0);
+        ctx.lineTo(-e.size, -e.size * 0.45);
+        ctx.lineTo(-e.size, e.size * 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.3;
+        ctx.fillRect(-e.size - 6, -1, 6, 2);
+        ctx.globalAlpha = 1;
+        break;
+      case "juggernaut":
+        ctx.fillRect(-e.size, -e.size, e.size * 2, e.size * 2);
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-e.size + 3, -e.size + 3, e.size * 2 - 6, e.size * 2 - 6);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(-3, -3, 6, 6);
+        break;
+      case "shielder":
+        ctx.beginPath();
+        ctx.arc(0, 0, e.size, 0, Math.PI * 2);
+        ctx.fill();
+        // Surrounding bubble.
+        ctx.strokeStyle = "rgba(100, 255, 218, 0.65)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, e.size + 5 + Math.sin(e.timer * 4) * 1.5, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      case "splitter":
+        ctx.fillRect(-e.size, -e.size * 0.8, e.size * 2, e.size * 1.6);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(-2, -e.size * 0.8, 4, e.size * 1.6);
+        break;
+      case "jammer":
+        // Diamond with pulsing halo.
+        ctx.beginPath();
+        ctx.moveTo(0, -e.size);
+        ctx.lineTo(e.size, 0);
+        ctx.lineTo(0, e.size);
+        ctx.lineTo(-e.size, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 235, 59, 0.55)";
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.arc(0, 0, 42 + Math.sin(e.timer * 4) * 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        break;
+      case "swarm":
+        // Tiny triangle cluster.
+        ctx.beginPath();
+        ctx.moveTo(e.size, 0);
+        ctx.lineTo(-e.size, -e.size);
+        ctx.lineTo(-e.size, e.size);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      case "overlord":
+        // Spiky irregular polygon.
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2;
+          const r = e.size * (i % 2 === 0 ? 1.1 : 0.75);
+          const x = Math.cos(a + e.timer * 0.5) * r;
+          const y = Math.sin(a + e.timer * 0.5) * r;
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.closePath();

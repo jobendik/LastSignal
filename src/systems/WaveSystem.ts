@@ -21,11 +21,28 @@ export class WaveSystem {
   reset(): void {
     this.pending.length = 0;
     this.allSpawned = false;
+    this.planningCountdown = 0;
+    this.endlessCurrent = null;
   }
+
+  /** Called by Game when entering PLANNING. Starts an auto-start countdown. */
+  beginPlanningCountdown(): void {
+    this.planningCountdown = this.planningDuration;
+  }
+
+  /** Remembered endless wave so HUD/codex have a stable reference. */
+  private endlessCurrent: WaveDefinition | null = null;
+
+  /** Planning-phase countdown (seconds) until auto-start. 0 disables auto-start. */
+  planningCountdown = 0;
+  readonly planningDuration = 20;
 
   get currentWaveDef(): WaveDefinition | null {
     const sector = this.game.core.sector;
     if (!sector) return null;
+    if (this.game.endless.active && this.game.core.waveIndex >= sector.waves.length) {
+      return this.endlessCurrent;
+    }
     return sector.waves[this.game.core.waveIndex] ?? null;
   }
 
@@ -36,14 +53,27 @@ export class WaveSystem {
   get hasMoreWaves(): boolean {
     const sector = this.game.core.sector;
     if (!sector) return false;
+    if (this.game.endless.active) return true;
     return this.game.core.waveIndex < sector.waves.length;
   }
 
   get totalWaves(): number {
+    if (this.game.endless.active) {
+      // Cosmetic: extend the displayed total by current endless progression.
+      return (this.game.core.sector?.waves.length ?? 0) + this.game.endless.wave + 1;
+    }
     return this.game.core.sector?.waves.length ?? 0;
   }
 
   startWave(early = false): void {
+    // Generate the next endless wave on demand so it's ready to read.
+    if (
+      this.game.endless.active &&
+      this.game.core.sector &&
+      this.game.core.waveIndex >= this.game.core.sector.waves.length
+    ) {
+      this.endlessCurrent = this.game.endless.generateWave();
+    }
     const wave = this.currentWaveDef;
     if (!wave) return;
 
@@ -119,7 +149,21 @@ export class WaveSystem {
     if (!this.hasMoreWaves) {
       this.game.onVictory();
     } else {
+      // Endless: update the best-wave tracker for persistence.
+      if (this.game.endless.active) {
+        const prof = this.game.core.profile;
+        prof.endlessBestWave = Math.max(prof.endlessBestWave, this.game.endless.wave);
+        this.game.persistence.saveProfile(prof);
+      }
       this.game.setState("PLANNING");
+    }
+  }
+
+  updatePlanningCountdown(dt: number): void {
+    if (this.planningCountdown <= 0) return;
+    this.planningCountdown = Math.max(0, this.planningCountdown - dt);
+    if (this.planningCountdown <= 0 && this.hasMoreWaves) {
+      this.startWave(false);
     }
   }
 

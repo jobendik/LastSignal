@@ -11,6 +11,8 @@ import { GameOverScreen } from "./GameOverScreen";
 import { VictoryScreen } from "./VictoryScreen";
 import { SettingsPanel } from "./SettingsPanel";
 import { CodexPanel } from "./CodexPanel";
+import { MetaPanel } from "./MetaPanel";
+import { AchievementToast } from "./AchievementToast";
 
 /**
  * Orchestrates all UI panels. Each panel is a small DOM component that
@@ -30,6 +32,8 @@ export class UIManager {
   victory: VictoryScreen;
   settingsPanel: SettingsPanel;
   codexPanel: CodexPanel;
+  metaPanel: MetaPanel;
+  achievementToast: AchievementToast;
 
   constructor(private readonly game: Game) {
     this.root = game.uiRoot;
@@ -46,6 +50,8 @@ export class UIManager {
     this.victory = new VictoryScreen(game);
     this.settingsPanel = new SettingsPanel(game);
     this.codexPanel = new CodexPanel(game);
+    this.metaPanel = new MetaPanel(game);
+    this.achievementToast = new AchievementToast(game);
   }
 
   attach(): void {
@@ -61,7 +67,9 @@ export class UIManager {
       this.gameOver.el,
       this.victory.el,
       this.settingsPanel.el,
-      this.codexPanel.el
+      this.codexPanel.el,
+      this.metaPanel.el,
+      this.achievementToast.el
     );
     this.game.bus.on<{ prev: string; next: string }>("state:changed", (p) => this.onState(p));
     this.game.bus.on("ui:mainMenuConfirm", () => this.game.setState("SECTOR_SELECT"));
@@ -73,7 +81,7 @@ export class UIManager {
     const all = [
       this.mainMenu, this.sectorSelect, this.hud, this.buildMenu, this.towerPanel,
       this.wavePreview, this.rewardScreen, this.pauseMenu, this.gameOver,
-      this.victory, this.settingsPanel, this.codexPanel,
+      this.victory, this.settingsPanel, this.codexPanel, this.metaPanel,
     ];
     for (const p of all) p.el.classList.remove("visible");
 
@@ -130,5 +138,12 @@ export class UIManager {
   }
   closeCodex(): void {
     this.codexPanel.el.classList.remove("visible");
+  }
+  openMeta(): void {
+    this.metaPanel.el.classList.add("visible");
+    this.metaPanel.refresh();
+  }
+  closeMeta(): void {
+    this.metaPanel.el.classList.remove("visible");
   }
 }

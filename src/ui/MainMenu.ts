@@ -16,7 +16,9 @@ export class MainMenu {
       el("div", { class: "ls-profile", html:
         `<div>Best sector cleared: <strong>${p.bestSectorCleared}</strong></div>` +
         `<div>Best wave reached: <strong>${p.bestWaveReached}</strong></div>` +
-        `<div>Codex entries: <strong>${p.codexSeen.length}</strong> / 7</div>`,
+        `<div>Codex entries: <strong>${p.codexSeen.length}</strong> / 14</div>` +
+        `<div>Research points: <strong>${p.researchPoints}</strong></div>` +
+        `<div>Endless best wave: <strong>${p.endlessBestWave}</strong></div>`,
       }),
     );
 
@@ -28,6 +30,10 @@ export class MainMenu {
     const codexBtn = el("button", { class: "ls-btn", text: "CODEX" });
     codexBtn.onclick = () => this.game.ui.openCodex();
     actions.append(codexBtn);
+
+    const researchBtn = el("button", { class: "ls-btn", text: "RESEARCH" });
+    researchBtn.onclick = () => this.game.ui.openMeta();
+    actions.append(researchBtn);
 
     const settingsBtn = el("button", { class: "ls-btn", text: "SETTINGS" });
     settingsBtn.onclick = () => this.game.ui.openSettings();

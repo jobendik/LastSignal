@@ -34,6 +34,10 @@ import { CodexSystem } from "../systems/CodexSystem";
 import { PersistenceSystem } from "../systems/PersistenceSystem";
 import { SettingsSystem } from "../systems/SettingsSystem";
 import { StatsSystem } from "../systems/StatsSystem";
+import { DifficultySystem } from "../systems/DifficultySystem";
+import { MetaSystem } from "../systems/MetaSystem";
+import { AchievementSystem } from "../systems/AchievementSystem";
+import { EndlessSystem } from "../systems/EndlessSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
@@ -63,6 +67,10 @@ export class Game {
   rewards!: RewardSystem;
   codex!: CodexSystem;
   stats!: StatsSystem;
+  difficulty!: DifficultySystem;
+  meta!: MetaSystem;
+  achievements!: AchievementSystem;
+  endless!: EndlessSystem;
   render!: RenderSystem;
   input!: InputSystem;
   ui!: UIManager;
@@ -112,6 +120,10 @@ export class Game {
     this.rewards = new RewardSystem(this);
     this.codex = new CodexSystem(this);
     this.stats = new StatsSystem(this);
+    this.difficulty = new DifficultySystem(this);
+    this.meta = new MetaSystem(this);
+    this.achievements = new AchievementSystem(this);
+    this.endless = new EndlessSystem(this);
     this.render = new RenderSystem(this);
     this.input = new InputSystem(this);
     this.ui = new UIManager(this);
@@ -141,6 +153,9 @@ export class Game {
 
   setState(next: GameStateId): void {
     this.stateMachine.set(next);
+    if (next === "PLANNING" && this.waves) {
+      this.waves.beginPlanningCountdown();
+    }
   }
   get state(): GameStateId {
     return this.stateMachine.state;
@@ -148,13 +163,21 @@ export class Game {
 
   // ----- Lifecycle helpers called by UI -----
 
-  beginSector(sector: SectorDefinition): void {
+  beginSector(sector: SectorDefinition, opts: { endless?: boolean } = {}): void {
+    const diff = this.difficulty.def;
+    const meta = this.meta.aggregate();
+
     this.core.sector = sector;
-    this.core.credits = sector.startingCredits;
-    this.core.coreMax = sector.coreIntegrity;
-    this.core.coreIntegrity = sector.coreIntegrity;
+    this.core.credits = sector.startingCredits + meta.startingCreditsAdd;
+    this.core.coreMax = Math.round(
+      sector.coreIntegrity * diff.coreIntegrityMul + meta.coreIntegrityAdd
+    );
+    this.core.coreIntegrity = this.core.coreMax;
     this.core.waveIndex = 0;
     this.core.upgrades = createEmptyUpgradeAggregate();
+    this.core.upgrades.towerDamageMul *= meta.towerDamageMul;
+    this.core.upgrades.towerRangeAdd += meta.towerRangeAdd;
+    this.core.upgrades.harvesterIncomeMul *= meta.harvesterIncomeMul;
     this.core.stats = createEmptyStats();
     this.core.shake = 0;
     this.core.slowMo = 0;
@@ -169,6 +192,8 @@ export class Game {
     this.drones.reset();
     this.waves.reset();
     this.codex.reset();
+    this.endless.reset();
+    if (opts.endless) this.endless.enable();
 
     this.audio.init();
     this.audio.resume();
@@ -227,6 +252,7 @@ export class Game {
     }
     this.core.shake = Math.min(18, this.core.shake + Math.min(10, amount / 4));
     this.audio.sfxCoreHit();
+    this.bus.emit("core:damaged", { amount, by: byType });
     if (this.core.coreIntegrity <= 0) {
       this.core.coreIntegrity = 0;
       this.onGameOver();
@@ -235,9 +261,13 @@ export class Game {
 
   addCredits(amount: number): void {
     if (amount <= 0) return;
-    this.core.credits += amount;
-    this.core.stats.creditsEarned += amount;
+    const mul = this.meta?.aggregate().rewardMul ?? 1;
+    const diffMul = this.difficulty?.def.rewardMul ?? 1;
+    const total = Math.max(1, Math.round(amount * mul * diffMul));
+    this.core.credits += total;
+    this.core.stats.creditsEarned += total;
     this.bus.emit("credits:changed", this.core.credits);
+    this.bus.emit("credits:earned", { amount: total });
   }
 
   onGameOver(): void {
@@ -253,7 +283,14 @@ export class Game {
     this.setState("VICTORY");
     this.audio.sfxVictory();
     this.bus.emit("game:victory");
+    this.awardResearchOnClear();
     this.commitProfile();
+  }
+
+  private awardResearchOnClear(): void {
+    // 2 base points plus up to 3 bonus by remaining core integrity.
+    const corePct = this.core.coreIntegrity / this.core.coreMax;
+    this.meta.addResearchPoints(2 + Math.floor(corePct * 3));
   }
 
   private commitProfile(): void {
@@ -305,6 +342,7 @@ export class Game {
       // Tower visuals still animate a bit, drones idle, particles decay.
       this.drones.update(dt * 0.5);
       this.particles.update(dt);
+      this.waves.updatePlanningCountdown(dt);
     } else if (this.state === "PAUSED") {
       // Freeze simulation; particles continue for ambient visual only.
       this.particles.update(dt * 0.2);

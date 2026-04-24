@@ -34,7 +34,10 @@ export type TowerType =
   | "stasis"
   | "mortar"
   | "tesla"
-  | "harvester";
+  | "harvester"
+  | "railgun"
+  | "flamer"
+  | "barrier";
 
 export type DamageType = "kinetic" | "energy" | "explosive" | "chain" | "none";
 export type StatusEffect = "none" | "slow" | "splash" | "chain" | "mark";
@@ -113,7 +116,14 @@ export type EnemyType =
   | "weaver"
   | "phantom"
   | "carrier"
-  | "leviathan";
+  | "leviathan"
+  | "sprinter"
+  | "juggernaut"
+  | "shielder"
+  | "splitter"
+  | "jammer"
+  | "swarm"
+  | "overlord";
 
 export type EnemyAbility = "none" | "heal" | "phase" | "spawn" | "boss";
 
@@ -272,6 +282,70 @@ export interface PersistedProfile {
   bestWaveReached: number;
   bestCoreRemaining: number;
   codexSeen: EnemyType[];
+  researchPoints: number;
+  researchUnlocked: string[];
+  achievementsUnlocked: string[];
+  endlessBestWave: number;
+  lastDifficulty: DifficultyId;
+}
+
+// ---------- Difficulty ----------
+export type DifficultyId = "recruit" | "standard" | "veteran" | "nightmare";
+
+export interface DifficultyDefinition {
+  id: DifficultyId;
+  name: string;
+  description: string;
+  accentColor: string;
+  enemyHpMul: number;
+  enemySpeedMul: number;
+  rewardMul: number;
+  coreIntegrityMul: number;
+  researchMul: number;
+}
+
+// ---------- Meta progression / research ----------
+export type ResearchId = string;
+
+export interface ResearchNode {
+  id: ResearchId;
+  name: string;
+  description: string;
+  cost: number;
+  requires?: ResearchId[];
+  /** Purely cosmetic/gameplay tag for UI rendering. */
+  tier: 1 | 2 | 3;
+  effect: ResearchEffect;
+}
+
+export interface ResearchEffect {
+  startingCreditsAdd?: number;
+  coreIntegrityAdd?: number;
+  towerDamageMul?: number;
+  towerRangeAdd?: number;
+  harvesterIncomeMul?: number;
+  unlocksTower?: TowerType;
+  unlocksMode?: "endless";
+  rewardMul?: number;
+}
+
+// ---------- Achievements ----------
+export type AchievementId = string;
+
+export interface AchievementDefinition {
+  id: AchievementId;
+  name: string;
+  description: string;
+  icon: string;
+  researchReward: number;
+}
+
+// ---------- Endless mode ----------
+export interface EndlessWaveState {
+  active: boolean;
+  wave: number;
+  hpScale: number;
+  speedScale: number;
 }
 
 

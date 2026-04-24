@@ -97,6 +97,51 @@ export const towerDefinitions: Record<TowerType, TowerDefinition> = {
     requiresCrystal: true,
     hotkey: "6",
   },
+  railgun: {
+    id: "railgun",
+    name: "Railgun",
+    role: "Long-range sniper",
+    description:
+      "Devastating single shot with massive range. Slow fire rate. Good vs Juggernauts.",
+    cost: 150,
+    range: 260,
+    damage: 42,
+    cooldown: 2.6,
+    color: "#ffeb3b",
+    damageType: "kinetic",
+    projectileSpeed: 900,
+    hotkey: "7",
+  },
+  flamer: {
+    id: "flamer",
+    name: "Flamer",
+    role: "Short-range sweep",
+    description:
+      "Emits a continuous flame cone. Melts Swarm and Scout waves at short range.",
+    cost: 70,
+    range: 74,
+    damage: 1.8,
+    cooldown: 0.09,
+    color: "#ff6e40",
+    damageType: "energy",
+    projectileSpeed: 260,
+    hotkey: "8",
+  },
+  barrier: {
+    id: "barrier",
+    name: "Barrier Node",
+    role: "Defensive shield",
+    description:
+      "Pulses a defensive field. Reduces incoming breach damage to the core while active.",
+    cost: 90,
+    range: 120,
+    damage: 0,
+    cooldown: 0.6,
+    color: "#80d8ff",
+    damageType: "none",
+    effect: "slow",
+    hotkey: "9",
+  },
 };
 
 export const towerOrder: TowerType[] = [
@@ -106,6 +151,9 @@ export const towerOrder: TowerType[] = [
   "mortar",
   "tesla",
   "harvester",
+  "railgun",
+  "flamer",
+  "barrier",
 ];
 
 /**
@@ -248,6 +296,75 @@ export const towerSpecializations: Record<TowerType, SpecializationTree> = {
         name: "Relay Node",
         description: "Nearby towers gain +10% fire rate.",
         mod: { flags: { relayNode: true } },
+      },
+    ],
+  },
+  railgun: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "railgun_heavy_slug",
+        name: "Heavy Slug",
+        description: "+40% damage; slightly longer cooldown.",
+        mod: { damageMul: 1.4, cooldownMul: 1.08 },
+      },
+      {
+        id: "railgun_overcharge",
+        name: "Overcharge",
+        description: "+25% range, +15% damage.",
+        mod: { rangeMul: 1.25, damageMul: 1.15 },
+      },
+      {
+        id: "railgun_piercing_round",
+        name: "Piercing Round",
+        description: "Rounds pierce through the first target.",
+        mod: { flags: { armorPiercer: true } },
+      },
+    ],
+  },
+  flamer: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "flamer_wide_cone",
+        name: "Wide Cone",
+        description: "+20% range.",
+        mod: { rangeMul: 1.2 },
+      },
+      {
+        id: "flamer_scorch",
+        name: "Scorch",
+        description: "Leaves a short burning ground on impact.",
+        mod: { flags: { burningGround: true } },
+      },
+      {
+        id: "flamer_overburn",
+        name: "Overburn",
+        description: "+25% damage on slowed targets.",
+        mod: { flags: { vulnerabilityPulse: true } },
+      },
+    ],
+  },
+  barrier: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "barrier_reinforce",
+        name: "Reinforce",
+        description: "+30% range on the barrier field.",
+        mod: { rangeMul: 1.3 },
+      },
+      {
+        id: "barrier_reflect",
+        name: "Reflect",
+        description: "Reflects 25% of breach damage back as score.",
+        mod: { flags: { relayNode: true } },
+      },
+      {
+        id: "barrier_stasis_core",
+        name: "Stasis Core",
+        description: "Enemies inside are briefly slowed.",
+        mod: { flags: { cryoField: true } },
       },
     ],
   },

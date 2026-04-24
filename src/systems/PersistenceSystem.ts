@@ -19,6 +19,11 @@ export const defaultProfile: PersistedProfile = {
   bestWaveReached: 0,
   bestCoreRemaining: 0,
   codexSeen: [],
+  researchPoints: 0,
+  researchUnlocked: [],
+  achievementsUnlocked: [],
+  endlessBestWave: 0,
+  lastDifficulty: "standard",
 };
 
 export class PersistenceSystem {
@@ -44,11 +49,17 @@ export class PersistenceSystem {
   loadProfile(): PersistedProfile {
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      if (!raw) return { ...defaultProfile, codexSeen: [] };
+      if (!raw) return { ...defaultProfile, codexSeen: [], researchUnlocked: [], achievementsUnlocked: [] };
       const parsed = JSON.parse(raw) as Partial<PersistedProfile>;
-      return { ...defaultProfile, ...parsed, codexSeen: parsed.codexSeen ?? [] };
+      return {
+        ...defaultProfile,
+        ...parsed,
+        codexSeen: parsed.codexSeen ?? [],
+        researchUnlocked: parsed.researchUnlocked ?? [],
+        achievementsUnlocked: parsed.achievementsUnlocked ?? [],
+      };
     } catch {
-      return { ...defaultProfile, codexSeen: [] };
+      return { ...defaultProfile, codexSeen: [], researchUnlocked: [], achievementsUnlocked: [] };
     }
   }
 

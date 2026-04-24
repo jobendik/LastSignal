@@ -16,6 +16,12 @@ export class HUD {
   private codexBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "CODEX" });
   private codexAlert = el("div", { class: "ls-codex-alert" });
   private bossBar = el("div", { class: "ls-boss-bar" });
+  private countdownEl = el("div", { class: "ls-wave-countdown" });
+  private countdownLabel = el("span", { class: "ls-wave-countdown-label", text: "NEXT WAVE IN" });
+  private countdownValue = el("span", { class: "ls-wave-countdown-value", text: "--" });
+  private countdownBar = el("div", { class: "ls-wave-countdown-bar" });
+  private countdownFill = el("div", { class: "ls-wave-countdown-fill" });
+  private rafId = 0;
 
   constructor(private readonly game: Game) {
     this.el = el("div", { class: "ls-panel ls-hud" });
@@ -66,10 +72,36 @@ export class HUD {
     this.settingsBtn.onclick = () => this.game.ui.openSettings();
     this.codexBtn.onclick = () => this.game.ui.openCodex();
 
-    this.el.append(left, right, this.codexAlert, this.bossBar);
+    this.countdownBar.append(this.countdownFill);
+    this.countdownEl.append(this.countdownLabel, this.countdownValue, this.countdownBar);
+
+    this.el.append(left, right, this.countdownEl, this.codexAlert, this.bossBar);
 
     this.game.bus.on("codex:new", (id: unknown) => this.showCodexAlert(String(id)));
     this.game.bus.on("codex:alertDismissed", () => this.hideCodexAlert());
+
+    // Keep the countdown ticking via rAF so we don't need a full refresh.
+    const tick = () => {
+      this.updateCountdown();
+      this.rafId = requestAnimationFrame(tick);
+    };
+    this.rafId = requestAnimationFrame(tick);
+  }
+
+  private updateCountdown(): void {
+    const w = this.game.waves;
+    const show = this.game.state === "PLANNING" && w.planningCountdown > 0 && w.hasMoreWaves;
+    if (!show) {
+      this.countdownEl.classList.remove("visible");
+      return;
+    }
+    this.countdownEl.classList.add("visible");
+    const secs = Math.ceil(w.planningCountdown);
+    this.countdownValue.textContent = `${secs}s`;
+    const pct = Math.max(0, Math.min(1, w.planningCountdown / w.planningDuration));
+    this.countdownFill.style.width = `${(pct * 100).toFixed(1)}%`;
+    this.countdownFill.style.background =
+      pct < 0.25 ? "#f44336" : pct < 0.5 ? "#ffb300" : "#66fcf1";
   }
 
   refresh(): void {
