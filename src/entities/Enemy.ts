@@ -81,6 +81,23 @@ export class Enemy {
   /** True if this enemy is an elite mini-boss variant (150% HP, glowing border). */
   isElite = false;
 
+  /**
+   * Flanking direction: ±1 makes this enemy add a lateral perpendicular force to their
+   * flow-field vector, diverging from the main lane. 0 = standard pathing.
+   */
+  flankDir: -1 | 0 | 1 = 0;
+
+  // Battle damage marks — set when hit by a specific tower type, persist until death.
+  burnMark = false;    // Flamer
+  iceMark = false;     // Stasis
+  electricMark = false; // Tesla
+
+  // Singularity pull state applied by upgraded Stasis towers.
+  singularityTimer = 0;
+  singularityMax = 1;
+  singularityX = 0;
+  singularityY = 0;
+
   constructor(type: EnemyType, x: number, y: number, hpOverride?: number) {
     const def = enemyDefinitions[type];
     this.def = def;
@@ -110,6 +127,11 @@ export class Enemy {
     this.hp -= actual;
     this.damageTakenThisWave += actual;
     this.lastDamageSource = source ?? this.lastDamageSource;
+    if (source?.type === "tower") {
+      if (source.towerType === "flamer") this.burnMark = true;
+      else if (source.towerType === "stasis") this.iceMark = true;
+      else if (source.towerType === "tesla") this.electricMark = true;
+    }
     if (this.hp <= 0) this.active = false;
     return actual;
   }

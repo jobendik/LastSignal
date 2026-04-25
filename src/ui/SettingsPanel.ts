@@ -25,6 +25,8 @@ export class SettingsPanel {
       this.checkboxRow("Reduced Motion", "reducedMotion", s.reducedMotion),
       this.checkboxRow("Reduced Flashing", "reducedFlashing", s.reducedFlashing),
       this.checkboxRow("Show Damage Numbers", "showDamageNumbers", s.showDamageNumbers),
+      this.checkboxRow("Subtitles", "subtitles", s.subtitles),
+      this.checkboxRow("Swap Mouse Buttons", "mouseButtonSwap", s.mouseButtonSwap),
       this.checkboxRow("Colorblind Markers", "colorblind", s.colorblind),
       this.checkboxRow("High Contrast", "highContrast", s.highContrast),
       this.selectRow("Font Scale", "fontScale", String(s.fontScale), [

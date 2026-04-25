@@ -1,7 +1,7 @@
 import type { Game } from "../core/Game";
 import { CellKind } from "../core/Types";
 import type { Enemy } from "../entities/Enemy";
-import type { Tower } from "../entities/Tower";
+import { Tower } from "../entities/Tower";
 import type { Drone } from "../entities/Drone";
 import type { Projectile } from "../entities/Projectile";
 import { COLS, ROWS, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
@@ -15,6 +15,9 @@ export class RenderSystem {
   private previousFrameCanvas: HTMLCanvasElement;
   private previousFrameCtx: CanvasRenderingContext2D;
   private noiseCanvas: HTMLCanvasElement;
+  // Pre-baked static terrain (rocks + AO shadows): rebuilt on sector start.
+  private terrainCache: HTMLCanvasElement;
+  private terrainCacheDirty = true;
   // Pre-built star field (static, generated once).
   private stars: { x: number; y: number; r: number; a: number }[] = [];
 
@@ -30,8 +33,16 @@ export class RenderSystem {
     this.noiseCanvas = document.createElement("canvas");
     this.noiseCanvas.width = 256;
     this.noiseCanvas.height = 256;
+    this.terrainCache = document.createElement("canvas");
+    this.terrainCache.width = VIEW_WIDTH;
+    this.terrainCache.height = VIEW_HEIGHT;
     this.generateNoiseTexture();
     this.generateStars();
+  }
+
+  /** Call when a new sector loads to force terrain re-bake next frame. */
+  invalidateTerrainCache(): void {
+    this.terrainCacheDirty = true;
   }
 
   private generateStars(): void {
@@ -105,6 +116,7 @@ export class RenderSystem {
     this.drawLightning(ctx);
     this.drawMuzzleFlashes(ctx);
     this.drawParticles(ctx);
+    this.drawCreditOrbs(ctx);
     this.drawFloatingText(ctx);
     this.drawBuildSynergyHighlights(ctx);
     this.drawPlacementPreview(ctx);
@@ -319,37 +331,46 @@ export class RenderSystem {
 
   private drawBackground(ctx: CanvasRenderingContext2D): void {
     ctx.save();
-    const g = ctx.createRadialGradient(
-      VIEW_WIDTH / 2,
-      VIEW_HEIGHT / 2,
-      100,
-      VIEW_WIDTH / 2,
-      VIEW_HEIGHT / 2,
-      VIEW_WIDTH / 1.2
+
+    // Sector-specific theme: tint background and grid to the sector's accent color.
+    const accent = this.game.core.sector?.accentColor ?? "#66fcf1";
+    const hexToRgbArr = (hex: string): [number, number, number] => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return [r, g, b];
+    };
+    const [ar, ag, ab] = hexToRgbArr(accent);
+
+    // Background gradient: dark center, sector-tinted edge.
+    const bg = ctx.createRadialGradient(
+      VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 80,
+      VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH / 1.1
     );
-    g.addColorStop(0, "rgba(12, 18, 26, 1)");
-    g.addColorStop(1, "rgba(4, 5, 8, 1)");
-    ctx.fillStyle = g;
+    bg.addColorStop(0, "rgba(10, 14, 20, 1)");
+    bg.addColorStop(1, `rgba(${Math.round(ar * 0.04)}, ${Math.round(ag * 0.04)}, ${Math.round(ab * 0.06)}, 1)`);
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
-    // Twinkling star field.
+    // Twinkling star field — color-tinted per sector.
     const elapsed = this.game.time.elapsed;
     ctx.shadowBlur = 0;
+    const starColor = `rgb(${Math.round(180 + ar * 0.25)}, ${Math.round(180 + ag * 0.25)}, ${Math.round(180 + ab * 0.25)})`;
     for (const s of this.stars) {
       const twinkle = s.a * (0.75 + Math.sin(elapsed * 1.3 + s.x * 0.07) * 0.25);
       ctx.globalAlpha = twinkle;
-      ctx.fillStyle = "#c8e6ff";
+      ctx.fillStyle = starColor;
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
 
-    // Animated grid: base glow with a slow pulse wave traveling across columns.
+    // Animated grid: sector accent color instead of always cyan.
     ctx.lineWidth = 1;
     for (let c = 0; c <= COLS; c++) {
       const wave = 0.04 + Math.sin(elapsed * 1.6 - c * 0.3) * 0.025;
-      ctx.strokeStyle = `rgba(102, 252, 241, ${wave.toFixed(3)})`;
+      ctx.strokeStyle = `rgba(${ar}, ${ag}, ${ab}, ${wave.toFixed(3)})`;
       ctx.beginPath();
       ctx.moveTo(c * TILE_SIZE, 0);
       ctx.lineTo(c * TILE_SIZE, VIEW_HEIGHT);
@@ -357,7 +378,7 @@ export class RenderSystem {
     }
     for (let r = 0; r <= ROWS; r++) {
       const wave = 0.04 + Math.sin(elapsed * 1.6 - r * 0.3) * 0.025;
-      ctx.strokeStyle = `rgba(102, 252, 241, ${wave.toFixed(3)})`;
+      ctx.strokeStyle = `rgba(${ar}, ${ag}, ${ab}, ${wave.toFixed(3)})`;
       ctx.beginPath();
       ctx.moveTo(0, r * TILE_SIZE);
       ctx.lineTo(VIEW_WIDTH, r * TILE_SIZE);
@@ -366,86 +387,58 @@ export class RenderSystem {
     ctx.restore();
   }
 
-  private drawTerrain(ctx: CanvasRenderingContext2D): void {
+  /** Bake static rocks + ambient occlusion into the off-screen cache canvas. */
+  private buildTerrainCache(): void {
+    const tc = this.terrainCache.getContext("2d")!;
+    tc.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
     const grid = this.game.grid;
+
+    // Rock polygons.
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const i = grid.idx(c, r);
-        const k = grid.cells[i];
+        if (grid.cells[i] !== CellKind.Rock) continue;
         const x = c * TILE_SIZE;
         const y = r * TILE_SIZE;
-        if (k === CellKind.Rock) {
-          // Deterministic varied polygon per tile.
-          const rng = (n: number) => Math.abs(Math.sin((c * 31 + r * 17) * 13.7 + n * 7.3));
-          const cx = x + TILE_SIZE / 2;
-          const cy = y + TILE_SIZE / 2;
-          const pts = 7;
-          ctx.beginPath();
-          for (let i = 0; i < pts; i++) {
-            const ang = (i / pts) * Math.PI * 2 - Math.PI / 2 + rng(i + 20) * 0.3;
-            const rad = 8 + rng(i) * 5;
-            const px = cx + Math.cos(ang) * rad;
-            const py = cy + Math.sin(ang) * rad;
-            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-          }
-          ctx.closePath();
-          ctx.fillStyle = "#232a33";
-          ctx.fill();
-          ctx.strokeStyle = "#0e1216";
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-          // Highlight edge.
-          ctx.beginPath();
-          for (let i = 0; i < 2; i++) {
-            const ang = (i / pts) * Math.PI * 2 - Math.PI / 2 + rng(i + 20) * 0.3;
-            const rad = 8 + rng(i) * 5;
-            const px = cx + Math.cos(ang) * rad;
-            const py = cy + Math.sin(ang) * rad;
-            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-          }
-          ctx.strokeStyle = "rgba(70, 90, 110, 0.5)";
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        } else if (k === CellKind.Crystal) {
-          const cx = x + TILE_SIZE / 2;
-          const cy = y + TILE_SIZE / 2;
-          const rot = this.game.time.elapsed * 0.45 + (c * 7 + r * 13) * 0.9;
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate(rot);
-          ctx.fillStyle = "#00e676";
-          ctx.globalAlpha = 0.72;
-          ctx.shadowBlur = 12;
-          ctx.shadowColor = "#00e676";
-          ctx.beginPath();
-          ctx.moveTo(0, -8);
-          ctx.lineTo(6, 0);
-          ctx.lineTo(0, 8);
-          ctx.lineTo(-6, 0);
-          ctx.closePath();
-          ctx.fill();
-          // Inner bright core.
-          ctx.globalAlpha = 0.45;
-          ctx.beginPath();
-          ctx.moveTo(0, -4);
-          ctx.lineTo(3, 0);
-          ctx.lineTo(0, 4);
-          ctx.lineTo(-3, 0);
-          ctx.closePath();
-          ctx.fillStyle = "#b9f6ca";
-          ctx.fill();
-          ctx.restore();
+        const rng = (n: number) => Math.abs(Math.sin((c * 31 + r * 17) * 13.7 + n * 7.3));
+        const cx = x + TILE_SIZE / 2;
+        const cy = y + TILE_SIZE / 2;
+        const pts = 7;
+        tc.beginPath();
+        for (let j = 0; j < pts; j++) {
+          const ang = (j / pts) * Math.PI * 2 - Math.PI / 2 + rng(j + 20) * 0.3;
+          const rad = 8 + rng(j) * 5;
+          const px = cx + Math.cos(ang) * rad;
+          const py = cy + Math.sin(ang) * rad;
+          j === 0 ? tc.moveTo(px, py) : tc.lineTo(px, py);
         }
+        tc.closePath();
+        tc.fillStyle = "#232a33";
+        tc.fill();
+        tc.strokeStyle = "#0e1216";
+        tc.lineWidth = 1.5;
+        tc.stroke();
+        // Highlight edge.
+        tc.beginPath();
+        for (let j = 0; j < 2; j++) {
+          const ang = (j / pts) * Math.PI * 2 - Math.PI / 2 + rng(j + 20) * 0.3;
+          const rad = 8 + rng(j) * 5;
+          const px = cx + Math.cos(ang) * rad;
+          const py = cy + Math.sin(ang) * rad;
+          j === 0 ? tc.moveTo(px, py) : tc.lineTo(px, py);
+        }
+        tc.strokeStyle = "rgba(70, 90, 110, 0.5)";
+        tc.lineWidth = 1;
+        tc.stroke();
       }
     }
 
-    // Ambient occlusion: dark shadow on tiles adjacent to rocks.
+    // Ambient occlusion: dark gradient on open tiles adjacent to rock/crystal.
     const AO_DEPTH = 12;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const k = grid.cells[grid.idx(c, r)];
         if (k !== CellKind.Rock && k !== CellKind.Crystal) continue;
-        // For each neighbor open tile, paint a shadow gradient at the shared edge.
         const checks = [[-1, 0], [1, 0], [0, -1], [0, 1]] as const;
         for (const [dc, dr] of checks) {
           const nc = c + dc;
@@ -455,17 +448,62 @@ export class RenderSystem {
           if (nk === CellKind.Rock || nk === CellKind.Crystal) continue;
           const nx = nc * TILE_SIZE;
           const ny = nr * TILE_SIZE;
-          // Shadow source (at the shared edge, facing into the open tile).
           const sx = nx + (dc === -1 ? TILE_SIZE : 0);
           const sy = ny + (dr === -1 ? TILE_SIZE : 0);
           const ex = sx + dc * -AO_DEPTH;
           const ey = sy + dr * -AO_DEPTH;
-          const aoGrd = ctx.createLinearGradient(sx, sy, ex, ey);
+          const aoGrd = tc.createLinearGradient(sx, sy, ex, ey);
           aoGrd.addColorStop(0, "rgba(0,0,0,0.4)");
           aoGrd.addColorStop(1, "rgba(0,0,0,0)");
-          ctx.fillStyle = aoGrd;
-          ctx.fillRect(nx, ny, TILE_SIZE, TILE_SIZE);
+          tc.fillStyle = aoGrd;
+          tc.fillRect(nx, ny, TILE_SIZE, TILE_SIZE);
         }
+      }
+    }
+
+    this.terrainCacheDirty = false;
+  }
+
+  private drawTerrain(ctx: CanvasRenderingContext2D): void {
+    // Static rocks + AO — blit from cache (rebuild only when sector changes).
+    if (this.terrainCacheDirty) this.buildTerrainCache();
+    ctx.drawImage(this.terrainCache, 0, 0);
+
+    // Crystals: dynamic (rotate each frame).
+    const grid = this.game.grid;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const i = grid.idx(c, r);
+        if (grid.cells[i] !== CellKind.Crystal) continue;
+        const x = c * TILE_SIZE;
+        const y = r * TILE_SIZE;
+        const cx = x + TILE_SIZE / 2;
+        const cy = y + TILE_SIZE / 2;
+        const rot = this.game.time.elapsed * 0.45 + (c * 7 + r * 13) * 0.9;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+        ctx.fillStyle = "#00e676";
+        ctx.globalAlpha = 0.72;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = "#00e676";
+        ctx.beginPath();
+        ctx.moveTo(0, -8);
+        ctx.lineTo(6, 0);
+        ctx.lineTo(0, 8);
+        ctx.lineTo(-6, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.45;
+        ctx.beginPath();
+        ctx.moveTo(0, -4);
+        ctx.lineTo(3, 0);
+        ctx.lineTo(0, 4);
+        ctx.lineTo(-3, 0);
+        ctx.closePath();
+        ctx.fillStyle = "#b9f6ca";
+        ctx.fill();
+        ctx.restore();
       }
     }
 
@@ -667,6 +705,26 @@ export class RenderSystem {
 
   private drawTowers(ctx: CanvasRenderingContext2D): void {
     for (const t of this.game.towers.list) this.drawTower(ctx, t);
+    // Dissolving towers: scale down + fade out after sell.
+    for (const t of this.game.towers.dissolving) {
+      const prog = t.dissolveTimer / Tower.DISSOLVE_MAX; // 1 → 0
+      ctx.save();
+      ctx.translate(t.pos.x, t.pos.y);
+      ctx.globalAlpha = prog * 0.7;
+      ctx.scale(prog, prog);
+      ctx.shadowBlur = 14 * prog;
+      ctx.shadowColor = t.def.color;
+      ctx.fillStyle = t.def.color;
+      ctx.fillRect(-8, -8, 16, 16);
+      // Outward-flying fragments.
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        const dist = (1 - prog) * 18;
+        ctx.globalAlpha = prog * 0.5;
+        ctx.fillRect(Math.cos(a) * dist - 2, Math.sin(a) * dist - 2, 4, 4);
+      }
+      ctx.restore();
+    }
   }
 
   private drawTower(ctx: CanvasRenderingContext2D, t: Tower): void {
@@ -901,6 +959,43 @@ export class RenderSystem {
       ctx.fillStyle = "#ff9800";
       ctx.fillRect(-9, -18, 18, 2);
     }
+
+    // Level-based structural complexity.
+    if (t.level >= 2 && !t.isEco) {
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      ctx.strokeStyle = t.def.color;
+      ctx.lineWidth = 1;
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = t.def.color;
+      // L2: thin accent ring.
+      ctx.beginPath();
+      ctx.arc(0, 0, 17, 0, Math.PI * 2);
+      ctx.stroke();
+      if (t.level >= 3) {
+        // L3: second outer ring with slight glow.
+        ctx.globalAlpha = 0.3;
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (t.level >= 4) {
+        // L4: 4 diagonal strut lines from center.
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 4;
+        for (let si = 0; si < 4; si++) {
+          const a = (si / 4) * Math.PI * 2 + Math.PI / 4;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * 9, Math.sin(a) * 9);
+          ctx.lineTo(Math.cos(a) * 18, Math.sin(a) * 18);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
     if (t.overcharge >= 5 && !t.isEco) {
       ctx.strokeStyle = "#ffeb3b";
       ctx.lineWidth = 1.5;
@@ -909,6 +1004,21 @@ export class RenderSystem {
       ctx.beginPath();
       ctx.arc(0, 0, 18 + Math.sin(elapsed * 6) * 1.5, 0, Math.PI * 2);
       ctx.stroke();
+    }
+    if (t.powerSurgeTimer > 0) {
+      const pulse = 0.65 + Math.sin(elapsed * 18) * 0.25;
+      ctx.strokeStyle = "#64ffda";
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = "#64ffda";
+      ctx.globalAlpha = pulse;
+      ctx.setLineDash([4, 3]);
+      ctx.lineDashOffset = -elapsed * 42;
+      ctx.beginPath();
+      ctx.arc(0, 0, 23 + Math.sin(elapsed * 10) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
     }
     if (this.game.core.settings.colorblind) {
       ctx.shadowBlur = 3;
@@ -1406,6 +1516,86 @@ export class RenderSystem {
       }
     }
 
+    // Battle damage marks — persistent visual scars from specific damage types.
+    if (e.burnMark) {
+      ctx.save();
+      const seed = e.maxHp;
+      ctx.globalAlpha = 0.55;
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = "#ff6d00";
+      for (let i = 0; i < 5; i++) {
+        const a = ((seed * (i + 3) * 53) % 628) / 100;
+        const r1 = e.size * 0.2;
+        const r2 = e.size * (0.5 + ((seed * (i + 7) * 31) % 100) / 200);
+        ctx.strokeStyle = i % 2 === 0 ? "#bf360c" : "#e64a19";
+        ctx.lineWidth = 1 + (i % 2);
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
+        ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2);
+        ctx.stroke();
+      }
+      // Char smudge at center.
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = "#212121";
+      ctx.beginPath();
+      ctx.arc(0, 0, e.size * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    if (e.electricMark) {
+      ctx.save();
+      const seed = e.maxHp + 1;
+      ctx.globalAlpha = 0.5;
+      ctx.shadowBlur = 5;
+      ctx.shadowColor = "#ffe082";
+      ctx.strokeStyle = "#ffe57f";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        const startA = ((seed * (i + 2) * 71) % 628) / 100;
+        const x0 = Math.cos(startA) * e.size * 0.3;
+        const y0 = Math.sin(startA) * e.size * 0.3;
+        const endA = startA + 1.3;
+        const x3 = Math.cos(endA) * e.size * 0.85;
+        const y3 = Math.sin(endA) * e.size * 0.85;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo((x0 + x3) / 2 + ((seed * i * 17) % 10) - 5, (y0 + y3) / 2 + ((seed * i * 23) % 8) - 4);
+        ctx.lineTo(x3, y3);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (e.iceMark && !e.freezeFxTimer) {
+      ctx.save();
+      const seed = e.maxHp + 2;
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = "#b3e5fc";
+      ctx.lineWidth = 1;
+      ctx.shadowBlur = 3;
+      ctx.shadowColor = "#81d4fa";
+      for (let i = 0; i < 4; i++) {
+        const a = ((seed * (i + 5) * 61) % 628) / 100;
+        const arm = e.size * 0.65;
+        const mx = Math.cos(a) * arm;
+        const my = Math.sin(a) * arm;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(mx, my);
+        // Two small cross-bars along each arm.
+        for (let b = 0; b < 2; b++) {
+          const t2 = 0.35 + b * 0.4;
+          const bx = mx * t2;
+          const by = my * t2;
+          const cx2 = Math.cos(a + Math.PI / 2) * arm * 0.22;
+          const cy2 = Math.sin(a + Math.PI / 2) * arm * 0.22;
+          ctx.moveTo(bx - cx2, by - cy2);
+          ctx.lineTo(bx + cx2, by + cy2);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // Elite: pulsing golden border.
     if (e.isElite) {
       ctx.save();
@@ -1791,6 +1981,32 @@ export class RenderSystem {
       ctx.shadowBlur = 4;
       ctx.shadowColor = "#000";
       ctx.fillText(f.text, f.pos.x, f.pos.y);
+      ctx.restore();
+    }
+  }
+
+  private drawCreditOrbs(ctx: CanvasRenderingContext2D): void {
+    for (const o of this.game.particles.creditOrbs) {
+      const t = o.life / o.maxLife;
+      ctx.save();
+      ctx.globalAlpha = t * 0.85;
+      ctx.translate(o.x, o.y);
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "#00e676";
+      ctx.fillStyle = "#00e676";
+      ctx.beginPath();
+      ctx.moveTo(0, -4 * t);
+      ctx.lineTo(3 * t, 0);
+      ctx.lineTo(0, 4 * t);
+      ctx.lineTo(-3 * t, 0);
+      ctx.closePath();
+      ctx.fill();
+      // Bright center.
+      ctx.globalAlpha = t * 0.5;
+      ctx.fillStyle = "#b9f6ca";
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.5 * t, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
   }

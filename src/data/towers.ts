@@ -232,10 +232,10 @@ export const towerSpecializations: Record<TowerType, SpecializationTree> = {
         mod: { flags: { deepFreeze: true } },
       },
       {
-        id: "stasis_cryo_field",
-        name: "Cryo Field",
-        description: "Applies slow in a small area around the target.",
-        mod: { flags: { cryoField: true } },
+        id: "stasis_singularity",
+        name: "Singularity Field",
+        description: "Creates a gravity well that pulls nearby enemies into the target point.",
+        mod: { flags: { singularity: true } },
       },
       {
         id: "stasis_vulnerability",

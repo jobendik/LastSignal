@@ -104,6 +104,8 @@ export interface GameCoreState {
   achievedMilestones: Set<string>;
   /** Number of Tactical Pause slow-mo uses remaining this wave. */
   tacticalPauseCharges: number;
+  /** Seconds until the next environmental power surge can strike a combat tower. */
+  powerSurgeTimer: number;
 }
 
 export function createEmptyStats(): RunStats {
@@ -115,6 +117,7 @@ export function createEmptyStats(): RunStats {
     damageByTowerType: {},
     damageByEnemyType: {},
     killsByEnemyType: {},
+    killsByTowerType: {},
     startedAt: Date.now(),
     bestTowerType: null,
     bestTowerLevel: 0,

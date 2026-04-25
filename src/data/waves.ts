@@ -170,12 +170,13 @@ export const defaultWaves: WaveDefinition[] = [
   }),
   summarize({
     id: "w09_swarm_burst",
-    name: "Swarm Burst",
-    description: "A pure scout swarm. Blasters and Tesla arrays shine here.",
-    warning: "Volume over armor. Chain and splash dominate.",
+    name: "Blitz Swarm",
+    description: "A pure scout swarm arrives all at once. Blasters and Tesla arrays shine here.",
+    warning: "BLITZ WAVE: no stagger. Volume over armor. Chain and splash dominate.",
     recommendedCounters: ["Blaster", "Tesla", "Mortar"],
     rewardCredits: 100,
     rewardChoice: false,
+    waveEvent: "blitz",
     lanes: [
       {
         spawnerId: "north",

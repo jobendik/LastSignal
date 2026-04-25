@@ -14,6 +14,7 @@ import { CodexPanel } from "./CodexPanel";
 import { MetaPanel } from "./MetaPanel";
 import { AchievementToast } from "./AchievementToast";
 import { KillFeed } from "./KillFeed";
+import { SubtitleOverlay } from "./SubtitleOverlay";
 
 /**
  * Orchestrates all UI panels. Each panel is a small DOM component that
@@ -36,6 +37,7 @@ export class UIManager {
   metaPanel: MetaPanel;
   achievementToast: AchievementToast;
   killFeed: KillFeed;
+  subtitles: SubtitleOverlay;
 
   constructor(private readonly game: Game) {
     this.root = game.uiRoot;
@@ -55,6 +57,7 @@ export class UIManager {
     this.metaPanel = new MetaPanel(game);
     this.achievementToast = new AchievementToast(game);
     this.killFeed = new KillFeed(game);
+    this.subtitles = new SubtitleOverlay(game);
   }
 
   attach(): void {
@@ -73,7 +76,8 @@ export class UIManager {
       this.codexPanel.el,
       this.metaPanel.el,
       this.killFeed.el,
-      this.achievementToast.el
+      this.achievementToast.el,
+      this.subtitles.el
     );
     this.root.addEventListener("pointerover", (e) => {
       const target = e.target as Element | null;

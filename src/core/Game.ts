@@ -92,6 +92,7 @@ export class Game {
     this.uiRoot = uiRoot;
 
     this.settings = new SettingsSystem(this);
+    this.audio.setSubtitleHandler((cue) => this.bus.emit("audio:subtitle", cue));
     const loadedSettings = this.persistence.loadSettings();
     const loadedProfile = this.persistence.loadProfile();
 
@@ -127,6 +128,7 @@ export class Game {
       bonusUpgradeCount: 0,
       achievedMilestones: new Set(),
       tacticalPauseCharges: 0,
+      powerSurgeTimer: 8,
     };
 
     // Wire systems that need `this`.
@@ -219,6 +221,7 @@ export class Game {
     this.core.bonusUpgradeCount = 0;
     this.core.achievedMilestones = new Set();
     this.core.tacticalPauseCharges = 0;
+    this.core.powerSurgeTimer = 8;
     this.core.speed = 1;
     this.time.timeScale = 1;
 
@@ -235,6 +238,7 @@ export class Game {
     this.core.coreIntegrity = this.core.coreMax;
 
     this.grid.loadSector(sector);
+    this.render.invalidateTerrainCache();
     this.enemies.reset();
     this.towers.reset();
     this.projectiles.reset();
@@ -505,6 +509,7 @@ export class Game {
       this.particles.update(dt);
       if (this.core.hitStopTimer <= 0) {
         this.waves.update(dt);
+        this.updatePowerSurges(dt);
         this.towers.update(dt);
         this.enemies.update(dt);
         this.projectiles.update(dt);
@@ -574,5 +579,32 @@ export class Game {
     } else if (this.core.emergencyOverheatTimer > 0) {
       this.core.emergencyOverheatTimer = Math.max(0, this.core.emergencyOverheatTimer - dt);
     }
+  }
+
+  private updatePowerSurges(dt: number): void {
+    if (this.state !== "WAVE_ACTIVE") return;
+    this.core.powerSurgeTimer -= dt;
+    if (this.core.powerSurgeTimer > 0) return;
+
+    const candidates = this.towers.list.filter((t) =>
+      t.buildProgress >= 1 &&
+      t.powerSurgeTimer <= 0 &&
+      !t.isEco &&
+      t.type !== "amplifier" &&
+      !this.towers.disabled.has(t)
+    );
+    if (candidates.length === 0) {
+      this.core.powerSurgeTimer = 4;
+      return;
+    }
+
+    const tower = candidates[Math.floor(Math.random() * candidates.length)]!;
+    tower.powerSurgeTimer = 3;
+    this.core.powerSurgeTimer = 12 + Math.random() * 8;
+    this.particles.spawnFloatingText(tower.pos.x, tower.pos.y - 30, "POWER SURGE", "#64ffda", 1.2, 12);
+    this.particles.spawnRing(tower.pos.x, tower.pos.y, 44, "#64ffda", 0.35);
+    this.particles.spawnBurst(tower.pos.x, tower.pos.y, "#64ffda", 14, { speed: 92, life: 0.45, size: 2 });
+    this.audio.sfxPowerSurge(tower.pos);
+    this.bus.emit("tower:powerSurge", tower);
   }
 }

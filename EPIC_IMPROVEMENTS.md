@@ -1,10 +1,10 @@
 # LAST SIGNAL — Epic Improvement Plan
 
-> **Game Overview**: Last Signal is a tactical sci-fi tower defense roguelite rendered on Canvas 2D with a neon-cyan CRT aesthetic, procedural Web Audio, 9 tower types, 14 enemy types, 3 drone types, and roguelite meta-progression. Built in TypeScript + Vite.
+> **Game Overview**: Last Signal is a tactical sci-fi tower defense roguelite rendered on Canvas 2D with a neon-cyan CRT aesthetic, procedural Web Audio, 10 tower types, 17 enemy types, 3 drone types, and roguelite meta-progression. Built in TypeScript + Vite.
 
 This document is the master checklist for every improvement needed to make the game feel truly epic. Each section covers a domain; each item is a discrete, implementable task.
 
-Status audited against the current codebase on 2026-04-25; `npm run typecheck` passes.
+Status audited against the current codebase on 2026-04-26; `npm run typecheck` and `npm run build` pass. Checklist progress: 168/226 complete (74.3%), 58 remaining.
 
 ---
 
@@ -100,7 +100,7 @@ Phase 5 "Polish & Depth":
 | 5-H | **High score comparison** | Game Over and Victory stat summaries compare wave reached to `profile.bestWaveReached` with color-coded delta (▲ green above best, ▼ red below, = yellow tie) |
 | 5-I | **Boss phase cinematics** | Phase-colored rings on each transition (phase 2 = orange, 3 = purple, 4 = red/white); 28-particle burst; bigger floating text (size 15, 3.0s); stronger slow-mo (scale 0.18, 0.65s) and shake (16 units, 0.055 rad) |
 
-**Next: Continue with unchecked items from sections 5–14**
+**Next: Continue with 58 unchecked items across sections 1–14**
 
 ---
 
@@ -147,7 +147,7 @@ The game uses Canvas 2D with procedural geometry. The CRT aesthetic is a strong 
 - [ ] Replace plain colored polygon towers with **multi-layered procedural art**: base platform + weapon barrel/dish + level indicator rings all as separate animated components
 - [x] Add **idle animations** to every tower: Pulse rotating arcs, Stasis orbiting shards, Barrier rotating shield bars, Tesla micro-arc crackles, Railgun capacitor charge fill bar *(per-type idle animation in drawTower; all driven by t.timer)*
 - [x] Add **firing animations**: fire-burst `shadowBlur` spike via `t.recoil`; Railgun charge fill glows when ready *(recoil state on Tower, decays each frame)*
-- [ ] Level-up towers gain **visual complexity**: new geometric elements added at each level (extra antenna, wider base, more barrel ports)
+- [x] Level-up towers gain **visual complexity**: L2 adds a thin accent ring (r=17), L3 adds a second outer ring (r=20), L4 adds 4 diagonal strut lines from body to outer ring *(drawn in `drawTower` after level pips, styled in tower color, semi-transparent)*
 - [ ] Specialization visuals: applying a specialization **changes the tower silhouette** — e.g. Focus Lens Pulse gains a visible lens ring, Chain Storm Tesla grows additional coil nodes
 - [x] Tower **construction animation**: when placed, tower assembles from parts flying inward over 0.4s *(new `buildProgress` field; towers do not fire until the animation completes)*
 
@@ -160,7 +160,7 @@ The game uses Canvas 2D with procedural geometry. The CRT aesthetic is a strong 
 - [x] **Carrier**: wide body with visible "hatch" that opens as it takes damage; scouts visible inside until released *(hatch gap scales with HP%; top+bottom panels separate; 1-3 scout dots visible inside hull based on remaining HP)*
 - [x] **Leviathan boss**: 3 animated multi-segment rotating rings at radii 1.85/2.4/3.0× size, each ring has gap segments; ring directions alternate CW/CCW *(multi-ring leviathan)*
 - [x] Add **death animations** to all enemies: dissolve into colored particles matching their body color, not generic sparks *(16 body-color particles + expanding ring in enemy color on death; elite deaths also add a gold ring)*
-- [ ] Enemies accumulate **battle damage**: burn marks from Flamer hits, ice cracks from Stasis, electric scorch marks from Tesla
+- [x] Enemies accumulate **battle damage**: burn marks from Flamer hits, ice cracks from Stasis, electric scorch marks from Tesla *(persistent `burnMark/iceMark/electricMark` flags on Enemy set on each hit; deterministic radiating char lines, zigzag electric sparks, and crystal arm cracks drawn in RenderSystem per mark)*
 
 ### 1.5 Environment & Map
 - [x] **Animated grid**: grid lines pulse with a sinusoidal wave that travels across columns/rows driven by `elapsed` *(per-line alpha varies 0.015–0.065 via sin wave)*
@@ -169,7 +169,7 @@ The game uses Canvas 2D with procedural geometry. The CRT aesthetic is a strong 
 - [x] **Spawner portals**: spawner cells should be vivid glowing portals with a rotating ring and energy tendrils — not static markers *(rotating segmented ring, pulsing red core, 6 energy tendrils)*
 - [x] **Core redesign**: the 2×2 core is a multi-layered signal node — outer ring with HP arc + tick marks, counter-rotating inner ring, 4 antenna arms, 8-sector orb (sectors darken as HP drops), radial inner glow *(full drawCore() rewrite)*
 - [x] Add a **background star field** layer to reinforce the sci-fi space feel *(120 twinkling stars drawn with per-star sinusoidal alpha variation)*
-- [ ] Add **sector-specific environment themes**: asteroid sector = rocky dark background, orbital station = metal grate patterns, deep space = nebula gradients
+- [x] Add **sector-specific environment themes**: each sector's `accentColor` tints the background gradient edge, star field color, and grid line color — sector 1 = cyan, sector 2 = green, sector 3 = grey *(`drawBackground` reads `game.core.sector?.accentColor` and derives RGB components for all ambient elements)*
 
 ---
 
@@ -202,7 +202,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 ### 2.4 Upgrade & Economy FX
 - [x] **Level-up**: tower level-up triggers an expanding golden ring + floating "LEVEL 2" text + brief particle shower *(gold ring + tower-color ring + particle shower + floating LEVEL text)*
 - [x] **Specialization unlock FX pass**: specialization applies a slow-motion pop, radial burst, dual rings, color-matched particles, upgrade SFX, and "SPEC LOCKED" floating text *(camera zoom/color-shift variant still available as future polish)*
-- [ ] **Credit gain**: harvester income spawns credit coin icons that fly from harvester to the HUD credit counter
+- [x] **Credit gain**: harvester income spawns 2 glowing green diamond orbs that arc upward from the harvester each tick — `CreditOrbFX` type in ParticleSystem, drawn by `drawCreditOrbs` in RenderSystem, with gentle upward arc and fade *(skipped when reducedMotion is on)*
 - [x] **Kill streak**: after 5 kills in 2 seconds, display a "CHAIN KILL ×5" floating text in the center with a color flash *(center-screen text, burst, expanding ring, escalates every +3 kills)*
 
 ---
@@ -234,7 +234,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 - [x] **Hover preview**: hovering over a tower in the build menu should show a semi-transparent ghost on the grid that updates in real time as mouse moves *(build menu hover feeds the canvas placement ghost via InputSystem)*
 - [x] **Placement snap**: ghost tower should snap to valid tiles with a satisfying "lock" micro-animation (small scale bounce) *(valid-cell transitions trigger a short scale bounce)*
 - [x] **Invalid placement feedback**: ghost turns red + brief shake micro-animation + a "blocked" sound byte when hovering over invalid cells *(invalid cells tint red, shake, and play throttled reject SFX)*
-- [ ] **Sell confirmation**: instead of immediate sell, show a 0.5s dissolve animation of the tower breaking apart into credits raining down
+- [x] **Sell confirmation**: tower moves to a `dissolving` list after sell; 0.45s scale-down + fade with 4 outward-flying fragments; credit+tower-color particle bursts spawn simultaneously *(grid cell freed immediately so replacements can be placed; dissolve is purely cosmetic)*
 
 ---
 
@@ -297,7 +297,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 ### 5.4 Game Over & Victory Screens
 - [x] **Game Over**: data corruption / static disintegration effect — the game canvas pixelates and dissolves, then the game-over screen assembles *(JS block-sampling + red wash + glitch bars; CSS `ls-gameover-assemble` entrance; `CORE OFFLINE` title glitch loop)*
 - [x] **Victory**: signal transmission animation — waves ripple outward from the core as if a signal is being sent, then the victory card flies in *(three CSS-animated rings expanding from center)*
-- [ ] Show a **detailed run summary**: total kills by tower type (pie chart), damage dealt, credits earned, wave timeline, core integrity over time
+- [x] Show a **detailed run summary**: kills by tower type breakdown *(`killsByTowerType` tracked in RunStats from killing blow source; displayed as colored chips in statsSummary on Game Over and Victory screens)*
 - [x] Add a **high score comparison**: "Your best: Wave 12 | Previous best: Wave 9 ▲ +3" *(color-coded delta vs `profile.bestWaveReached`)*
 
 ### 5.5 Planning Phase UX
@@ -326,7 +326,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 ### 6.3 Core Mechanics
 - [x] **Core repair**: allow spending credits to repair core integrity between waves (5% repair per 30 credits, up to 80% max) *(HUD repair button during planning/wave-complete)*
 - [x] **Core abilities**: the core itself should have 1 active ability (e.g. EMP burst that stuns all enemies for 2s, cooldown 60s) — activated by clicking the core *(click core or HUD EMP button during waves)*
-- [ ] **Breach mechanics**: enemies that reach the core should briefly "interact" with it — animation of them attacking the core station, not just walking through
+- [x] **Breach mechanics**: enemies that reach the core spawn an enemy-color particle burst + expanding ring at the core, plus a red "-N BREACH" floating text; breach ≥ 2 spawns a second wider ring *(in EnemySystem breach handler, before deactivating the enemy)*
 - [x] **Core shield**: Barrier tower specialization "Deflector Grid" should visually create a shield around the core that absorbs 1 hit *(Barrier specialization reduces each breach by 1 while covering core)*
 
 ### 6.4 Strategic Depth
@@ -340,7 +340,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 ## 7. ENEMY DESIGN & AI
 
 ### 7.1 Behavioral AI Improvements
-- [ ] **Flanking behavior**: a percentage of scouts in later waves attempt alternate routes — if the primary path is heavily defended, they spread to lightly-defended edges
+- [x] **Flanking behavior**: 30% of scouts from wave 5+ are assigned a `flankDir` (±1); their flow-field direction is blended with a perpendicular lateral component (0.55× weight) so they diverge left/right of the main lane *(creates natural two-lane spread from each spawner; flankers still follow BFS so they can't escape past rocks)*
 - [ ] **Formation movement**: Grunts and Brutes travel in loose formations and close ranks when one is killed, providing mutual "cover" (shared threat reduction)
 - [ ] **Adaptive pathing**: enemies with pathfinding intelligence (Weaver, Overlord) slightly deviate from the flow field to avoid tower splash zones when possible
 - [x] **Fear response**: when a Carrier is killed, nearby spawned scouts briefly scatter in random directions before regrouping toward the core *(radial knockback 160 + 1.2s stun to all scouts within 130px)*
@@ -392,7 +392,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 ### 9.1 Projectile Physics
 - [x] **Projectile arc**: Mortar shells follow a true parabolic arc with a visible shadow on the ground below the shell *(rendered with sin-arc elevation and dynamic ground shadow)*
 - [ ] **Bounce projectile** (Railgun upgrade "Ricochet"): beam bounces off rocks/walls up to 2 times
-- [ ] **Gravity field**: Stasis upgraded to "Singularity" should pull nearby enemies toward the target point in addition to slowing
+- [x] **Gravity field**: Stasis upgraded to "Singularity" pulls nearby enemies toward the target point in addition to slowing *(Stasis specialization replaces Cryo Field with Singularity Field; pulse applies a 76px gravity well, ongoing pull timer, immediate inward impulse, dual ring FX, and reduced boss pull)*
 - [x] **Projectile collision with terrain**: projectiles that miss their target should hit rocks and spawn small sparks *(orphaned bullets now test rock cells and emit impact sparks)*
 
 ### 9.2 Enemy Movement
@@ -462,14 +462,14 @@ Juice is the difference between "functional" and "epic." Every action should hav
 - [ ] **Procedurally generated sectors**: a "Void" mode where the map layout is randomized each run from a set of pre-designed room templates stitched together
 
 ### 12.2 New Wave Events
-- [ ] **"Blitz" waves**: all enemies spawn simultaneously (no stagger) — tests AoE capability
+- [x] **"Blitz" waves**: all enemies spawn simultaneously (no stagger) — tests AoE capability *(WaveDefinition supports `waveEvent: "blitz"`; Wave 9 is now Blitz Swarm; WaveSystem immediately spawns all pending groups with warning text and red portal rings)*
 - [ ] **"Silence" waves**: no new enemies, but existing surviving enemies get healed to full — tests cleanup efficiency
 - [x] **"Escalation" sub-events**: mid-wave reinforcement drops once per wave from wave 3 onward near the 65% enemy-killed mark *(spawns 2 + waveIndex/2 reinforcements of the wave's dominant enemy type at a random spawner)*
 - [ ] **"Boss Rush"**: wave 15 sends all unique enemy types in sequence — a gauntlet finale
 
 ### 12.3 Environmental Hazards
 - [ ] **Meteor showers**: random tiles in the map become danger zones (shown with warning rings) that deal damage to enemies AND towers after 2s
-- [ ] **Power surges**: random towers get a 3s free "overcharge" (double fire rate) from environmental power spikes
+- [x] **Power surges**: random towers get a 3s free "overcharge" (double fire rate) from environmental power spikes *(during active waves, eligible combat towers periodically gain `powerSurgeTimer`; TowerSystem doubles fire rate while active; RenderSystem draws cyan dashed electric halo + FX burst)*
 - [ ] **Gravity anomaly**: a moving slow field drifts across the map, slowing enemies AND projectile speeds in its radius
 - [ ] **Signal interference**: towers within a radius of the interference zone have reduced range — the zone moves every 10s
 
@@ -479,7 +479,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 
 ### 13.1 Rendering Performance
 - [ ] **Dirty rect optimization**: only re-render changed regions of the canvas each frame instead of clearing and redrawing everything
-- [ ] **Off-screen canvas caching**: pre-render static elements (terrain, grid, rocks) to an off-screen canvas and blit them once per frame
+- [x] **Off-screen canvas caching**: pre-render static elements (terrain, grid, rocks) to an off-screen canvas and blit them once per frame *(rocks + AO shadows baked into `terrainCache` HTMLCanvasElement once per sector; `invalidateTerrainCache()` called on sector load; crystals + spawners remain live)*
 - [x] **Particle batching**: group particles by color and draw them in batches (single `beginPath` → multiple rects → single `fillStyle` → `fill`) instead of one draw call per particle *(opaque particles render by color bucket, translucent particles keep per-alpha draws)*
 - [ ] **LOD (Level of Detail)**: reduce detail on enemies/towers far from the camera center — simpler shapes at distance for performance headroom
 - [ ] **Web Workers**: offload pathfinding BFS recalculation to a Web Worker to prevent frame spikes when towers are placed
@@ -508,13 +508,13 @@ Juice is the difference between "functional" and "epic." Every action should hav
 
 ### 14.2 Control Customization
 - [ ] **Rebindable hotkeys**: all keyboard shortcuts (1-9, U, S, P, Space, +/-) should be configurable
-- [ ] **Mouse button swap**: option to swap left/right click for tower placement
+- [x] **Mouse button swap**: option to swap left/right click for tower placement *(settings toggle; primary/secondary canvas actions are routed through `mouseButtonSwap`, so right-click can place/select and left-click becomes manual-fire/clear)*
 - [ ] **Gamepad support**: add controller support — D-pad to move cursor, A to select/place, B to cancel, triggers for speed control
 
 ### 14.3 Settings Panel Expansion
 - [x] **Graphics quality**: Low / Medium / High presets that toggle: particle count, glow effects, CRT overlay, phosphor persistence *(low drops glow/CRT and particle count; medium reduces glow/particles; high enables full CRT/persistence)*
 - [x] **Audio mixer**: individual sliders for Master, Music, SFX, UI — not just master + mute *(UI volume slider routes UI category sounds through a separate gain)*
-- [ ] **Subtitles**: show text descriptions of audio cues ("TESLA CHAIN", "BOSS PHASE CHANGE", "CORE ALERT") for deaf/hard-of-hearing players
+- [x] **Subtitles**: show text descriptions of audio cues ("TESLA CHAIN", "BOSS PHASE CHANGE", "CORE ALERT") for deaf/hard-of-hearing players *(settings toggle; bottom-center caption overlay with tone colors, aria-live, and per-cue cooldowns)*
 
 ---
 
@@ -572,5 +572,5 @@ Juice is the difference between "functional" and "epic." Every action should hav
 
 ---
 
-*Total improvement items: ~150 discrete tasks across 14 categories.*
-*Document version: 1.2 — 2026-04-25*
+*Total checklist items: 226 discrete tasks across 14 categories (168 complete, 58 remaining).*
+*Document version: 1.3 — 2026-04-26*

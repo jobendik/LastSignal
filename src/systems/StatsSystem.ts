@@ -1,5 +1,5 @@
 import type { Game } from "../core/Game";
-import type { EnemyType, RunJournalEntry, RunResult } from "../core/Types";
+import type { EnemyType, RunJournalEntry, RunResult, TowerType } from "../core/Types";
 
 /** Tracks and writes persistence summary of the current run. */
 export class StatsSystem {
@@ -11,10 +11,13 @@ export class StatsSystem {
     stats.damageByTowerType[t] = (stats.damageByTowerType[t] ?? 0) + amount;
   }
 
-  recordKill(enemy: EnemyType): void {
+  recordKill(enemy: EnemyType, byTower?: TowerType): void {
     const stats = this.game.core.stats;
     stats.enemiesKilled++;
     stats.killsByEnemyType[enemy] = (stats.killsByEnemyType[enemy] ?? 0) + 1;
+    if (byTower) {
+      stats.killsByTowerType[byTower] = (stats.killsByTowerType[byTower] ?? 0) + 1;
+    }
   }
 
   finalize(): void {

@@ -10,6 +10,8 @@ import { VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
 /** Handles tower behavior: targeting, firing, specialization effects, upgrades, economy ticks. */
 export class TowerSystem {
   list: Tower[] = [];
+  /** Towers mid-sell-dissolve (removed from grid, still rendered briefly). */
+  dissolving: Tower[] = [];
   selected: Tower | null = null;
   /** Tower disable timers keyed on tower ref. */
   disabled = new Map<Tower, number>();
@@ -18,6 +20,7 @@ export class TowerSystem {
 
   reset(): void {
     this.list.length = 0;
+    this.dissolving.length = 0;
     this.selected = null;
     this.disabled.clear();
   }
@@ -91,6 +94,7 @@ export class TowerSystem {
     const refund = Math.floor(t.totalInvested * this.game.core.upgrades.sellRefundMul);
     this.game.core.credits += refund;
     const def = t.def;
+    // Remove from grid and active list immediately so towers can be placed here again.
     this.game.grid.removeTower(t.c, t.r, Boolean(def.requiresCrystal));
     this.list = this.list.filter((x) => x !== t);
     if (this.selected === t) this.selected = null;
@@ -98,6 +102,12 @@ export class TowerSystem {
     this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 20, `+${refund}`, "#ffeb3b");
     this.game.bus.emit("credits:changed", this.game.core.credits);
     this.game.bus.emit("tower:sold", t);
+    // Start dissolve animation — tower moves to dissolving list and is removed after timer.
+    t.dissolveTimer = Tower.DISSOLVE_MAX;
+    this.dissolving.push(t);
+    // Burst particles to sell-credit color.
+    this.game.particles.spawnBurst(t.pos.x, t.pos.y, t.def.color, 8, { speed: 80, life: 0.4, size: 2 });
+    this.game.particles.spawnBurst(t.pos.x, t.pos.y, "#ffeb3b", 5, { speed: 55, life: 0.5, size: 1.5 });
   }
 
   /** One-per-sector tower recall: refunds 100% of invested credits. */
@@ -232,12 +242,20 @@ export class TowerSystem {
   }
 
   update(dt: number): void {
+    // Tick dissolving towers (sold towers that are still animating out).
+    for (const t of this.dissolving) {
+      t.dissolveTimer = Math.max(0, t.dissolveTimer - dt);
+    }
+    this.dissolving = this.dissolving.filter((t) => t.dissolveTimer > 0);
+
     const up = this.game.core.upgrades;
     const lowCoreActive =
       up.lowCoreThreshold > 0 &&
       this.game.core.coreIntegrity / this.game.core.coreMax <= up.lowCoreThreshold;
 
     for (const t of this.list) {
+      if (t.powerSurgeTimer > 0) t.powerSurgeTimer = Math.max(0, t.powerSurgeTimer - dt);
+
       // Construction: advance build animation, skip firing until complete.
       if (t.buildProgress < 1) {
         t.buildProgress = Math.min(1, t.buildProgress + dt / 0.4);
@@ -289,6 +307,7 @@ export class TowerSystem {
       let fireRateMul = up.towerFireRateMul;
       if (lowCoreActive) fireRateMul *= up.lowCoreFireRateMul;
       if (this.game.core.emergencyTimer > 0) fireRateMul *= 1.5;
+      fireRateMul *= this.powerSurgeMul(t);
       // Relay node: harvester boost.
       if (this.hasNearbyRelay(t)) fireRateMul *= 1.1;
       // Run modifier: overclock (lower towerCooldownMul = shorter cooldown = faster fire).
@@ -353,6 +372,7 @@ export class TowerSystem {
       this.game.audio.sfxCredit(t.pos);
       this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 18, `+${income}`, "#00e676", 0.8, 12);
       this.game.particles.spawnRing(t.pos.x, t.pos.y, 22, "#00e676");
+      this.game.particles.spawnCreditOrbs(t.pos.x, t.pos.y, 2);
     }
   }
 
@@ -360,6 +380,7 @@ export class TowerSystem {
     const stats = this.effectiveStats(t);
     let fireRateMul = this.game.core.upgrades.towerFireRateMul;
     if (this.game.core.emergencyTimer > 0) fireRateMul *= 1.5;
+    fireRateMul *= this.powerSurgeMul(t);
     if (this.hasNearbyRelay(t)) fireRateMul *= 1.1;
     for (const m of this.game.core.activeModifiers) {
       if (m.towerCooldownMul) fireRateMul /= m.towerCooldownMul;
@@ -386,6 +407,11 @@ export class TowerSystem {
     target.freezeFxMax = duration;
     this.game.particles.spawnBeam(t.pos.x, t.pos.y, target.pos.x, target.pos.y, t.def.color, 0.18);
 
+    if (t.flags.singularity) {
+      this.applySingularityPulse(t, target, duration, strength);
+      return;
+    }
+
     // Cryo Field: slow everyone around the target a bit.
     if (t.flags.cryoField) {
       for (const e of this.game.enemies.list) {
@@ -397,6 +423,44 @@ export class TowerSystem {
         }
       }
       this.game.particles.spawnRing(target.pos.x, target.pos.y, 40, t.def.color);
+    }
+  }
+
+  private applySingularityPulse(t: Tower, target: Enemy, duration: number, strength: number): void {
+    const radius = 76;
+    const pullDuration = t.flags.deepFreeze ? 1.45 : 1.15;
+    const center = target.pos.clone();
+    let affected = 0;
+
+    for (const e of this.game.enemies.list) {
+      if (!e.active || e.isTunneling) continue;
+      const d = e.pos.dist(center);
+      if (d > radius) continue;
+      const falloff = 1 - d / radius;
+      const slowDuration = duration * (0.45 + falloff * 0.45);
+      e.applySlow(slowDuration, Math.max(0.25, strength - 0.05));
+      e.freezeFxTimer = Math.max(e.freezeFxTimer, slowDuration);
+      e.freezeFxMax = Math.max(e.freezeFxMax, slowDuration);
+      e.singularityX = center.x;
+      e.singularityY = center.y;
+      e.singularityTimer = Math.max(e.singularityTimer, pullDuration);
+      e.singularityMax = Math.max(e.singularityMax, pullDuration);
+      if (d > 4) {
+        const impulse = (e.isBoss ? 70 : 185) * falloff;
+        e.knockbackVel = e.knockbackVel.add(center.sub(e.pos).normalize().mult(impulse));
+      }
+      affected++;
+    }
+
+    this.game.particles.spawnRing(center.x, center.y, radius, t.def.color, 0.42);
+    this.game.particles.spawnRing(center.x, center.y, radius * 0.52, "#ffffff", 0.22);
+    this.game.particles.spawnBurst(center.x, center.y, t.def.color, Math.min(18, 4 + affected * 2), {
+      speed: 34,
+      life: 0.55,
+      size: 2,
+    });
+    if (affected >= 4) {
+      this.game.particles.spawnFloatingText(center.x, center.y - 24, "SINGULARITY", t.def.color, 0.9, 11);
     }
   }
 
@@ -603,7 +667,8 @@ export class TowerSystem {
 
   private updateBarrier(t: Tower, dt: number): void {
     const stats = this.effectiveStats(t);
-    const fireRateMul = this.game.core.emergencyTimer > 0 ? 1.5 : 1;
+    let fireRateMul = this.game.core.emergencyTimer > 0 ? 1.5 : 1;
+    fireRateMul *= this.powerSurgeMul(t);
     t.timer -= dt * fireRateMul;
     if (t.timer > 0) return;
     t.timer = stats.cooldown;
@@ -619,6 +684,10 @@ export class TowerSystem {
       }
     }
     this.game.particles.spawnRing(t.pos.x, t.pos.y, stats.range, t.def.color);
+  }
+
+  private powerSurgeMul(t: Tower): number {
+    return t.powerSurgeTimer > 0 ? 2 : 1;
   }
 
   private firePulse(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {

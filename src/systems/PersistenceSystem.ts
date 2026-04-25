@@ -13,6 +13,8 @@ export const defaultSettings: GameSettings = {
   reducedMotion: false,
   reducedFlashing: false,
   showDamageNumbers: true,
+  subtitles: false,
+  mouseButtonSwap: false,
   colorblind: false,
   highContrast: false,
   fontScale: 1,

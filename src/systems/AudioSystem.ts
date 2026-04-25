@@ -23,6 +23,8 @@ export class AudioSystem {
   initialized = false;
   muted = false;
   private settings: GameSettings | null = null;
+  private subtitleHandler: ((cue: AudioSubtitleCue) => void) | null = null;
+  private subtitleCooldowns = new Map<string, number>();
   private voiceExpiries: Record<AudioCategory, number[]> = {
     bullet: [],
     explosion: [],
@@ -32,6 +34,10 @@ export class AudioSystem {
     reward: [],
     world: [],
   };
+
+  setSubtitleHandler(handler: (cue: AudioSubtitleCue) => void): void {
+    this.subtitleHandler = handler;
+  }
 
   init(): void {
     if (this.initialized) return;
@@ -178,6 +184,7 @@ export class AudioSystem {
   // ---- SFX: per-tower procedural sounds ----
 
   sfxTowerFire(type: string, position?: AudioPosition): void {
+    this.emitSubtitle(this.towerCue(type), "tower", 1.25, 0.95);
     switch (type) {
       case "tesla":    this.sfxTesla(position); break;
       case "railgun":  this.sfxRailgun(position); break;
@@ -324,6 +331,7 @@ export class AudioSystem {
   }
 
   sfxExplosion(volume = 0.4, position?: AudioPosition): void {
+    this.emitSubtitle("EXPLOSION", "alert", 1.2, 1.2);
     if (!this.ready() || !this.beginVoice("explosion", 0.36)) return;
     const now = this.ctx!.currentTime;
     const out = this.spatialOutput("explosion", position, 0.45);
@@ -352,6 +360,7 @@ export class AudioSystem {
   }
 
   sfxCoreHit(position?: AudioPosition): void {
+    this.emitSubtitle("CORE ALERT", "alert", 2.0, 0.8, 2);
     if (!this.ready() || !this.beginVoice("alert", 0.32)) return;
     this.duckMusic(0.45, 0.45);
     const now = this.ctx!.currentTime;
@@ -370,18 +379,27 @@ export class AudioSystem {
   }
 
   sfxBuild(position?: AudioPosition): void {
+    this.emitSubtitle("TOWER DEPLOYED", "tower", 1.2, 0.7);
     this.sfxShoot(1.4, 0.15, "world", position);
   }
 
   sfxUpgrade(position?: AudioPosition): void {
+    this.emitSubtitle("UPGRADE APPLIED", "reward", 1.4, 0.7);
     this.sfxShoot(1.8, 0.2, "world", position);
   }
 
+  sfxPowerSurge(position?: AudioPosition): void {
+    this.emitSubtitle("POWER SURGE", "reward", 1.5, 0.6, 2);
+    this.sfxShoot(1.75, 0.16, "world", position);
+  }
+
   sfxSell(position?: AudioPosition): void {
+    this.emitSubtitle("TOWER SOLD", "neutral", 1.2, 0.7);
     this.sfxShoot(0.7, 0.15, "world", position);
   }
 
   sfxWaveStart(): void {
+    this.emitSubtitle("WAVE START", "alert", 1.7, 0.5, 2);
     if (!this.ready() || !this.beginVoice("alert", 0.42)) return;
     const now = this.ctx!.currentTime;
     const osc = this.ctx!.createOscillator();
@@ -398,6 +416,7 @@ export class AudioSystem {
   }
 
   sfxBossAlert(position?: AudioPosition): void {
+    this.emitSubtitle("BOSS ALERT", "alert", 2.1, 0.7, 3);
     if (!this.ready() || !this.beginVoice("alert", 1.05)) return;
     this.duckMusic(1.15, 0.32);
     const now = this.ctx!.currentTime;
@@ -418,10 +437,12 @@ export class AudioSystem {
   }
 
   sfxReward(): void {
+    this.emitSubtitle("REWARD READY", "reward", 1.5, 0.9);
     this.sfxShoot(2.2, 0.22, "reward");
   }
 
   sfxVictory(): void {
+    this.emitSubtitle("VICTORY STING", "reward", 2.2, 0.5, 3);
     if (!this.ready() || !this.beginVoice("alert", 0.7)) return;
     const now = this.ctx!.currentTime;
     const freqs = [440, 550, 660, 880];
@@ -440,6 +461,7 @@ export class AudioSystem {
   }
 
   sfxLose(): void {
+    this.emitSubtitle("SIGNAL LOST", "alert", 2.4, 0.5, 3);
     if (!this.ready() || !this.beginVoice("alert", 1.4)) return;
     const now = this.ctx!.currentTime;
     [300, 225, 150, 75].forEach((freq, i) => {
@@ -471,6 +493,7 @@ export class AudioSystem {
   }
 
   sfxAchievement(): void {
+    this.emitSubtitle("ACHIEVEMENT UNLOCKED", "reward", 1.8, 0.8, 2);
     if (!this.ready() || !this.beginVoice("reward", 0.45)) return;
     const now = this.ctx!.currentTime;
     [1046, 1318, 1568].forEach((freq, i) => {
@@ -492,6 +515,7 @@ export class AudioSystem {
   }
 
   sfxCredit(position?: AudioPosition): void {
+    this.emitSubtitle("CREDITS COLLECTED", "reward", 1.0, 2.0);
     this.sfxShoot(2.05, 0.08, "reward", position);
   }
 
@@ -501,6 +525,8 @@ export class AudioSystem {
   }
 
   sfxEnemyAbility(kind: "heal" | "phase" | "spawn", position?: AudioPosition): void {
+    const text = kind === "heal" ? "WEAVER HEAL" : kind === "phase" ? "PHANTOM PHASE" : "ENEMY RELEASE";
+    this.emitSubtitle(text, "enemy", 1.4, 0.9);
     if (kind === "heal") this.sfxShoot(1.65, 0.08, "enemy", position);
     else if (kind === "phase") this.sfxShoot(1.9, 0.055, "enemy", position);
     else this.sfxShoot(0.75, 0.1, "enemy", position);
@@ -576,6 +602,37 @@ export class AudioSystem {
     this.musicGain.gain.linearRampToValueAtTime(base, now + duration);
   }
 
+  private towerCue(type: string): string {
+    switch (type) {
+      case "tesla": return "TESLA CHAIN";
+      case "railgun": return "RAILGUN DISCHARGE";
+      case "mortar": return "MORTAR LAUNCH";
+      case "flamer": return "FLAMER BURST";
+      case "stasis": return "STASIS CHIME";
+      case "blaster": return "BLASTER FIRE";
+      case "barrier": return "BARRIER PULSE";
+      case "harvester": return "HARVESTER PULSE";
+      case "amplifier": return "AMPLIFIER RESONANCE";
+      default: return "PULSE FIRE";
+    }
+  }
+
+  private emitSubtitle(
+    text: string,
+    tone: AudioSubtitleTone = "neutral",
+    duration = 1.5,
+    cooldown = 1,
+    priority = 1
+  ): void {
+    if (!this.settings?.subtitles || !this.subtitleHandler) return;
+    const now = performance.now() / 1000;
+    const key = `${tone}:${text}`;
+    const nextAllowed = this.subtitleCooldowns.get(key) ?? 0;
+    if (now < nextAllowed) return;
+    this.subtitleCooldowns.set(key, now + cooldown);
+    this.subtitleHandler({ text, tone, duration, priority });
+  }
+
   private createImpulseResponse(seconds: number, decay: number): AudioBuffer | null {
     if (!this.ctx) return null;
     const rate = this.ctx.sampleRate;
@@ -594,3 +651,11 @@ export class AudioSystem {
 
 type AudioCategory = "bullet" | "explosion" | "enemy" | "ui" | "alert" | "reward" | "world";
 type AudioPosition = number | { x: number };
+export type AudioSubtitleTone = "neutral" | "alert" | "reward" | "enemy" | "tower";
+
+export interface AudioSubtitleCue {
+  text: string;
+  tone: AudioSubtitleTone;
+  duration: number;
+  priority: number;
+}

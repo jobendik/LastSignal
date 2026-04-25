@@ -35,7 +35,18 @@ function statsSummary(g: Game): string {
     .slice(0, 3)
     .map(([k, v]) => `${k}: ${v}`)
     .join(" · ");
-  if (topKills) rows.push(`Top kills: ${topKills}`);
+  if (topKills) rows.push(`Top targets: ${topKills}`);
+
+  const towerKillEntries = Object.entries(s.killsByTowerType)
+    .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+  if (towerKillEntries.length > 0) {
+    const towerBreakdown = towerKillEntries
+      .slice(0, 4)
+      .map(([k, v]) => `<span class="ls-stat-tower-kill">${k.toUpperCase()} <b>${v}</b></span>`)
+      .join(" ");
+    rows.push(`Kills by tower: ${towerBreakdown}`);
+  }
+
   return rows.map((r) => `<div>${r}</div>`).join("");
 }
 

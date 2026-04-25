@@ -25,22 +25,10 @@ export class InputSystem {
       this.showPlacementPreview = false;
       this.lastPreviewKey = "";
     });
-    canvas.addEventListener("click", (e) => this.onClick(e));
+    canvas.addEventListener("click", (e) => this.onPrimaryButton(e));
     canvas.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      if (this.isBuildingState()) {
-        const cell = this.cellFromEvent(e);
-        const tower = this.game.towers.findTowerAt(cell.c, cell.r);
-        if (tower) {
-          this.selectedTowerType = null;
-          this.showPlacementPreview = false;
-          this.game.towers.selected = tower;
-          this.game.towers.manualFire(tower);
-          this.game.bus.emit("tower:selected", tower);
-          return;
-        }
-      }
-      this.clearSelection();
+      this.onSecondaryButton(e);
     });
     window.addEventListener("keydown", (e) => this.onKey(e));
   }
@@ -67,7 +55,23 @@ export class InputSystem {
     this.updatePlacementFeedback();
   }
 
-  private onClick(e: MouseEvent): void {
+  private onPrimaryButton(e: MouseEvent): void {
+    if (this.game.core.settings.mouseButtonSwap) {
+      this.handleSecondaryAction(e);
+    } else {
+      this.handlePrimaryAction(e);
+    }
+  }
+
+  private onSecondaryButton(e: MouseEvent): void {
+    if (this.game.core.settings.mouseButtonSwap) {
+      this.handlePrimaryAction(e);
+    } else {
+      this.handleSecondaryAction(e);
+    }
+  }
+
+  private handlePrimaryAction(e: MouseEvent): void {
     if (!this.isBuildingState()) return;
     const cell = this.cellFromEvent(e);
 
@@ -96,6 +100,22 @@ export class InputSystem {
     const tower = this.game.towers.findTowerAt(cell.c, cell.r);
     this.game.towers.selected = tower;
     this.game.bus.emit("tower:selected", tower);
+  }
+
+  private handleSecondaryAction(e: MouseEvent): void {
+    if (this.isBuildingState()) {
+      const cell = this.cellFromEvent(e);
+      const tower = this.game.towers.findTowerAt(cell.c, cell.r);
+      if (tower) {
+        this.selectedTowerType = null;
+        this.showPlacementPreview = false;
+        this.game.towers.selected = tower;
+        this.game.towers.manualFire(tower);
+        this.game.bus.emit("tower:selected", tower);
+        return;
+      }
+    }
+    this.clearSelection();
   }
 
   private tryBuild(cell: { c: number; r: number }, keepSelected: boolean): void {

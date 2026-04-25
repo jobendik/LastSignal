@@ -52,6 +52,11 @@ export class EnemySystem {
       enemy.maxHp = enemy.hp;
     }
 
+    // Flanking scouts: from wave 5 onward, ~30% of scouts deviate laterally.
+    if (type === "scout" && this.game.core.waveIndex >= 4 && Math.random() < 0.3) {
+      enemy.flankDir = Math.random() < 0.5 ? 1 : -1;
+    }
+
     if (enemy.isBoss) {
       enemy.bossEntranceTimer = enemy.bossEntranceMax;
       this.game.audio.sfxBossAlert(enemy.pos);
@@ -121,6 +126,18 @@ export class EnemySystem {
         }
       }
       if (e.stunTimer > 0) e.stunTimer -= dt;
+      if (e.singularityTimer > 0) {
+        const dx = e.singularityX - e.pos.x;
+        const dy = e.singularityY - e.pos.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 4) {
+          const pullRamp = Math.max(0.2, e.singularityTimer / Math.max(0.1, e.singularityMax));
+          const pull = (e.isBoss ? 90 : 360) * pullRamp;
+          e.knockbackVel = e.knockbackVel.add(new Vector2(dx / dist, dy / dist).mult(pull * dt));
+          e.vel = e.vel.mult(e.isBoss ? 0.98 : 0.94);
+        }
+        e.singularityTimer = Math.max(0, e.singularityTimer - dt);
+      }
 
       // Weaver heal pulse.
       if (e.ability === "heal") {
@@ -139,7 +156,15 @@ export class EnemySystem {
       // Movement.
       const spd = e.currentSpeed;
       if (spd > 0) {
-        const dir = this.game.grid.getVector(e.pos.x, e.pos.y);
+        let dir = this.game.grid.getVector(e.pos.x, e.pos.y);
+        // Flanking scouts: add a lateral perpendicular component so they diverge from the main lane.
+        if (e.flankDir !== 0) {
+          const perpX = -dir.y * e.flankDir;
+          const perpY = dir.x * e.flankDir;
+          const blended = new Vector2(dir.x + perpX * 0.55, dir.y + perpY * 0.55);
+          const m = Math.hypot(blended.x, blended.y);
+          dir = m > 0 ? new Vector2(blended.x / m, blended.y / m) : dir;
+        }
         let desired = dir.mult(spd);
         // Small wobble for visual variety (not used for phased or boss to keep them readable).
         if (!e.isBoss) {
@@ -177,6 +202,15 @@ export class EnemySystem {
           this.game.damageCore(e.breach, e.type, e.pos.x, e.pos.y);
           e.breached = true;
           e.active = false;
+          // Breach impact FX: enemy color burst converging into core + warning flash.
+          const cx = this.game.grid.corePos.x;
+          const cy = this.game.grid.corePos.y;
+          this.game.particles.spawnBurst(cx, cy, e.color, 10, { speed: 90, life: 0.45, size: 2.2 });
+          this.game.particles.spawnRing(cx, cy, 44, e.color, 0.45);
+          if (e.breach >= 2) {
+            this.game.particles.spawnRing(cx, cy, 70, e.color, 0.6);
+          }
+          this.game.particles.spawnFloatingText(cx, cy - 28, `-${e.breach} BREACH`, "#ef9a9a", 1.0, 13);
         }
         continue;
       }
@@ -461,7 +495,8 @@ export class EnemySystem {
       const reward = Math.round(e.reward * rewardMul);
       this.game.addCredits(reward);
       this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 12, `+${reward}`, "#ffeb3b", 0.9, 12);
-      this.game.stats.recordKill(e.type);
+      const killSource = e.lastDamageSource?.type === "tower" ? e.lastDamageSource.towerType : undefined;
+      this.game.stats.recordKill(e.type, killSource);
       this.game.waves.recordKill(e.type);
       if (e.lastDamageSource?.type === "tower" && e.lastDamageSource.tower) {
         e.lastDamageSource.tower.kills++;

@@ -65,6 +65,18 @@ export interface ScreenFlashFX {
   active: boolean;
 }
 
+export interface CreditOrbFX {
+  x: number;
+  y: number;
+  /** Horizontal speed (px/s). */
+  vx: number;
+  /** Initial upward speed (px/s). */
+  vy: number;
+  life: number;
+  maxLife: number;
+  active: boolean;
+}
+
 export class ParticleSystem {
   particles: Particle[] = [];
   floatingText: FloatingText[] = [];
@@ -75,6 +87,7 @@ export class ParticleSystem {
   muzzleFlashes: MuzzleFlashFX[] = [];
   scorchDecals: ScorchDecalFX[] = [];
   screenFlashes: ScreenFlashFX[] = [];
+  creditOrbs: CreditOrbFX[] = [];
 
   constructor(private readonly game: Game) {}
 
@@ -88,6 +101,24 @@ export class ParticleSystem {
     this.muzzleFlashes.length = 0;
     this.scorchDecals.length = 0;
     this.screenFlashes.length = 0;
+    this.creditOrbs.length = 0;
+  }
+
+  spawnCreditOrbs(x: number, y: number, count = 2): void {
+    if (this.game.core.settings.reducedMotion) return;
+    for (let i = 0; i < count; i++) {
+      const angle = -Math.PI / 2 + (i - (count - 1) / 2) * 0.55;
+      const speed = rnd(50, 80);
+      this.creditOrbs.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: rnd(0.65, 0.9),
+        maxLife: 0.9,
+        active: true,
+      });
+    }
   }
 
   spawnMuzzleFlash(x: number, y: number, angle: number, color: string): void {
@@ -360,6 +391,16 @@ export class ParticleSystem {
       if (f.life <= 0) f.active = false;
     }
     this.screenFlashes = this.screenFlashes.filter((f) => f.active);
+
+    // Credit orbs: arc upward with a gentle arc, fade out.
+    for (const o of this.creditOrbs) {
+      o.x += o.vx * dt;
+      o.y += o.vy * dt;
+      o.vy += 55 * dt; // gentle downward pull (softer than gravity)
+      o.life -= dt;
+      if (o.life <= 0) o.active = false;
+    }
+    this.creditOrbs = this.creditOrbs.filter((o) => o.active);
 
     // Lightning jitter
     for (const l of this.lightning) {

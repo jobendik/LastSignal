@@ -147,6 +147,10 @@ export class WaveSystem {
     this.game.setState("WAVE_ACTIVE");
     this.game.audio.sfxWaveStart();
     this.game.bus.emit("wave:started", wave);
+
+    if (wave.waveEvent === "blitz") {
+      this.triggerBlitzWave(wave);
+    }
   }
 
   isWaveFinished(): boolean {
@@ -216,11 +220,7 @@ export class WaveSystem {
     for (const g of this.pending) {
       g.timer -= dt;
       while (g.timer <= 0 && g.remaining > 0) {
-        const s = g.spawner;
-        // Spawn near spawner tile, slight random offset.
-        const x = s.c * 32 + 16;
-        const y = s.r * 32 + 16;
-        this.game.enemies.spawn(g.type, x, y);
+        this.spawnFromGroup(g);
         g.remaining--;
         g.timer += g.interval;
       }
@@ -356,6 +356,42 @@ export class WaveSystem {
     this.game.particles.spawnFloatingText(x, y - 28, `CHOKEPOINT +${bonus}CR`, "#ffab40", 2.5, 13);
     this.game.particles.spawnRing(x, y, 36, "#ffab40", 0.3);
     this.game.particles.spawnRing(x, y, 52, "#ffab40", 0.18);
+  }
+
+  private triggerBlitzWave(wave: WaveDefinition): void {
+    let spawned = 0;
+    for (const g of this.pending) {
+      while (g.remaining > 0) {
+        this.spawnFromGroup(g, spawned);
+        g.remaining--;
+        spawned++;
+      }
+      this.game.particles.spawnRing(g.spawner.c * TILE_SIZE + TILE_SIZE / 2, g.spawner.r * TILE_SIZE + TILE_SIZE / 2, 48, "#ff5252", 0.32);
+    }
+    this.pending.length = 0;
+    this.allSpawned = true;
+    this.game.particles.spawnFloatingText(
+      this.game.grid.corePos.x,
+      this.game.grid.corePos.y - 56,
+      "BLITZ WAVE",
+      "#ff5252",
+      2.2,
+      16
+    );
+    this.game.particles.spawnRing(this.game.grid.corePos.x, this.game.grid.corePos.y, 120, "#ff5252", 0.42);
+    this.game.bus.emit("wave:blitz", { wave, spawned });
+  }
+
+  private spawnFromGroup(g: PendingGroup, index = 0): void {
+    const x = g.spawner.c * TILE_SIZE + TILE_SIZE / 2 + (Math.random() - 0.5) * 8;
+    const y = g.spawner.r * TILE_SIZE + TILE_SIZE / 2 + (Math.random() - 0.5) * 8;
+    const e = this.game.enemies.spawn(g.type, x, y);
+    if (index > 0) {
+      const angle = index * 2.399963229728653;
+      const radius = Math.min(18, 3 + Math.sqrt(index) * 2.2);
+      e.pos.x += Math.cos(angle) * radius;
+      e.pos.y += Math.sin(angle) * radius;
+    }
   }
 
   /** Spawner telegraph signs for RenderSystem: groups about to spawn within 1.5s. */

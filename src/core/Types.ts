@@ -74,6 +74,7 @@ export type TowerFlag =
   | "suppressiveFire"
   | "deepFreeze"
   | "cryoField"
+  | "singularity"
   | "vulnerabilityPulse"
   | "shrapnel"
   | "armorBreaker"
@@ -176,6 +177,8 @@ export interface WaveDefinition {
   recommendedCounters: string[];
   rewardCredits: number;
   rewardChoice: boolean;
+  /** Optional special event that changes how the wave plays. */
+  waveEvent?: "blitz";
   lanes: WaveLane[];
   /** Convenience flat list for UI + codex generation. */
   enemySummary?: { type: EnemyType; count: number }[];
@@ -282,6 +285,8 @@ export interface GameSettings {
   reducedMotion: boolean;
   reducedFlashing: boolean;
   showDamageNumbers: boolean;
+  subtitles: boolean;
+  mouseButtonSwap: boolean;
   colorblind: boolean;
   highContrast: boolean;
   fontScale: number;
@@ -296,6 +301,7 @@ export interface RunStats {
   damageByTowerType: Partial<Record<TowerType, number>>;
   damageByEnemyType: Partial<Record<EnemyType, number>>;
   killsByEnemyType: Partial<Record<EnemyType, number>>;
+  killsByTowerType: Partial<Record<TowerType, number>>;
   startedAt: number;
   bestTowerType: TowerType | null;
   bestTowerLevel: number;

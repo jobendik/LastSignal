@@ -31,6 +31,11 @@ export class Tower {
   heatTimer = 0;
   /** Construction animation: counts 0→1 over 0.4s. Tower is disabled while < 1. */
   buildProgress = 0;
+  /** Sell dissolve animation: counts down from 0.45 to 0; tower renders as disintegrating while > 0. */
+  dissolveTimer = 0;
+  /** Environmental power surge: while > 0, tower fires at double rate. */
+  powerSurgeTimer = 0;
+  static readonly DISSOLVE_MAX = 0.45;
   specId: string | null = null;
   flags: Partial<Record<TowerFlag, boolean>> = {};
   mods: TowerMod[] = [];
