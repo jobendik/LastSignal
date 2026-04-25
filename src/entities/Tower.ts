@@ -20,10 +20,15 @@ export class Tower {
   timer: number;
   angle = -Math.PI / 2;
   recoil = 0;
+  manualCooldown = 0;
+  manualCooldownMax = 12;
+  overcharge = 0;
   totalInvested: number;
   kills = 0;
   totalDamage = 0;
   burstCount = 0; // for Pulse triple burst
+  /** Heat accumulated by Flamer while firing (decays when idle). Drives overheat visual. */
+  heatTimer = 0;
   specId: string | null = null;
   flags: Partial<Record<TowerFlag, boolean>> = {};
   mods: TowerMod[] = [];

@@ -3,6 +3,7 @@ import { Projectile } from "../entities/Projectile";
 import { Vector2 } from "../core/Vector2";
 import type { Enemy } from "../entities/Enemy";
 import { PROJECTILE_CAP } from "../core/Config";
+import { CellKind } from "../core/Types";
 
 export class ProjectileSystem {
   list: Projectile[] = [];
@@ -48,6 +49,11 @@ export class ProjectileSystem {
       p.trail.push(p.pos.clone());
       if (p.trail.length > 6) p.trail.shift();
       p.pos = p.pos.add(dir.mult(p.speed * dt));
+      if (!p.target && p.kind !== "mortar" && this.hitTerrain(p)) {
+        this.game.particles.spawnImpactBurst(p.pos.x, p.pos.y, Math.atan2(-dir.y, -dir.x), p.color, 0.8);
+        p.active = false;
+        continue;
+      }
 
       // Collision with target (direct hit) or world.
       if (p.target) {
@@ -76,8 +82,7 @@ export class ProjectileSystem {
 
     // Splash damage or direct hit.
     if (p.splashRadius > 0) {
-      this.game.particles.spawnRing(impactX, impactY, p.splashRadius, p.color);
-      this.game.particles.spawnBurst(impactX, impactY, p.color, 12, { speed: 180, life: 0.5, size: 3 });
+      this.game.particles.spawnMortarExplosion(impactX, impactY, p.splashRadius, p.color);
       this.game.audio.sfxExplosion(0.35);
       for (const e of this.game.enemies.list) {
         if (!e.active) continue;
@@ -89,6 +94,8 @@ export class ProjectileSystem {
           dmg *= this.globalMul(p);
           if (p.armorBreak && e.def.armor) dmg *= 1.6;
           this.game.enemies.damage(e, dmg, this.sourceFor(p));
+          const knock = 165 * Math.max(0, 1 - d / p.splashRadius);
+          if (knock > 20) this.game.enemies.knockback(e, impactX, impactY, knock);
         }
       }
       if (p.burningGround) {
@@ -109,7 +116,14 @@ export class ProjectileSystem {
   private sourceFor(p: Projectile): import("../entities/Enemy").DamageSource | null {
     if (p.ownerType === "drone") return { type: "drone" };
     if (p.ownerType === "other") return { type: "other" };
-    return { type: "tower", towerType: p.ownerType };
+    return { type: "tower", towerType: p.ownerType, tower: p.owner.tower };
+  }
+
+  private hitTerrain(p: Projectile): boolean {
+    if (p.pos.x < 0 || p.pos.y < 0 || p.pos.x > this.game.width || p.pos.y > this.game.height) return false;
+    const { c, r } = this.game.grid.worldToCell(p.pos.x, p.pos.y);
+    const cell = this.game.grid.cells[this.game.grid.idx(c, r)];
+    return cell === CellKind.Rock;
   }
 
   private globalMul(p: Projectile): number {

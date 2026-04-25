@@ -19,6 +19,7 @@ export class Drone {
   color: string;
   timer = 0;
   wanderAngle = rnd(0, Math.PI * 2);
+  bobPhase = rnd(0, Math.PI * 2);
   active = true;
 
   // Guardian: orbit angle around core.

@@ -19,6 +19,14 @@ export class BuildMenu {
 
   refresh(): void {
     clear(this.el);
+    const stats = this.game.core.stats;
+    this.el.append(
+      el("div", { class: "ls-economy-mini" }, [
+        el("div", { text: `Earned ${stats.creditsEarned}` }),
+        el("div", { text: `Spent ${stats.creditsSpent}` }),
+      ])
+    );
+
     this.el.append(el("div", { class: "ls-build-title", text: "TOWERS" }));
     const towerList = el("div", { class: "ls-tower-list" });
     const metaUnlocks = new Set(this.game.meta.aggregate().unlockedTowers);
@@ -28,19 +36,29 @@ export class BuildMenu {
       const def = towerDefinitions[type];
       const cost = this.game.towers.buildCost(type);
       const active = this.game.input.selectedTowerType === type;
-      const affordable = this.game.core.credits >= cost;
+      const tierUnlocked = this.game.towers.isTierUnlocked(type);
+      const limit = this.game.towers.buildLimit(type);
+      const limitReached = limit != null && this.game.towers.list.filter((t) => t.type === type).length >= limit;
+      const affordable = this.game.core.credits >= cost && tierUnlocked && !limitReached;
+      const role = !tierUnlocked
+        ? `Unlocks wave ${this.game.towers.unlockWave(type)}`
+        : limitReached
+          ? `Limit ${limit} reached`
+          : def.role;
       const btn = el("button", {
-        class: `ls-tower-btn${active ? " active" : ""}${affordable ? "" : " disabled"}`,
+        class: `ls-tower-btn${active ? " active" : ""}${affordable ? " affordable" : " disabled unaffordable"}`,
       });
       btn.style.borderColor = def.color;
       btn.append(
         el("div", { class: "ls-tower-row" }, [
           el("span", { class: "ls-tower-key", text: def.hotkey ?? "" }),
           el("span", { class: "ls-tower-name", text: def.name }),
-          el("span", { class: "ls-tower-cost", text: `${cost}CR` }),
+          el("span", { class: `ls-tower-cost${affordable ? "" : " unaffordable"}`, text: `${cost}CR` }),
         ]),
-        el("div", { class: "ls-tower-role", text: def.role }),
+        el("div", { class: "ls-tower-role", text: role }),
       );
+      btn.onmouseenter = () => this.game.input.setHoverBuildTool(type);
+      btn.onmouseleave = () => this.game.input.setHoverBuildTool(null);
       btn.onclick = () => this.game.input.setBuildTool(type);
       towerList.append(btn);
     }
@@ -53,13 +71,13 @@ export class BuildMenu {
       const cost = this.game.drones.nextCost(type);
       const affordable = this.game.core.credits >= cost;
       const btn = el("button", {
-        class: `ls-tower-btn${affordable ? "" : " disabled"}`,
+        class: `ls-tower-btn${affordable ? " affordable" : " disabled unaffordable"}`,
       });
       btn.style.borderColor = def.color;
       btn.append(
         el("div", { class: "ls-tower-row" }, [
           el("span", { class: "ls-tower-name", text: def.name }),
-          el("span", { class: "ls-tower-cost", text: `${cost}CR` }),
+          el("span", { class: `ls-tower-cost${affordable ? "" : " unaffordable"}`, text: `${cost}CR` }),
         ]),
         el("div", { class: "ls-tower-role", text: def.role }),
       );

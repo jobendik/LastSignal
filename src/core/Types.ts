@@ -83,7 +83,8 @@ export type TowerFlag =
   | "deepExtraction"
   | "crystalStabilizer"
   | "relayNode"
-  | "signalMarker";
+  | "signalMarker"
+  | "deflectorGrid";
 
 export interface TowerMod {
   rangeMul?: number;
@@ -126,9 +127,12 @@ export type EnemyType =
   | "splitter"
   | "jammer"
   | "swarm"
-  | "overlord";
+  | "overlord"
+  | "tunneler"
+  | "saboteur"
+  | "cache";
 
-export type EnemyAbility = "none" | "heal" | "phase" | "spawn" | "boss";
+export type EnemyAbility = "none" | "heal" | "phase" | "spawn" | "boss" | "tunnel";
 
 export interface EnemyDefinition {
   id: EnemyType;
@@ -224,11 +228,15 @@ export interface UpgradeEffect {
   lowCoreThreshold?: number;
 }
 
+export type UpgradeRarity = "common" | "uncommon" | "rare" | "legendary";
+
 export interface UpgradeDefinition {
   id: string;
   name: string;
   description: string;
   target: UpgradeTarget;
+  rarity?: UpgradeRarity;
+  synergyHint?: string;
   effect: UpgradeEffect;
 }
 
@@ -261,16 +269,22 @@ export interface GameSettings {
   masterVolume: number;
   musicVolume: number;
   sfxVolume: number;
+  uiVolume: number;
   muted: boolean;
   screenShake: boolean;
+  reducedMotion: boolean;
   reducedFlashing: boolean;
   showDamageNumbers: boolean;
   colorblind: boolean;
+  highContrast: boolean;
+  fontScale: number;
+  graphicsQuality: "low" | "medium" | "high";
 }
 
 export interface RunStats {
   enemiesKilled: number;
   creditsEarned: number;
+  creditsSpent: number;
   coreDamageTaken: number;
   damageByTowerType: Partial<Record<TowerType, number>>;
   damageByEnemyType: Partial<Record<EnemyType, number>>;
@@ -349,6 +363,34 @@ export interface EndlessWaveState {
   wave: number;
   hpScale: number;
   speedScale: number;
+}
+
+// ---------- Run modifiers ----------
+/** A random per-run modifier rolled at sector start that twists the rules. */
+export interface RunModifier {
+  id: string;
+  name: string;
+  description: string;
+  /** Each active enemy heals this many HP per second. */
+  enemyHealPerSec?: number;
+  /** Multiplier on enemy movement speed applied at spawn. */
+  enemySpeedMul?: number;
+  /** Multiplier on enemy max HP applied at spawn. */
+  enemyHpMul?: number;
+  /** Flat armor added to every enemy (0..1 range; capped at 0.95). */
+  enemyArmorAdd?: number;
+  /** Multiplier on enemy credit reward at kill time. */
+  enemyRewardMul?: number;
+  /** Multiplier on tower build costs. */
+  towerCostMul?: number;
+  /** Cooldown multiplier on towers (< 1 = shorter cooldown = faster fire). */
+  towerCooldownMul?: number;
+  /** If true, harvesters produce no passive income. */
+  harvestDisabled?: boolean;
+  /** Multiplier applied to harvester income (stacks with upgrade aggregate). */
+  harvesterIncomeMul?: number;
+  /** Multiplier on core max integrity at sector start. */
+  coreMul?: number;
 }
 
 

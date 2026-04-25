@@ -1,5 +1,5 @@
 import type { Game } from "../core/Game";
-import type { TowerType } from "../core/Types";
+import { CellKind, type TowerType } from "../core/Types";
 import { towerOrder } from "../data/towers";
 import { TILE_SIZE } from "../core/Config";
 
@@ -8,7 +8,12 @@ export class InputSystem {
   mouseY = 0;
   overCell: { c: number; r: number } | null = null;
   selectedTowerType: TowerType | null = null;
+  hoverTowerType: TowerType | null = null;
   showPlacementPreview = false;
+  placementSnapTimer = 0;
+  placementInvalidTimer = 0;
+  private lastPreviewKey = "";
+  private lastInvalidSoundTime = -Infinity;
 
   constructor(private readonly game: Game) {}
 
@@ -18,17 +23,31 @@ export class InputSystem {
     canvas.addEventListener("mouseleave", () => {
       this.overCell = null;
       this.showPlacementPreview = false;
+      this.lastPreviewKey = "";
     });
     canvas.addEventListener("click", (e) => this.onClick(e));
     canvas.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+      if (this.isBuildingState()) {
+        const cell = this.cellFromEvent(e);
+        const tower = this.game.towers.findTowerAt(cell.c, cell.r);
+        if (tower) {
+          this.selectedTowerType = null;
+          this.showPlacementPreview = false;
+          this.game.towers.selected = tower;
+          this.game.towers.manualFire(tower);
+          this.game.bus.emit("tower:selected", tower);
+          return;
+        }
+      }
       this.clearSelection();
     });
     window.addEventListener("keydown", (e) => this.onKey(e));
   }
 
-  update(_dt: number): void {
-    // Reserved for polling-style behaviors.
+  update(dt: number): void {
+    if (this.placementSnapTimer > 0) this.placementSnapTimer = Math.max(0, this.placementSnapTimer - dt);
+    if (this.placementInvalidTimer > 0) this.placementInvalidTimer = Math.max(0, this.placementInvalidTimer - dt);
   }
 
   private cellFromEvent(e: MouseEvent): { c: number; r: number } {
@@ -44,28 +63,41 @@ export class InputSystem {
 
   private onMouseMove(e: MouseEvent): void {
     this.overCell = this.cellFromEvent(e);
-    this.showPlacementPreview = Boolean(this.selectedTowerType) && this.isBuildingState();
+    this.showPlacementPreview = Boolean(this.placementTowerType) && this.isBuildingState();
+    this.updatePlacementFeedback();
   }
 
   private onClick(e: MouseEvent): void {
     if (!this.isBuildingState()) return;
     const cell = this.cellFromEvent(e);
     if (this.selectedTowerType) {
-      this.tryBuild(cell);
+      this.tryBuild(cell, e.shiftKey);
       return;
     }
     // Otherwise — select tower at cell.
+    const i = this.game.grid.idx(cell.c, cell.r);
+    if (this.game.grid.cells[i] === CellKind.Core) {
+      this.game.activateCoreAbility();
+      return;
+    }
     const tower = this.game.towers.findTowerAt(cell.c, cell.r);
     this.game.towers.selected = tower;
     this.game.bus.emit("tower:selected", tower);
   }
 
-  private tryBuild(cell: { c: number; r: number }): void {
+  private tryBuild(cell: { c: number; r: number }, keepSelected: boolean): void {
     const type = this.selectedTowerType!;
     const res = this.game.towers.place(type, cell.c, cell.r);
     if (!res) {
       // Invalid — play a small rejection sound.
       this.game.audio.sfxShoot(0.5, 0.08);
+      this.placementInvalidTimer = 0.22;
+      return;
+    }
+    if (!keepSelected) {
+      this.selectedTowerType = null;
+      this.showPlacementPreview = false;
+      this.game.bus.emit("build:tool", this.selectedTowerType);
     }
   }
 
@@ -76,14 +108,47 @@ export class InputSystem {
       this.selectedTowerType = type;
     }
     this.showPlacementPreview = Boolean(this.selectedTowerType);
+    this.updatePlacementFeedback(true);
     this.game.bus.emit("build:tool", this.selectedTowerType);
+  }
+
+  setHoverBuildTool(type: TowerType | null): void {
+    this.hoverTowerType = type;
+    this.showPlacementPreview = Boolean(this.placementTowerType) && this.isBuildingState();
+    this.updatePlacementFeedback(true);
   }
 
   clearSelection(): void {
     this.selectedTowerType = null;
+    this.hoverTowerType = null;
     this.showPlacementPreview = false;
     this.game.towers.selected = null;
     this.game.bus.emit("ui:cleared");
+  }
+
+  private updatePlacementFeedback(force = false): void {
+    const type = this.placementTowerType;
+    if (!type || !this.overCell || !this.isBuildingState()) {
+      this.lastPreviewKey = "";
+      return;
+    }
+
+    const key = `${type}:${this.overCell.c}:${this.overCell.r}`;
+    if (!force && key === this.lastPreviewKey) return;
+    this.lastPreviewKey = key;
+
+    const valid = this.game.towers.canPlace(type, this.overCell.c, this.overCell.r).ok;
+    if (valid) {
+      this.placementSnapTimer = 0.18;
+      return;
+    }
+
+    this.placementInvalidTimer = 0.22;
+    const now = this.game.time.elapsed;
+    if (this.selectedTowerType && now - this.lastInvalidSoundTime > 0.28) {
+      this.game.audio.sfxShoot(0.45, 0.06);
+      this.lastInvalidSoundTime = now;
+    }
   }
 
   private isBuildingState(): boolean {
@@ -180,6 +245,10 @@ export class InputSystem {
 
   get hoverCell(): { c: number; r: number } | null {
     return this.overCell;
+  }
+
+  get placementTowerType(): TowerType | null {
+    return this.selectedTowerType ?? this.hoverTowerType;
   }
 
   get hoverWorld(): { x: number; y: number } | null {

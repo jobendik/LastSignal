@@ -42,7 +42,8 @@ export class EndlessSystem {
     if (this.wave >= 3) pool.push("brute", "weaver");
     if (this.wave >= 5) pool.push("phantom", "shielder");
     if (this.wave >= 7) pool.push("splitter", "jammer");
-    if (this.wave >= 10) pool.push("juggernaut", "carrier");
+    if (this.wave >= 8) pool.push("tunneler");
+    if (this.wave >= 10) pool.push("juggernaut", "carrier", "saboteur");
 
     const spawners = this.game.grid.spawners;
     const lanes = spawners.map((s, i) => ({

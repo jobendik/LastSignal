@@ -19,11 +19,25 @@ export class SettingsPanel {
       this.sliderRow("Master Volume", "masterVolume", s.masterVolume),
       this.sliderRow("Music Volume", "musicVolume", s.musicVolume),
       this.sliderRow("SFX Volume", "sfxVolume", s.sfxVolume),
+      this.sliderRow("UI Volume", "uiVolume", s.uiVolume),
       this.checkboxRow("Mute All", "muted", s.muted),
       this.checkboxRow("Screen Shake", "screenShake", s.screenShake),
+      this.checkboxRow("Reduced Motion", "reducedMotion", s.reducedMotion),
       this.checkboxRow("Reduced Flashing", "reducedFlashing", s.reducedFlashing),
       this.checkboxRow("Show Damage Numbers", "showDamageNumbers", s.showDamageNumbers),
       this.checkboxRow("Colorblind Markers", "colorblind", s.colorblind),
+      this.checkboxRow("High Contrast", "highContrast", s.highContrast),
+      this.selectRow("Font Scale", "fontScale", String(s.fontScale), [
+        ["0.8", "80%"],
+        ["1", "100%"],
+        ["1.2", "120%"],
+        ["1.5", "150%"],
+      ]),
+      this.selectRow("Graphics", "graphicsQuality", s.graphicsQuality, [
+        ["low", "Low"],
+        ["medium", "Medium"],
+        ["high", "High"],
+      ]),
     );
     this.el.append(form);
     const row = el("div", { class: "ls-overlay-actions" });
@@ -57,6 +71,29 @@ export class SettingsPanel {
       this.game.settings.update({ [key]: input.checked } as Partial<GameSettings>);
     };
     row.append(input);
+    return row;
+  }
+
+  private selectRow(
+    label: string,
+    key: keyof GameSettings,
+    value: string,
+    options: [string, string][]
+  ): HTMLElement {
+    const row = el("label", { class: "ls-form-row" });
+    row.append(el("span", { class: "ls-form-label", text: label }));
+    const select = el("select", { class: "ls-select" }) as HTMLSelectElement;
+    for (const [v, text] of options) {
+      const option = el("option", { attrs: { value: v }, text }) as HTMLOptionElement;
+      option.selected = v === value;
+      select.append(option);
+    }
+    select.onchange = () => {
+      const raw = select.value;
+      const next = key === "fontScale" ? parseFloat(raw) : raw;
+      this.game.settings.update({ [key]: next } as Partial<GameSettings>);
+    };
+    row.append(select);
     return row;
   }
 }

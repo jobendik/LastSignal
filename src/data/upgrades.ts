@@ -10,6 +10,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Overclock Protocol",
     description: "All towers fire 10% faster.",
     target: "global",
+    rarity: "uncommon",
+    synergyHint: "Pairs with every damage tower.",
     effect: { towerFireRateMul: 1.1 },
   },
   {
@@ -17,6 +19,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Drone Command Link",
     description: "Drones gain +1 damage and +20 range.",
     target: "drone",
+    rarity: "uncommon",
+    synergyHint: "Pairs with Pulse Signal Marker.",
     effect: { droneDamageAdd: 1, droneRangeAdd: 20 },
   },
   {
@@ -24,6 +28,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Crystal Resonance",
     description: "Harvesters generate 25% more credits.",
     target: "economy",
+    rarity: "rare",
+    synergyHint: "Amplifies Harvester economy.",
     effect: { harvesterIncomeMul: 1.25 },
   },
   {
@@ -31,6 +37,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Stasis Amplifier",
     description: "Slowed enemies take 20% more damage.",
     target: "stasis",
+    rarity: "rare",
+    synergyHint: "Pairs with Mortar and Tesla kill zones.",
     effect: { slowedEnemyDamageMul: 1.2 },
   },
   {
@@ -38,6 +46,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Emergency Core Shield",
     description: "Immediately restore 20 Core Integrity.",
     target: "core",
+    rarity: "common",
+    synergyHint: "Best when the core is already damaged.",
     effect: { coreIntegrityAdd: 20 },
   },
   {
@@ -45,6 +55,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Tesla Conductor",
     description: "Tesla chains jump one extra time.",
     target: "tesla",
+    rarity: "rare",
+    synergyHint: "Pairs with Stasis Conduction.",
     effect: { teslaChainAdd: 1 },
   },
   {
@@ -52,6 +64,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Mortar Payload",
     description: "Mortar splash radius increased by 20%.",
     target: "mortar",
+    rarity: "uncommon",
+    synergyHint: "Pairs with Stasis clumps.",
     effect: { mortarSplashMul: 1.2 },
   },
   {
@@ -59,6 +73,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Scanner Pulse",
     description: "Phased enemies are visible 40% longer.",
     target: "global",
+    rarity: "uncommon",
+    synergyHint: "Counters Phantom waves.",
     effect: { phantomVisibleBonus: 0.4 },
   },
   {
@@ -66,6 +82,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Pulse Calibration",
     description: "Pulse towers gain +15% range and +15% damage.",
     target: "pulse",
+    rarity: "uncommon",
+    synergyHint: "Strengthens early defensive lines.",
     effect: {
       specificTowerDamageMul: { type: "pulse", mul: 1.15 },
       specificTowerRangeMul: { type: "pulse", mul: 1.15 },
@@ -76,6 +94,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Rapid Construction",
     description: "New towers cost 10% less.",
     target: "economy",
+    rarity: "rare",
+    synergyHint: "Pairs with wide tower coverage.",
     effect: { towerBuildCostMul: 0.9 },
   },
   {
@@ -83,7 +103,27 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Salvage Protocol",
     description: "Selling towers refunds 70% instead of 50%.",
     target: "economy",
+    rarity: "uncommon",
+    synergyHint: "Supports flexible lane pivots.",
     effect: { sellRefundMul: 0.7 },
+  },
+  {
+    id: "salvage_training",
+    name: "Salvage Training",
+    description: "Selling towers refunds 60% instead of 50%.",
+    target: "economy",
+    rarity: "common",
+    synergyHint: "A safer early repositioning option.",
+    effect: { sellRefundMul: 0.6 },
+  },
+  {
+    id: "salvage_mastery",
+    name: "Salvage Mastery",
+    description: "Selling towers refunds 80% instead of 50%.",
+    target: "economy",
+    rarity: "rare",
+    synergyHint: "Pairs with aggressive lane pivots.",
+    effect: { sellRefundMul: 0.8 },
   },
   {
     id: "last_stand_circuit",
@@ -91,6 +131,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     description:
       "When core integrity drops below 25%, all towers fire 30% faster.",
     target: "global",
+    rarity: "legendary",
+    synergyHint: "Pairs with risky low-core runs.",
     effect: { lowCoreFireRateMul: 1.3, lowCoreThreshold: 0.25 },
   },
   {
@@ -98,6 +140,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Focus Array",
     description: "Blaster damage +25%.",
     target: "blaster",
+    rarity: "common",
+    synergyHint: "Pairs with anti-scout lanes.",
     effect: { specificTowerDamageMul: { type: "blaster", mul: 1.25 } },
   },
   {
@@ -105,6 +149,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Heavy Munitions",
     description: "Mortar damage +20%.",
     target: "mortar",
+    rarity: "common",
+    synergyHint: "Pairs with splash-heavy builds.",
     effect: { specificTowerDamageMul: { type: "mortar", mul: 1.2 } },
   },
   {
@@ -112,6 +158,8 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     name: "Signal Amplifier",
     description: "All towers gain +6 range.",
     target: "global",
+    rarity: "common",
+    synergyHint: "Pairs with long-lane coverage.",
     effect: { towerRangeAdd: 6 },
   },
 ];

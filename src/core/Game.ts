@@ -41,6 +41,7 @@ import { EndlessSystem } from "../systems/EndlessSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
+import { rollModifiers } from "../data/modifiers";
 
 export class Game {
   bus = new EventBus();
@@ -108,7 +109,15 @@ export class Game {
       shakeDir: { x: 0, y: 0 },
       shakeRot: 0,
       slowMo: 0,
+      slowMoScale: 0.35,
       showHeatmap: false,
+      coreAbilityCooldown: 0,
+      coreAbilityCooldownMax: 60,
+      emergencyTriggered: false,
+      emergencyTimer: 0,
+      emergencyOverheatTimer: 0,
+      activeModifiers: [],
+      hitStopTimer: 0,
     };
 
     // Wire systems that need `this`.
@@ -136,6 +145,7 @@ export class Game {
     this.audio.applySettings(this.core.settings);
     this.input.attach();
     this.ui.attach();
+    this.settings.applyVisualSettings();
     this.setState("MAIN_MENU");
     this.running = true;
     const loop = (now: number) => {
@@ -159,6 +169,9 @@ export class Game {
     if (next === "PLANNING" && this.waves) {
       this.waves.beginPlanningCountdown();
     }
+    // Adaptive music intensity.
+    if (next === "WAVE_ACTIVE") this.audio.setMusicIntensity(1);
+    else if (next === "PLANNING" || next === "WAVE_COMPLETE" || next === "REWARD_CHOICE") this.audio.setMusicIntensity(0);
   }
   get state(): GameStateId {
     return this.stateMachine.state;
@@ -184,8 +197,26 @@ export class Game {
     this.core.stats = createEmptyStats();
     this.core.shake = 0;
     this.core.slowMo = 0;
+    this.core.slowMoScale = 0.35;
+    this.core.coreAbilityCooldown = 0;
+    this.core.emergencyTriggered = false;
+    this.core.emergencyTimer = 0;
+    this.core.emergencyOverheatTimer = 0;
+    this.core.hitStopTimer = 0;
     this.core.speed = 1;
     this.time.timeScale = 1;
+
+    // Roll run modifiers (skip on very first sector to ease new players in).
+    const sectorIdx = sectorDefinitions.findIndex((s) => s.id === sector.id);
+    const mods = rollModifiers(sectorIdx);
+    this.core.activeModifiers = mods;
+    // Apply core integrity modifier, then sync coreIntegrity to final coreMax.
+    for (const m of mods) {
+      if (m.coreMul) {
+        this.core.coreMax = Math.round(this.core.coreMax * m.coreMul);
+      }
+    }
+    this.core.coreIntegrity = this.core.coreMax;
 
     this.grid.loadSector(sector);
     this.enemies.reset();
@@ -247,6 +278,15 @@ export class Game {
   }
 
   damageCore(amount: number, byType?: EnemyType, fromX?: number, fromY?: number): void {
+    if (amount > 0 && this.hasCoreDeflector()) {
+      amount = Math.max(0, amount - 1);
+      this.particles.spawnRing(this.grid.corePos.x, this.grid.corePos.y, 78, "#80d8ff");
+      this.particles.spawnFloatingText(this.grid.corePos.x, this.grid.corePos.y - 38, "DEFLECT", "#80d8ff", 0.7, 11);
+      if (amount <= 0) {
+        this.bus.emit("core:shielded", { amount: 1 });
+        return;
+      }
+    }
     this.core.coreIntegrity -= amount;
     this.core.stats.coreDamageTaken += amount;
     if (byType) {
@@ -270,6 +310,60 @@ export class Game {
     }
   }
 
+  hasCoreDeflector(): boolean {
+    if (!this.towers) return false;
+    const core = this.grid.corePos;
+    for (const t of this.towers.list) {
+      if (t.type !== "barrier" || !t.flags.deflectorGrid) continue;
+      if (t.pos.dist(core) <= this.towers.effectiveStats(t).range) return true;
+    }
+    return false;
+  }
+
+  repairCore(): boolean {
+    if (this.state !== "PLANNING" && this.state !== "WAVE_COMPLETE") return false;
+    const repairCap = this.core.coreMax * 0.8;
+    if (this.core.coreIntegrity >= repairCap) return false;
+    const cost = 30;
+    if (this.core.credits < cost) return false;
+
+    if (!this.spendCredits(cost)) return false;
+    const repaired = this.core.coreMax * 0.05;
+    this.core.coreIntegrity = Math.min(repairCap, this.core.coreIntegrity + repaired);
+    this.particles.spawnFloatingText(
+      this.grid.corePos.x,
+      this.grid.corePos.y - 30,
+      `+${Math.round(repaired)} CORE`,
+      "#4caf50",
+      0.9,
+      12
+    );
+    this.particles.spawnRing(this.grid.corePos.x, this.grid.corePos.y, 54, "#4caf50");
+    this.audio.sfxReward();
+    this.bus.emit("core:repaired", { amount: repaired });
+    return true;
+  }
+
+  activateCoreAbility(): boolean {
+    if (this.state !== "WAVE_ACTIVE" || this.core.coreAbilityCooldown > 0) return false;
+    let affected = 0;
+    for (const e of this.enemies.list) {
+      if (!e.active) continue;
+      e.applyStun(2);
+      affected++;
+    }
+    if (affected === 0) return false;
+
+    const { x, y } = this.grid.corePos;
+    this.core.coreAbilityCooldown = this.core.coreAbilityCooldownMax;
+    this.particles.spawnRing(x, y, 240, "#66fcf1");
+    this.particles.spawnBurst(x, y, "#66fcf1", 34, { speed: 230, life: 0.65, size: 2.5 });
+    this.particles.spawnFloatingText(x, y - 42, "CORE EMP", "#66fcf1", 1.1, 17);
+    this.audio.sfxStasis();
+    this.bus.emit("core:ability", { affected });
+    return true;
+  }
+
   addCredits(amount: number): void {
     if (amount <= 0) return;
     const mul = this.meta?.aggregate().rewardMul ?? 1;
@@ -279,6 +373,15 @@ export class Game {
     this.core.stats.creditsEarned += total;
     this.bus.emit("credits:changed", this.core.credits);
     this.bus.emit("credits:earned", { amount: total });
+  }
+
+  spendCredits(amount: number): boolean {
+    if (amount <= 0) return true;
+    if (this.core.credits < amount) return false;
+    this.core.credits -= amount;
+    this.core.stats.creditsSpent += amount;
+    this.bus.emit("credits:changed", this.core.credits);
+    return true;
   }
 
   onGameOver(): void {
@@ -326,28 +429,42 @@ export class Game {
     if (dt <= 0) return;
     if (dt > MAX_DT) dt = MAX_DT;
 
-    // Always-on updates (UI, shake decay, slow-mo etc.)
+    // Always-on updates (UI, shake decay, slow-mo, hit-stop decay using real time).
+    const rawDt = this.time.dt;
+    if (this.core.hitStopTimer > 0) {
+      this.core.hitStopTimer = Math.max(0, this.core.hitStopTimer - rawDt);
+    }
     if (this.core.shake > 0) this.core.shake = Math.max(0, this.core.shake - dt * 30);
     if (this.core.shakeRot > 0) this.core.shakeRot = Math.max(0, this.core.shakeRot - dt * 8);
     if (this.core.slowMo > 0) {
-      this.core.slowMo -= dt;
-      this.time.timeScale = 0.35;
-      if (this.core.slowMo <= 0) this.time.timeScale = this.core.speed;
+      this.core.slowMo -= rawDt;
+      this.time.timeScale = this.core.slowMoScale;
+      if (this.core.slowMo <= 0) {
+        this.time.timeScale = this.core.speed;
+        this.core.slowMoScale = 0.35; // reset for next use
+      }
     }
+    if (this.core.coreAbilityCooldown > 0) {
+      this.core.coreAbilityCooldown = Math.max(0, this.core.coreAbilityCooldown - dt);
+    }
+    this.updateEmergencyProtocol(dt);
 
     // Only tick simulation during active wave / wave-complete / victory fanfare.
     const active = this.state === "WAVE_ACTIVE" || this.state === "WAVE_COMPLETE";
     if (active) {
-      this.waves.update(dt);
-      this.towers.update(dt);
-      this.enemies.update(dt);
-      this.projectiles.update(dt);
-      this.drones.update(dt);
+      // Particles always update for visual feedback; simulation freezes during hit-stop.
       this.particles.update(dt);
-      this.economy.update(dt);
+      if (this.core.hitStopTimer <= 0) {
+        this.waves.update(dt);
+        this.towers.update(dt);
+        this.enemies.update(dt);
+        this.projectiles.update(dt);
+        this.drones.update(dt);
+        this.economy.update(dt);
+      }
 
-      // Wave completion check
-      if (this.state === "WAVE_ACTIVE" && this.waves.isWaveFinished() && this.enemies.list.length === 0) {
+      // Wave completion check (only when simulation is running).
+      if (this.core.hitStopTimer <= 0 && this.state === "WAVE_ACTIVE" && this.waves.isWaveFinished() && this.enemies.list.length === 0) {
         this.waves.onWaveComplete();
       }
     } else if (this.state === "PLANNING") {
@@ -366,4 +483,47 @@ export class Game {
   // ----- Convenience world metrics -----
   get width(): number { return VIEW_WIDTH; }
   get height(): number { return VIEW_HEIGHT; }
+
+  private updateEmergencyProtocol(dt: number): void {
+    const corePct = this.core.coreIntegrity / this.core.coreMax;
+    if (
+      !this.core.emergencyTriggered &&
+      this.state === "WAVE_ACTIVE" &&
+      corePct > 0 &&
+      corePct < 0.2
+    ) {
+      this.core.emergencyTriggered = true;
+      this.core.emergencyTimer = 15;
+      this.core.emergencyOverheatTimer = 0;
+      this.particles.spawnFloatingText(
+        this.grid.corePos.x,
+        this.grid.corePos.y - 46,
+        "EMERGENCY PROTOCOL",
+        "#ff5252",
+        1.6,
+        16
+      );
+      this.particles.spawnRing(this.grid.corePos.x, this.grid.corePos.y, 180, "#ff5252");
+      this.audio.sfxBossAlert();
+      this.bus.emit("core:emergency", { active: true });
+    }
+
+    if (this.core.emergencyTimer > 0) {
+      this.core.emergencyTimer = Math.max(0, this.core.emergencyTimer - dt);
+      if (this.core.emergencyTimer <= 0) {
+        this.core.emergencyOverheatTimer = 5;
+        this.particles.spawnFloatingText(
+          this.grid.corePos.x,
+          this.grid.corePos.y - 46,
+          "SYSTEM OVERHEAT",
+          "#ff9800",
+          1.3,
+          15
+        );
+        this.bus.emit("core:emergency", { active: false });
+      }
+    } else if (this.core.emergencyOverheatTimer > 0) {
+      this.core.emergencyOverheatTimer = Math.max(0, this.core.emergencyOverheatTimer - dt);
+    }
+  }
 }

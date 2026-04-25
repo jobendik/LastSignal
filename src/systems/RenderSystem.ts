@@ -12,6 +12,9 @@ import type { TowerType } from "../core/Types";
 export class RenderSystem {
   private lightCanvas: HTMLCanvasElement;
   private lightCtx: CanvasRenderingContext2D;
+  private previousFrameCanvas: HTMLCanvasElement;
+  private previousFrameCtx: CanvasRenderingContext2D;
+  private noiseCanvas: HTMLCanvasElement;
   // Pre-built star field (static, generated once).
   private stars: { x: number; y: number; r: number; a: number }[] = [];
 
@@ -20,6 +23,14 @@ export class RenderSystem {
     this.lightCanvas.width  = VIEW_WIDTH;
     this.lightCanvas.height = VIEW_HEIGHT;
     this.lightCtx = this.lightCanvas.getContext("2d")!;
+    this.previousFrameCanvas = document.createElement("canvas");
+    this.previousFrameCanvas.width = VIEW_WIDTH;
+    this.previousFrameCanvas.height = VIEW_HEIGHT;
+    this.previousFrameCtx = this.previousFrameCanvas.getContext("2d")!;
+    this.noiseCanvas = document.createElement("canvas");
+    this.noiseCanvas.width = 256;
+    this.noiseCanvas.height = 256;
+    this.generateNoiseTexture();
     this.generateStars();
   }
 
@@ -34,15 +45,34 @@ export class RenderSystem {
     }
   }
 
+  private generateNoiseTexture(): void {
+    const nctx = this.noiseCanvas.getContext("2d")!;
+    const img = nctx.createImageData(this.noiseCanvas.width, this.noiseCanvas.height);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = Math.floor(Math.random() * 255);
+      img.data[i] = v;
+      img.data[i + 1] = v;
+      img.data[i + 2] = v;
+      img.data[i + 3] = Math.floor(Math.random() * 90);
+    }
+    nctx.putImageData(img, 0, 0);
+  }
+
   render(): void {
     const ctx = this.game.ctx;
+    const quality = this.game.core.settings.graphicsQuality;
+    const reducedMotion = this.game.core.settings.reducedMotion;
+    this.previousFrameCtx.setTransform(1, 0, 0, 1, 0, 0);
+    this.previousFrameCtx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    this.previousFrameCtx.drawImage(ctx.canvas, 0, 0);
+
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
     // Screen shake: directional bias toward impact + rotational component.
     const shake = this.game.core.shake;
     const shakeRot = this.game.core.shakeRot;
-    if (shake > 0.01 || shakeRot > 0.001) {
+    if (this.game.core.settings.screenShake && !reducedMotion && (shake > 0.01 || shakeRot > 0.001)) {
       const dir = this.game.core.shakeDir;
       const rand = (Math.random() - 0.5);
       // 60% directional, 40% random perpendicular
@@ -55,12 +85,16 @@ export class RenderSystem {
     }
 
     this.drawBackground(ctx);
+    if (quality === "high" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
+      this.drawPhosphorPersistence(ctx);
+    }
     this.drawTerrain(ctx);
     if (this.game.core.debug.showFlow) this.drawFlowDebug(ctx);
     this.drawPathPreview(ctx);
     if (this.game.core.showHeatmap) this.drawHeatmap(ctx);
     this.drawCore(ctx);
     this.drawDamageZones(ctx);
+    this.drawScorchDecals(ctx);
     this.drawRings(ctx);
     this.drawTowers(ctx);
     this.drawEnemies(ctx);
@@ -71,21 +105,27 @@ export class RenderSystem {
     this.drawMuzzleFlashes(ctx);
     this.drawParticles(ctx);
     this.drawFloatingText(ctx);
+    this.drawBuildSynergyHighlights(ctx);
     this.drawPlacementPreview(ctx);
     this.drawSelectionHighlights(ctx);
     if (this.game.core.debug.show) this.drawDebugOverlay(ctx);
 
     // Dynamic light layer — additive compositing.
-    this.buildLightLayer();
-    ctx.save();
-    ctx.globalCompositeOperation = "screen";
-    ctx.globalAlpha = 0.55;
-    ctx.drawImage(this.lightCanvas, 0, 0);
-    ctx.restore();
+    if (quality !== "low") {
+      this.buildLightLayer();
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = quality === "medium" ? 0.36 : 0.55;
+      ctx.drawImage(this.lightCanvas, 0, 0);
+      ctx.restore();
+    }
 
     // Reset shake before CRT so the overlay sits fixed on screen.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (!this.game.core.settings.reducedFlashing) this.drawCRTOverlay(ctx);
+    if (quality !== "low" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
+      this.drawCRTOverlay(ctx);
+    }
+    this.drawScreenFlashes(ctx);
   }
 
   private buildLightLayer(): void {
@@ -124,7 +164,14 @@ export class RenderSystem {
 
     // Tower ambient glow (dim, always-on).
     for (const t of this.game.towers.list) {
-      addLight(t.pos.x, t.pos.y, 28, hexToRgb(t.def.color), 0.15);
+      const fireGlow = Math.max(0, Math.min(1, t.recoil / 4));
+      addLight(
+        t.pos.x,
+        t.pos.y,
+        28 + fireGlow * 34,
+        hexToRgb(t.def.color),
+        0.15 + fireGlow * 0.32
+      );
     }
 
     // Projectile glow (brightest light source).
@@ -197,6 +244,29 @@ export class RenderSystem {
       ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
     }
 
+    if (this.game.core.settings.graphicsQuality === "high") this.drawFilmGrain(ctx);
+
+    ctx.restore();
+  }
+
+  private drawPhosphorPersistence(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+    ctx.globalAlpha = 0.11;
+    ctx.globalCompositeOperation = "screen";
+    ctx.drawImage(this.previousFrameCanvas, 0, 0);
+    ctx.restore();
+  }
+
+  private drawFilmGrain(ctx: CanvasRenderingContext2D): void {
+    const pattern = ctx.createPattern(this.noiseCanvas, "repeat");
+    if (!pattern) return;
+    const ox = Math.floor(Math.random() * this.noiseCanvas.width);
+    const oy = Math.floor(Math.random() * this.noiseCanvas.height);
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    ctx.translate(-ox, -oy);
+    ctx.fillStyle = pattern;
+    ctx.fillRect(0, 0, VIEW_WIDTH + this.noiseCanvas.width, VIEW_HEIGHT + this.noiseCanvas.height);
     ctx.restore();
   }
 
@@ -357,6 +427,22 @@ export class RenderSystem {
       }
       ctx.restore();
     }
+
+    // Telegraph: flash spawner bright when a group is about to spawn.
+    if (this.game.state === "WAVE_ACTIVE") {
+      for (const sign of this.game.waves.telegraphSigns) {
+        ctx.save();
+        ctx.globalAlpha = sign.intensity * 0.65;
+        ctx.strokeStyle = "#ff5252";
+        ctx.lineWidth = 3 + sign.intensity * 3;
+        ctx.shadowBlur = 20 + sign.intensity * 20;
+        ctx.shadowColor = "#ff1a00";
+        ctx.beginPath();
+        ctx.arc(sign.x, sign.y, 18 + sign.intensity * 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
   }
 
   private drawCore(ctx: CanvasRenderingContext2D): void {
@@ -386,6 +472,21 @@ export class RenderSystem {
     ctx.beginPath();
     ctx.arc(cx, cy, 36, 0, Math.PI * 2);
     ctx.stroke();
+
+    if (this.game.hasCoreDeflector()) {
+      ctx.save();
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = "#80d8ff";
+      ctx.strokeStyle = `rgba(128, 216, 255, ${(0.45 + Math.sin(elapsed * 4) * 0.16).toFixed(2)})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 5]);
+      ctx.lineDashOffset = -elapsed * 18;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 43, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
 
     // HP arc overlay on the outer ring.
     ctx.shadowBlur = 8;
@@ -479,6 +580,10 @@ export class RenderSystem {
   private drawTower(ctx: CanvasRenderingContext2D, t: Tower): void {
     ctx.save();
     const disabled = this.game.towers["disabled"].has(t);
+    // Check jammer aura — show yellow interference halo.
+    const jammed = !disabled && this.game.enemies.list.some(
+      (e) => e.active && e.type === "jammer" && e.pos.dist(t.pos) < 80
+    );
     ctx.globalAlpha = disabled ? 0.4 : 1;
 
     // Base plate.
@@ -489,13 +594,9 @@ export class RenderSystem {
 
     // Turret.
     ctx.translate(t.pos.x, t.pos.y);
-    const stats = (t.statBlock());
+    const stats = this.game.towers.effectiveStats(t);
     const elapsed = this.game.time.elapsed;
-    const target = this.findTargetForDraw(t);
-    const ang = Math.atan2(
-      (target?.pos.y ?? t.pos.y) - t.pos.y,
-      (target?.pos.x ?? t.pos.x + 1) - t.pos.x
-    );
+    const aimAngle = t.isEco ? 0 : t.angle;
 
     // --- Idle ring animations (drawn in world space before rotation) ---
     if (t.type === "pulse") {
@@ -547,11 +648,12 @@ export class RenderSystem {
       ctx.restore();
     }
 
-    if (!t.isEco) ctx.rotate(ang);
+    if (!t.isEco) ctx.rotate(aimAngle);
 
     // Fire glow: shadowBlur spikes when recoil is active (just fired).
     const fireBurst = t.recoil / 4;
-    ctx.shadowBlur = 8 + fireBurst * 20;
+    const overchargeGlow = t.overcharge >= 5 ? 12 + Math.sin(elapsed * 8) * 3 : 0;
+    ctx.shadowBlur = 8 + fireBurst * 20 + overchargeGlow;
     ctx.shadowColor = t.def.color;
     ctx.fillStyle = t.def.color;
 
@@ -599,6 +701,23 @@ export class RenderSystem {
       ctx.beginPath();
       ctx.arc(10, 0, 3.5 + fireBurst * 2, 0, Math.PI * 2);
       ctx.fill();
+      // Overheat glow: barrel turns red-hot above heat threshold.
+      if (t.heatTimer > 2) {
+        const heatFrac = Math.min(1, (t.heatTimer - 2) / 6);
+        const r = 255;
+        const g = Math.round(100 - heatFrac * 80);
+        ctx.save();
+        ctx.shadowBlur = 18 + heatFrac * 14;
+        ctx.shadowColor = `rgb(${r},${g},0)`;
+        ctx.globalAlpha = heatFrac * 0.6;
+        ctx.fillStyle = `rgb(${r},${g},0)`;
+        ctx.fillRect(-2, -5, 12, 10);
+        // Barrel tip ember.
+        ctx.beginPath();
+        ctx.arc(10, 0, 4 + heatFrac * 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     } else if (t.type === "barrier") {
       ctx.beginPath();
       for (let i = 0; i < 6; i++) {
@@ -620,7 +739,7 @@ export class RenderSystem {
     }
 
     // Level pips.
-    ctx.rotate(-ang);
+    ctx.rotate(-aimAngle);
     ctx.shadowBlur = 0;
     const pips = Math.min(t.level, 5);
     ctx.fillStyle = "#ffeb3b";
@@ -631,9 +750,45 @@ export class RenderSystem {
       ctx.fillStyle = "#ff9800";
       ctx.fillRect(-9, -18, 18, 2);
     }
+    if (t.overcharge >= 5 && !t.isEco) {
+      ctx.strokeStyle = "#ffeb3b";
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "#ffeb3b";
+      ctx.beginPath();
+      ctx.arc(0, 0, 18 + Math.sin(elapsed * 6) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (this.game.core.settings.colorblind) {
+      ctx.shadowBlur = 3;
+      ctx.shadowColor = "#000";
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 9px Courier New";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(t.type.charAt(0).toUpperCase(), 0, 0);
+    }
 
     // Cooldown arc — drawn around the base plate after all rotation resets.
     this.drawCooldownArc(ctx, t);
+
+    // Jammer interference halo.
+    if (jammed) {
+      const pulse = 0.5 + Math.sin(this.game.time.elapsed * 14) * 0.35;
+      ctx.save();
+      ctx.globalAlpha = pulse * 0.75;
+      ctx.strokeStyle = "#ffeb3b";
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#ffeb3b";
+      ctx.setLineDash([3, 5]);
+      ctx.lineDashOffset = this.game.time.elapsed * -30;
+      ctx.beginPath();
+      ctx.arc(0, 0, 18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
 
     ctx.restore();
     void stats;
@@ -642,7 +797,7 @@ export class RenderSystem {
   private drawCooldownArc(ctx: CanvasRenderingContext2D, t: Tower): void {
     if (t.isEco) {
       // Harvester: green income arc.
-      const stats = t.statBlock();
+      const stats = this.game.towers.effectiveStats(t);
       const progress = Math.max(0, Math.min(1, 1 - t.timer / stats.cooldown));
       ctx.beginPath();
       ctx.arc(0, 0, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress, false);
@@ -654,7 +809,7 @@ export class RenderSystem {
       return;
     }
     if (t.type === "barrier" || t.type === "stasis") return; // handled elsewhere
-    const stats = t.statBlock();
+    const stats = this.game.towers.effectiveStats(t);
     const progress = Math.max(0, Math.min(1, 1 - t.timer / stats.cooldown));
     if (progress < 0.02) return; // nothing to draw yet
     const isReady = progress >= 0.98;
@@ -665,13 +820,23 @@ export class RenderSystem {
     ctx.shadowBlur = isReady ? 8 : 0;
     ctx.shadowColor = t.def.color;
     ctx.stroke();
+
+    if (t.manualCooldown > 0) {
+      const manualProgress = Math.max(0, Math.min(1, 1 - t.manualCooldown / t.manualCooldownMax));
+      ctx.beginPath();
+      ctx.arc(0, 0, 18, Math.PI / 2, Math.PI / 2 + Math.PI * 2 * manualProgress, false);
+      ctx.strokeStyle = "rgba(255, 235, 59, 0.55)";
+      ctx.lineWidth = 1;
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+    }
   }
 
   private findTargetForDraw(t: Tower): Enemy | null {
     // Display-only — cheap nearest in range.
     let best: Enemy | null = null;
     let bd = Infinity;
-    const range = t.statBlock().range;
+    const range = this.game.towers.effectiveStats(t).range;
     for (const e of this.game.enemies.list) {
       if (!e.active) continue;
       const d = e.pos.dist(t.pos);
@@ -688,11 +853,70 @@ export class RenderSystem {
     ctx.save();
     ctx.translate(e.pos.x, e.pos.y);
 
-    if (e.isPhased) ctx.globalAlpha = 0.25 + Math.sin(e.timer * 12) * 0.1;
+    // Boss entrance: contracting portal ring (drawn before boss body scale).
+    if (e.isBoss && e.bossEntranceTimer > 0) {
+      const prog = 1 - e.bossEntranceTimer / e.bossEntranceMax;
+      const ringRad = Math.max(2, (1 - prog) * 100);
+      const ringAlpha = (1 - prog) * 0.85;
+      ctx.save();
+      ctx.globalAlpha = ringAlpha;
+      ctx.strokeStyle = "#ff2200";
+      ctx.lineWidth = 5 - prog * 3;
+      ctx.shadowBlur = 40;
+      ctx.shadowColor = "#ff2200";
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRad, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner dashed ring rotating inward.
+      ctx.globalAlpha = ringAlpha * 0.55;
+      ctx.setLineDash([5, 9]);
+      ctx.lineDashOffset = e.timer * -60;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRad * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
 
+    let enemyAlpha = 1;
+    if (e.isPhased) enemyAlpha = 0.25 + Math.sin(e.timer * 12) * 0.1;
+    if (e.spawnFxTimer > 0) {
+      const spawnProgress = 1 - e.spawnFxTimer / e.spawnFxMax;
+      const scale = 0.25 + spawnProgress * 0.75;
+      enemyAlpha *= 0.35 + spawnProgress * 0.65;
+      ctx.scale(scale, scale);
+    } else if (e.isBoss && e.bossEntranceTimer > 0) {
+      // Boss body scales from 0 to 1 over entrance duration.
+      const prog = 1 - e.bossEntranceTimer / e.bossEntranceMax;
+      const easedScale = prog * prog; // ease-in so it pops at the end
+      ctx.scale(easedScale, easedScale);
+      enemyAlpha *= easedScale;
+    }
+    // Tunneler underground: fade body and show dirt ripple.
+    if (e.type === "tunneler" && e.tunnelTransitionProg > 0) {
+      enemyAlpha *= 1 - e.tunnelTransitionProg;
+      if (e.isTunneling) {
+        ctx.save();
+        ctx.globalAlpha = 0.25 * e.tunnelTransitionProg;
+        ctx.strokeStyle = "#8d6e63";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 6]);
+        ctx.lineDashOffset = e.timer * -22;
+        ctx.beginPath();
+        ctx.arc(0, 0, e.size + 4 + Math.sin(e.timer * 8) * 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = enemyAlpha;
+
+    const frozen = e.freezeFxTimer > 0;
+    const bodyColor = frozen ? "#d8fbff" : e.color;
     ctx.shadowBlur = e.isBoss ? 18 : 8;
-    ctx.shadowColor = e.color;
-    ctx.fillStyle = e.color;
+    ctx.shadowColor = frozen ? "#80d8ff" : e.color;
+    ctx.fillStyle = bodyColor;
 
     // Shape by type.
     switch (e.type) {
@@ -917,6 +1141,79 @@ export class RenderSystem {
         ctx.lineWidth = 2;
         ctx.stroke();
         break;
+      case "tunneler": {
+        // Oval body with burrowing claw marks.
+        ctx.save();
+        ctx.scale(0.7, 1);
+        ctx.beginPath();
+        ctx.arc(0, 0, e.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "#a1887f";
+        ctx.lineWidth = 1;
+        ctx.globalAlpha *= 0.7;
+        for (let i = -1; i <= 1; i += 2) {
+          ctx.beginPath();
+          ctx.moveTo(i * 3, -e.size * 0.5);
+          ctx.lineTo(i * 3, e.size * 0.5);
+          ctx.stroke();
+        }
+        ctx.restore();
+        break;
+      }
+      case "saboteur": {
+        // Jagged asymmetric shape.
+        ctx.beginPath();
+        ctx.moveTo(e.size, 0);
+        ctx.lineTo(e.size * 0.3, -e.size);
+        ctx.lineTo(-e.size, -e.size * 0.5);
+        ctx.lineTo(-e.size * 0.5, e.size * 0.5);
+        ctx.lineTo(e.size * 0.2, e.size);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case "cache": {
+        // Rotating golden diamond.
+        ctx.save();
+        ctx.rotate(e.timer * 2.4);
+        ctx.beginPath();
+        ctx.moveTo(0, -e.size * 1.4);
+        ctx.lineTo(e.size * 0.85, 0);
+        ctx.lineTo(0, e.size * 1.4);
+        ctx.lineTo(-e.size * 0.85, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        // Outer sparkle ring.
+        const sparkAlpha = 0.4 + Math.sin(e.timer * 7) * 0.2;
+        ctx.save();
+        ctx.globalAlpha = sparkAlpha;
+        ctx.strokeStyle = "#ffd700";
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "#ffd700";
+        ctx.beginPath();
+        ctx.arc(0, 0, e.size + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
+    }
+
+    // Elite: pulsing golden border.
+    if (e.isElite) {
+      ctx.save();
+      ctx.globalAlpha = 0.7 + Math.sin(e.timer * 3) * 0.2;
+      ctx.strokeStyle = "#ffd700";
+      ctx.lineWidth = 2.5;
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = "#ffd700";
+      ctx.beginPath();
+      ctx.arc(0, 0, e.size + 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
 
     // Mark indicator (signal marker).
@@ -930,12 +1227,41 @@ export class RenderSystem {
 
     // Slow halo.
     if (e.slowTimer > 0) {
-      ctx.strokeStyle = "#9c27b0";
+      ctx.strokeStyle = frozen ? "#b3f5ff" : "#9c27b0";
       ctx.setLineDash([2, 3]);
       ctx.beginPath();
       ctx.arc(0, 0, e.size + 6, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
+    }
+
+    if (frozen) {
+      const frost = Math.max(0.25, e.freezeFxTimer / e.freezeFxMax);
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.9, frost);
+      ctx.strokeStyle = "#dffcff";
+      ctx.fillStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "#80d8ff";
+      for (let i = 0; i < 7; i++) {
+        const a = e.timer * 0.25 + (i / 7) * Math.PI * 2;
+        const inner = e.size * 0.58;
+        const outer = e.size + 5 + (i % 2) * 3;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+        ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * outer, Math.sin(a) * outer, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 0.22 * frost;
+      ctx.fillStyle = "#d8fbff";
+      ctx.beginPath();
+      ctx.arc(0, 0, e.size + 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
     // HP bar.
@@ -948,6 +1274,13 @@ export class RenderSystem {
     ctx.fillRect(-w / 2, -e.size - 10, w, h);
     ctx.fillStyle = hpPct < 0.33 ? "#f44336" : hpPct < 0.66 ? "#ffb300" : "#4caf50";
     ctx.fillRect(-w / 2, -e.size - 10, w * hpPct, h);
+    if (e.damageTakenThisWave > 0) {
+      const dmgPct = Math.max(0, Math.min(1, e.damageTakenThisWave / e.maxHp));
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.fillRect(-w / 2, -e.size - 15, w, 2);
+      ctx.fillStyle = "#ffeb3b";
+      ctx.fillRect(-w / 2, -e.size - 15, w * dmgPct, 2);
+    }
 
     if (e.isBoss) {
       ctx.fillStyle = "#fff";
@@ -973,7 +1306,8 @@ export class RenderSystem {
 
   private drawDrone(ctx: CanvasRenderingContext2D, d: Drone): void {
     ctx.save();
-    ctx.translate(d.pos.x, d.pos.y);
+    const bob = Math.sin(this.game.time.elapsed * 4.2 + d.bobPhase) * 3;
+    ctx.translate(d.pos.x, d.pos.y + bob);
     ctx.rotate(d.angle);
     ctx.shadowBlur = 10;
     ctx.shadowColor = d.color;
@@ -1050,20 +1384,46 @@ export class RenderSystem {
       }
     }
 
-    // Head.
+    // Head. Bullet classes get distinct silhouettes for quick readability.
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 10;
     ctx.shadowColor = p.color;
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.pos.x, p.pos.y, 3, 0, Math.PI * 2);
-    ctx.fill();
-    if (p.kind === "bullet") {
+
+    if (p.ownerType === "blaster") {
+      const ang = Math.atan2(p.lastDir.y, p.lastDir.x);
+      ctx.save();
+      ctx.translate(p.pos.x, p.pos.y);
+      ctx.rotate(ang);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-5, -1.6, 10, 3.2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(2, -0.8, 4, 1.6);
+      ctx.restore();
+    } else if (p.ownerType === "pulse") {
+      const progress = p.maxLife > 0 ? 1 - p.life / p.maxLife : 0;
+      const ringRadius = 3 + (progress % 0.28) * 18;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.pos.x, p.pos.y, ringRadius, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.fillStyle = "#ffffff";
       ctx.shadowBlur = 0;
       ctx.beginPath();
-      ctx.arc(p.pos.x, p.pos.y, 1.2, 0, Math.PI * 2);
+      ctx.arc(p.pos.x, p.pos.y, 1.4, 0, Math.PI * 2);
       ctx.fill();
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.pos.x, p.pos.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      if (p.kind === "bullet") {
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(p.pos.x, p.pos.y, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     ctx.restore();
   }
@@ -1071,14 +1431,38 @@ export class RenderSystem {
   private drawBeams(ctx: CanvasRenderingContext2D): void {
     for (const b of this.game.particles.beams) {
       ctx.save();
-      ctx.strokeStyle = b.color;
-      ctx.lineWidth = 2 + (b.life / b.maxLife) * 3;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = b.color;
-      ctx.beginPath();
-      ctx.moveTo(b.fromX, b.fromY);
-      ctx.lineTo(b.toX, b.toY);
-      ctx.stroke();
+      const a = b.life / b.maxLife;
+      if (b.kind === "railgun") {
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = a * 0.5;
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = b.width * 1.9;
+        ctx.shadowBlur = 26;
+        ctx.shadowColor = b.color;
+        ctx.beginPath();
+        ctx.moveTo(b.fromX, b.fromY);
+        ctx.lineTo(b.toX, b.toY);
+        ctx.stroke();
+
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = Math.max(2, b.width * 0.45);
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = "#ffffff";
+        ctx.beginPath();
+        ctx.moveTo(b.fromX, b.fromY);
+        ctx.lineTo(b.toX, b.toY);
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 2 + a * 3;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = b.color;
+        ctx.beginPath();
+        ctx.moveTo(b.fromX, b.fromY);
+        ctx.lineTo(b.toX, b.toY);
+        ctx.stroke();
+      }
       ctx.restore();
     }
   }
@@ -1142,12 +1526,53 @@ export class RenderSystem {
     }
   }
 
-  private drawParticles(ctx: CanvasRenderingContext2D): void {
-    for (const p of this.game.particles.particles) {
+  private drawScorchDecals(ctx: CanvasRenderingContext2D): void {
+    for (const s of this.game.particles.scorchDecals) {
+      const a = Math.max(0, s.life / s.maxLife);
       ctx.save();
-      ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-      ctx.fillStyle = p.color;
-      ctx.fillRect(p.pos.x - p.size / 2, p.pos.y - p.size / 2, p.size, p.size);
+      ctx.globalAlpha = 0.38 * a;
+      const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.radius);
+      grad.addColorStop(0, s.color);
+      grad.addColorStop(0.55, "rgba(24, 16, 12, 0.7)");
+      grad.addColorStop(1, "rgba(24, 16, 12, 0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, s.radius * 1.15, s.radius * 0.72, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  private drawParticles(ctx: CanvasRenderingContext2D): void {
+    const groups = new Map<string, { x: number; y: number; size: number; alpha: number }[]>();
+    for (const p of this.game.particles.particles) {
+      const key = p.color;
+      const bucket = groups.get(key);
+      const item = {
+        x: p.pos.x - p.size / 2,
+        y: p.pos.y - p.size / 2,
+        size: p.size,
+        alpha: Math.max(0, p.life / p.maxLife),
+      };
+      if (bucket) bucket.push(item);
+      else groups.set(key, [item]);
+    }
+
+    for (const [color, particles] of groups) {
+      ctx.save();
+      ctx.fillStyle = color;
+      const opaque = particles.filter((p) => p.alpha > 0.85);
+      if (opaque.length > 0) {
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        for (const p of opaque) ctx.rect(p.x, p.y, p.size, p.size);
+        ctx.fill();
+      }
+      for (const p of particles) {
+        if (p.alpha > 0.85) continue;
+        ctx.globalAlpha = p.alpha;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+      }
       ctx.restore();
     }
   }
@@ -1166,30 +1591,131 @@ export class RenderSystem {
     }
   }
 
+  private drawScreenFlashes(ctx: CanvasRenderingContext2D): void {
+    for (const f of this.game.particles.screenFlashes) {
+      const a = (f.life / f.maxLife) * f.alpha;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = f.color;
+      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+      ctx.restore();
+    }
+  }
+
+  private drawBuildSynergyHighlights(ctx: CanvasRenderingContext2D): void {
+    const type = this.game.input.selectedTowerType;
+    if (!type) return;
+
+    const hover = this.game.input.hoverCell;
+    const elapsed = this.game.time.elapsed;
+    for (const tower of this.game.towers.list) {
+      const maxCells = this.buildSynergyDistance(type, tower);
+      if (maxCells <= 0) continue;
+
+      let near = false;
+      if (hover) {
+        const dc = Math.abs(hover.c - tower.c);
+        const dr = Math.abs(hover.r - tower.r);
+        near = Math.max(dc, dr) <= maxCells;
+      }
+
+      const pulse = 0.55 + Math.sin(elapsed * 7) * 0.18;
+      ctx.save();
+      ctx.globalAlpha = near ? 0.9 : 0.38;
+      ctx.strokeStyle = near ? "#00e676" : "#66fcf1";
+      ctx.lineWidth = near ? 2 : 1;
+      ctx.shadowBlur = near ? 16 : 8;
+      ctx.shadowColor = ctx.strokeStyle;
+      ctx.setLineDash([5, 4]);
+      ctx.lineDashOffset = -elapsed * 20;
+      ctx.beginPath();
+      ctx.arc(tower.pos.x, tower.pos.y, 22 + pulse * 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (near && hover) {
+        const hx = hover.c * TILE_SIZE + TILE_SIZE / 2;
+        const hy = hover.r * TILE_SIZE + TILE_SIZE / 2;
+        ctx.globalAlpha = 0.32;
+        ctx.beginPath();
+        ctx.moveTo(hx, hy);
+        ctx.lineTo(tower.pos.x, tower.pos.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  private buildSynergyDistance(type: TowerType, tower: Tower): number {
+    if ((type === "stasis" && tower.type === "tesla") || (type === "tesla" && tower.type === "stasis")) return 1;
+    if ((type === "barrier" && tower.type === "harvester") || (type === "harvester" && tower.type === "barrier")) return 1;
+    if (type !== "harvester" && tower.type === "harvester" && tower.flags.relayNode) return 3;
+    if (type === "harvester" && !tower.isEco) return 3;
+    return 0;
+  }
+
   private drawPlacementPreview(ctx: CanvasRenderingContext2D): void {
     const input = this.game.input;
-    if (!input.showPlacementPreview || !input.selectedTowerType || !input.hoverCell) return;
-    const t = input.selectedTowerType;
+    const t = input.placementTowerType;
+    if (!input.showPlacementPreview || !t || !input.hoverCell) return;
     const { c, r } = input.hoverCell;
     const check = this.game.towers.canPlace(t, c, r);
     const ok = check.ok;
 
-    const x = c * TILE_SIZE;
-    const y = r * TILE_SIZE;
+    const def = towerDefinitions[t];
+    const cx = c * TILE_SIZE + TILE_SIZE / 2;
+    const cy = r * TILE_SIZE + TILE_SIZE / 2;
+    const snap = input.placementSnapTimer > 0 ? input.placementSnapTimer / 0.18 : 0;
+    const invalid = input.placementInvalidTimer > 0 ? input.placementInvalidTimer / 0.22 : 0;
+    const bounce = ok ? 1 + Math.sin((1 - snap) * Math.PI) * 0.14 : 1;
+    const shake = ok ? 0 : Math.sin(invalid * Math.PI * 10) * 3 * invalid;
+    const color = ok ? def.color : "#ff5252";
+
     ctx.save();
-    ctx.strokeStyle = ok ? "#4caf50" : "#f44336";
-    ctx.fillStyle = ok ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)";
-    ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-    ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    ctx.translate(cx + shake, cy);
+    ctx.scale(bounce, bounce);
+
+    ctx.strokeStyle = color;
+    ctx.fillStyle = ok ? "rgba(102, 252, 241, 0.12)" : "rgba(255, 82, 82, 0.18)";
+    ctx.lineWidth = ok ? 1 : 2;
+    ctx.fillRect(-TILE_SIZE / 2 + 2, -TILE_SIZE / 2 + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    ctx.strokeRect(-TILE_SIZE / 2 + 2, -TILE_SIZE / 2 + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+
+    ctx.globalAlpha = ok ? 0.52 : 0.42;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = color;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = ok ? 0.38 : 0.5;
+    if (t === "mortar" || t === "barrier") {
+      ctx.strokeRect(-9, -9, 18, 18);
+    } else if (t === "tesla" || t === "stasis") {
+      ctx.beginPath();
+      ctx.moveTo(0, -12);
+      ctx.lineTo(11, 8);
+      ctx.lineTo(-11, 8);
+      ctx.closePath();
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(13, 0);
+      ctx.lineTo(-8, 8);
+      ctx.lineTo(-4, 0);
+      ctx.lineTo(-8, -8);
+      ctx.closePath();
+      ctx.stroke();
+    }
 
     // Range ring.
     if (ok) {
-      const def = (this.game.towers as unknown as { __unused?: unknown });
-      void def;
       const range = this.previewRange(t);
+      ctx.scale(1 / bounce, 1 / bounce);
       ctx.strokeStyle = "rgba(102, 252, 241, 0.5)";
       ctx.beginPath();
-      ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, range, 0, Math.PI * 2);
+      ctx.arc(0, 0, range, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();

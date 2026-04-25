@@ -7,11 +7,16 @@ export const defaultSettings: GameSettings = {
   masterVolume: 0.8,
   musicVolume: 0.25,
   sfxVolume: 0.7,
+  uiVolume: 0.7,
   muted: false,
   screenShake: true,
+  reducedMotion: false,
   reducedFlashing: false,
   showDamageNumbers: true,
   colorblind: false,
+  highContrast: false,
+  fontScale: 1,
+  graphicsQuality: "high",
 };
 
 export const defaultProfile: PersistedProfile = {

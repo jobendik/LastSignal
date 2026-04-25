@@ -1,7 +1,7 @@
 import { EventBus } from "./EventBus";
 import { StateMachine } from "./StateMachine";
 import { Time } from "./Time";
-import type { GameSettings, PersistedProfile, RunStats, SectorDefinition, SpeedMultiplier, TowerType, UpgradeEffect } from "./Types";
+import type { GameSettings, PersistedProfile, RunModifier, RunStats, SectorDefinition, SpeedMultiplier, TowerType, UpgradeEffect } from "./Types";
 
 /** Aggregate upgrade state (accumulated effects from chosen signal upgrades). */
 export interface UpgradeAggregate {
@@ -77,14 +77,25 @@ export interface GameCoreState {
   shake: number;
   shakeDir: { x: number; y: number }; // normalized direction of last impact
   shakeRot: number;                   // rotational shake amplitude (radians)
-  slowMo: number; // seconds of slow-motion
+  slowMo: number;       // seconds of slow-motion remaining
+  slowMoScale: number;  // time scale during slow-mo (default 0.35, lower = more dramatic)
   showHeatmap: boolean;               // live enemy-density heat overlay (H key)
+  coreAbilityCooldown: number;
+  coreAbilityCooldownMax: number;
+  emergencyTriggered: boolean;
+  emergencyTimer: number;
+  emergencyOverheatTimer: number;
+  /** Active run modifiers rolled at sector start. */
+  activeModifiers: RunModifier[];
+  /** Seconds of simulation freeze remaining after a big kill (hit-stop effect). */
+  hitStopTimer: number;
 }
 
 export function createEmptyStats(): RunStats {
   return {
     enemiesKilled: 0,
     creditsEarned: 0,
+    creditsSpent: 0,
     coreDamageTaken: 0,
     damageByTowerType: {},
     damageByEnemyType: {},
@@ -122,7 +133,7 @@ export function applyUpgradeEffect(
   if (effect.mortarSplashMul) agg.mortarSplashMul *= effect.mortarSplashMul;
   if (effect.phantomVisibleBonus) agg.phantomVisibleBonus += effect.phantomVisibleBonus;
   if (effect.towerBuildCostMul) agg.towerBuildCostMul *= effect.towerBuildCostMul;
-  if (effect.sellRefundMul) agg.sellRefundMul = effect.sellRefundMul;
+  if (effect.sellRefundMul) agg.sellRefundMul = Math.max(agg.sellRefundMul, effect.sellRefundMul);
   if (effect.lowCoreFireRateMul) {
     agg.lowCoreFireRateMul = Math.max(agg.lowCoreFireRateMul, effect.lowCoreFireRateMul);
   }

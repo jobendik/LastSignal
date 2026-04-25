@@ -205,6 +205,48 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     isBoss: true,
     armor: 0.18,
   },
+  tunneler: {
+    id: "tunneler",
+    name: "Tunneler",
+    role: "Subterranean infiltrator",
+    description:
+      "Periodically dives underground, becoming invisible and moving faster until it surfaces closer to the core.",
+    hp: 38,
+    speed: 52,
+    reward: 16,
+    breach: 12,
+    color: "#8d6e63",
+    size: 8,
+    ability: "tunnel",
+  },
+  saboteur: {
+    id: "saboteur",
+    name: "Saboteur",
+    role: "Tower disabler",
+    description:
+      "Disables any tower it passes within range of for 3 seconds. Eliminate it before it reaches your defenses.",
+    hp: 30,
+    speed: 62,
+    reward: 14,
+    breach: 9,
+    color: "#ff6f00",
+    size: 7,
+    ability: "none",
+  },
+  cache: {
+    id: "cache",
+    name: "Data Cache",
+    role: "Credit bounty target",
+    description:
+      "A rogue data packet carrying intercepted credits. Moves fast — kill it before it escapes past the core.",
+    hp: 22,
+    speed: 100,
+    reward: 50,
+    breach: 0,
+    color: "#ffd700",
+    size: 7,
+    ability: "none",
+  },
 };
 
 export const enemyOrder: EnemyType[] = [
@@ -222,4 +264,7 @@ export const enemyOrder: EnemyType[] = [
   "jammer",
   "swarm",
   "overlord",
+  "tunneler",
+  "saboteur",
+  "cache",
 ];

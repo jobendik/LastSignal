@@ -12,6 +12,19 @@ export class EconomySystem {
 
   /** Called when wave ends — crystal stabilizer bonus payouts. */
   onWaveComplete(): void {
+    const interest = Math.floor(this.game.core.credits * 0.02);
+    if (interest > 0) {
+      this.game.addCredits(interest);
+      this.game.particles.spawnFloatingText(
+        this.game.grid.corePos.x,
+        this.game.grid.corePos.y - 56,
+        `INTEREST +${interest}`,
+        "#ffeb3b",
+        1,
+        12
+      );
+    }
+
     for (const t of this.game.towers.list) {
       if (t.type === "harvester" && t.flags.crystalStabilizer) {
         const bonus = Math.round((t.def.income ?? 15) * 2);

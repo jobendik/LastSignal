@@ -30,6 +30,7 @@ export class AchievementToast {
       return;
     }
     this.showing = true;
+    this.game.audio.sfxAchievement();
     clear(this.el);
     this.el.append(
       el("div", { class: "ls-achievement-icon", text: def.icon }),

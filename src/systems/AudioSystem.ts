@@ -9,10 +9,27 @@ export class AudioSystem {
   master: GainNode | null = null;
   musicGain: GainNode | null = null;
   sfxGain: GainNode | null = null;
+  uiGain: GainNode | null = null;
+  limiter: DynamicsCompressorNode | null = null;
+  reverb: ConvolverNode | null = null;
+  reverbGain: GainNode | null = null;
   bgmOsc: OscillatorNode | null = null;
+  /** Tension drone: fades in during waves, fades out during planning. */
+  private bgmTensionGain: GainNode | null = null;
+  /** Beat pulse layer: sparse rhythmic clicks that intensify during waves. */
+  private bgmBeatInterval: ReturnType<typeof setInterval> | null = null;
+  private bgmIntensity = 0; // 0=calm, 1=wave, 2=boss
   initialized = false;
   muted = false;
   private settings: GameSettings | null = null;
+  private voiceExpiries: Record<AudioCategory, number[]> = {
+    bullet: [],
+    explosion: [],
+    enemy: [],
+    ui: [],
+    alert: [],
+    reward: [],
+  };
 
   init(): void {
     if (this.initialized) return;
@@ -26,12 +43,28 @@ export class AudioSystem {
       this.master = this.ctx.createGain();
       this.musicGain = this.ctx.createGain();
       this.sfxGain = this.ctx.createGain();
+      this.uiGain = this.ctx.createGain();
+      this.limiter = this.ctx.createDynamicsCompressor();
+      this.limiter.threshold.value = -8;
+      this.limiter.knee.value = 12;
+      this.limiter.ratio.value = 12;
+      this.limiter.attack.value = 0.003;
+      this.limiter.release.value = 0.25;
+      this.reverb = this.ctx.createConvolver();
+      this.reverb.buffer = this.createImpulseResponse(0.55, 1.9);
+      this.reverbGain = this.ctx.createGain();
+      this.reverbGain.gain.value = 0.16;
       this.musicGain.connect(this.master);
       this.sfxGain.connect(this.master);
-      this.master.connect(this.ctx.destination);
+      this.uiGain.connect(this.master);
+      this.reverb.connect(this.reverbGain);
+      this.reverbGain.connect(this.sfxGain);
+      this.master.connect(this.limiter);
+      this.limiter.connect(this.ctx.destination);
       this.master.gain.value = 0.8;
       this.musicGain.gain.value = 0.25;
       this.sfxGain.gain.value = 0.7;
+      this.uiGain.gain.value = 0.7;
       this.initialized = true;
       if (this.settings) this.applySettings(this.settings);
     } catch (err) {
@@ -41,11 +74,12 @@ export class AudioSystem {
 
   applySettings(s: GameSettings): void {
     this.settings = s;
-    if (!this.initialized || !this.master || !this.musicGain || !this.sfxGain) return;
+    if (!this.initialized || !this.master || !this.musicGain || !this.sfxGain || !this.uiGain) return;
     const effMaster = s.muted ? 0 : s.masterVolume;
     this.master.gain.value = effMaster;
     this.musicGain.gain.value = s.musicVolume;
     this.sfxGain.gain.value = s.sfxVolume;
+    this.uiGain.gain.value = s.uiVolume;
   }
 
   resume(): void {
@@ -57,6 +91,8 @@ export class AudioSystem {
   startMusic(): void {
     if (!this.initialized || !this.ctx || !this.musicGain || this.bgmOsc) return;
     const ctx = this.ctx;
+
+    // Base drone: deep sawtooth with slow LFO pitch wobble.
     const osc = ctx.createOscillator();
     osc.type = "sawtooth";
     osc.frequency.value = 55;
@@ -78,17 +114,63 @@ export class AudioSystem {
     osc.start();
     lfo.start();
     this.bgmOsc = osc;
+
+    // Tension layer: higher-pitched dissonant overtone that cross-fades in during waves.
+    const tensionOsc = ctx.createOscillator();
+    tensionOsc.type = "triangle";
+    tensionOsc.frequency.value = 82.5; // minor third above 55Hz for tension
+    const tensionFilter = ctx.createBiquadFilter();
+    tensionFilter.type = "highpass";
+    tensionFilter.frequency.value = 120;
+    const tensionGain = ctx.createGain();
+    tensionGain.gain.value = 0; // starts silent
+    tensionOsc.connect(tensionFilter);
+    tensionFilter.connect(tensionGain);
+    tensionGain.connect(this.musicGain);
+    tensionOsc.start();
+    this.bgmTensionGain = tensionGain;
+
+    // Beat pulse: occasional sparse rhythmic clicks during wave.
+    this.bgmBeatInterval = setInterval(() => {
+      if (this.bgmIntensity < 1 || !this.ctx || !this.musicGain) return;
+      this.bgmPulse();
+    }, 1800);
   }
 
   stopMusic(): void {
     if (this.bgmOsc) {
-      try {
-        this.bgmOsc.stop();
-      } catch {
-        /* ignore */
-      }
+      try { this.bgmOsc.stop(); } catch { /* ignore */ }
       this.bgmOsc = null;
     }
+    if (this.bgmBeatInterval !== null) {
+      clearInterval(this.bgmBeatInterval);
+      this.bgmBeatInterval = null;
+    }
+    this.bgmTensionGain = null;
+  }
+
+  /** Set music intensity: 0=planning calm, 1=wave active, 2=boss fight. */
+  setMusicIntensity(intensity: 0 | 1 | 2): void {
+    if (!this.initialized || !this.ctx || !this.bgmTensionGain) return;
+    this.bgmIntensity = intensity;
+    const now = this.ctx.currentTime;
+    const targetGain = intensity === 0 ? 0 : intensity === 1 ? 0.18 : 0.35;
+    this.bgmTensionGain.gain.cancelScheduledValues(now);
+    this.bgmTensionGain.gain.setValueAtTime(this.bgmTensionGain.gain.value, now);
+    this.bgmTensionGain.gain.linearRampToValueAtTime(targetGain, now + (intensity > 0 ? 1.8 : 4.0));
+  }
+
+  private bgmPulse(): void {
+    if (!this.initialized || !this.ctx || !this.musicGain) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 110;
+    g.gain.setValueAtTime(0.06 * (this.bgmIntensity === 2 ? 2.0 : 1.0), now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    osc.connect(g); g.connect(this.musicGain);
+    osc.start(now); osc.stop(now + 0.2);
   }
 
   // ---- SFX: per-tower procedural sounds ----
@@ -107,7 +189,7 @@ export class AudioSystem {
   }
 
   sfxTesla(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("bullet", 0.12)) return;
     const now = this.ctx!.currentTime;
     // Sharp electric crack: burst of noise + high-pitch oscillator.
     const bufSize = Math.max(1, Math.floor(this.ctx!.sampleRate * 0.05));
@@ -138,7 +220,7 @@ export class AudioSystem {
   }
 
   sfxRailgun(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("bullet", 0.24)) return;
     const now = this.ctx!.currentTime;
     // Deep crack + high snap.
     const osc = this.ctx!.createOscillator();
@@ -163,7 +245,7 @@ export class AudioSystem {
   }
 
   sfxMortar(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("bullet", 0.32)) return;
     const now = this.ctx!.currentTime;
     // Deep low-frequency thump.
     const osc = this.ctx!.createOscillator();
@@ -178,7 +260,7 @@ export class AudioSystem {
   }
 
   sfxFlamer(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("bullet", 0.12)) return;
     const now = this.ctx!.currentTime;
     // Hissing roar: filtered noise with low-pass sweep.
     const bufSize = Math.max(1, Math.floor(this.ctx!.sampleRate * 0.12));
@@ -199,7 +281,7 @@ export class AudioSystem {
   }
 
   sfxStasis(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("bullet", 0.22)) return;
     const now = this.ctx!.currentTime;
     // Crystalline ascending chime.
     const freqs = [880, 1320, 1760];
@@ -217,8 +299,8 @@ export class AudioSystem {
 
   // ---- SFX: procedural helpers ----
 
-  sfxShoot(pitch = 1, volume = 0.2): void {
-    if (!this.ready()) return;
+  sfxShoot(pitch = 1, volume = 0.2, category: AudioCategory = "bullet"): void {
+    if (!this.ready() || !this.beginVoice(category, 0.12)) return;
     const now = this.ctx!.currentTime;
     const osc = this.ctx!.createOscillator();
     const gain = this.ctx!.createGain();
@@ -228,13 +310,13 @@ export class AudioSystem {
     gain.gain.setValueAtTime(volume, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
     osc.connect(gain);
-    gain.connect(this.sfxGain!);
+    gain.connect(this.outputFor(category));
     osc.start(now);
     osc.stop(now + 0.12);
   }
 
   sfxExplosion(volume = 0.4): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("explosion", 0.36)) return;
     const now = this.ctx!.currentTime;
     const bufferSize = Math.max(1, Math.floor(this.ctx!.sampleRate * 0.35));
     const buffer = this.ctx!.createBuffer(1, bufferSize, this.ctx!.sampleRate);
@@ -252,15 +334,17 @@ export class AudioSystem {
     noise.connect(filter);
     filter.connect(gain);
     gain.connect(this.sfxGain!);
+    if (this.reverb) gain.connect(this.reverb);
     noise.start(now);
   }
 
-  sfxDeath(): void {
-    this.sfxShoot(0.5, 0.15);
+  sfxDeath(pitch = 0.5): void {
+    this.sfxShoot(pitch, 0.15, "enemy");
   }
 
   sfxCoreHit(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("alert", 0.32)) return;
+    this.duckMusic(0.45, 0.45);
     const now = this.ctx!.currentTime;
     const osc = this.ctx!.createOscillator();
     const gain = this.ctx!.createGain();
@@ -276,19 +360,19 @@ export class AudioSystem {
   }
 
   sfxBuild(): void {
-    this.sfxShoot(1.4, 0.15);
+    this.sfxShoot(1.4, 0.15, "ui");
   }
 
   sfxUpgrade(): void {
-    this.sfxShoot(1.8, 0.2);
+    this.sfxShoot(1.8, 0.2, "ui");
   }
 
   sfxSell(): void {
-    this.sfxShoot(0.7, 0.15);
+    this.sfxShoot(0.7, 0.15, "ui");
   }
 
   sfxWaveStart(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("alert", 0.42)) return;
     const now = this.ctx!.currentTime;
     const osc = this.ctx!.createOscillator();
     const gain = this.ctx!.createGain();
@@ -304,7 +388,8 @@ export class AudioSystem {
   }
 
   sfxBossAlert(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("alert", 1.05)) return;
+    this.duckMusic(1.15, 0.32);
     const now = this.ctx!.currentTime;
     for (let i = 0; i < 3; i++) {
       const osc = this.ctx!.createOscillator();
@@ -322,11 +407,11 @@ export class AudioSystem {
   }
 
   sfxReward(): void {
-    this.sfxShoot(2.2, 0.22);
+    this.sfxShoot(2.2, 0.22, "reward");
   }
 
   sfxVictory(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("alert", 0.7)) return;
     const now = this.ctx!.currentTime;
     const freqs = [440, 550, 660, 880];
     freqs.forEach((f, i) => {
@@ -344,22 +429,135 @@ export class AudioSystem {
   }
 
   sfxLose(): void {
-    if (!this.ready()) return;
+    if (!this.ready() || !this.beginVoice("alert", 1.4)) return;
     const now = this.ctx!.currentTime;
-    const osc = this.ctx!.createOscillator();
-    const gain = this.ctx!.createGain();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(300, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + 1.2);
-    gain.gain.setValueAtTime(0.35, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.3);
-    osc.connect(gain);
-    gain.connect(this.sfxGain!);
-    osc.start(now);
-    osc.stop(now + 1.4);
+    [300, 225, 150, 75].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = i === 3 ? "sawtooth" : "triangle";
+      osc.frequency.setValueAtTime(freq, now + i * 0.16);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq * 0.45), now + i * 0.16 + 0.42);
+      gain.gain.setValueAtTime(0.22, now + i * 0.16);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.16 + 0.55);
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(now + i * 0.16);
+      osc.stop(now + i * 0.16 + 0.6);
+    });
+  }
+
+  sfxUiHover(): void {
+    this.sfxShoot(1.9, 0.045, "ui");
+  }
+
+  sfxUiClick(): void {
+    this.ensureStartedForGesture();
+    this.sfxShoot(1.25, 0.09, "ui");
+  }
+
+  sfxPanel(open = true): void {
+    this.sfxShoot(open ? 1.55 : 0.85, 0.08, "ui");
+  }
+
+  sfxAchievement(): void {
+    if (!this.ready() || !this.beginVoice("reward", 0.45)) return;
+    const now = this.ctx!.currentTime;
+    [1046, 1318, 1568].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, now + i * 0.07);
+      gain.gain.setValueAtTime(0.12, now + i * 0.07);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + 0.22);
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(now + i * 0.07);
+      osc.stop(now + i * 0.07 + 0.24);
+    });
+  }
+
+  sfxCardFlip(): void {
+    this.sfxShoot(2.6, 0.055, "ui");
+  }
+
+  sfxCredit(): void {
+    this.sfxShoot(2.05, 0.08, "reward");
+  }
+
+  sfxEnemyArrival(type: string): void {
+    const pitch = type === "brute" || type === "carrier" ? 0.62 : type === "phantom" ? 1.45 : 0.92;
+    this.sfxShoot(pitch, 0.07, "enemy");
+  }
+
+  sfxEnemyAbility(kind: "heal" | "phase" | "spawn"): void {
+    if (kind === "heal") this.sfxShoot(1.65, 0.08, "enemy");
+    else if (kind === "phase") this.sfxShoot(1.9, 0.055, "enemy");
+    else this.sfxShoot(0.75, 0.1, "enemy");
+  }
+
+  sfxEnemyDeath(type: string): void {
+    const pitch = type === "brute" || type === "juggernaut" ? 0.38 : type === "phantom" ? 1.25 : 0.58;
+    this.sfxDeath(pitch);
   }
 
   private ready(): boolean {
-    return Boolean(this.initialized && this.ctx && this.sfxGain);
+    return Boolean(this.initialized && this.ctx && this.sfxGain && this.uiGain);
+  }
+
+  private outputFor(category: AudioCategory): GainNode {
+    return category === "ui" ? this.uiGain! : this.sfxGain!;
+  }
+
+  private ensureStartedForGesture(): void {
+    if (!this.initialized) this.init();
+    this.resume();
+  }
+
+  private beginVoice(category: AudioCategory, duration: number): boolean {
+    if (!this.ctx) return false;
+    const now = this.ctx.currentTime;
+    const list = this.voiceExpiries[category];
+    while (list.length > 0 && list[0]! <= now) list.shift();
+    if (list.length >= this.voiceLimit(category)) return false;
+    list.push(now + duration);
+    return true;
+  }
+
+  private voiceLimit(category: AudioCategory): number {
+    switch (category) {
+      case "bullet": return 8;
+      case "explosion": return 4;
+      case "enemy": return 8;
+      case "ui": return 6;
+      case "alert": return 3;
+      case "reward": return 4;
+    }
+  }
+
+  private duckMusic(duration: number, factor: number): void {
+    if (!this.ctx || !this.musicGain) return;
+    const now = this.ctx.currentTime;
+    const base = this.settings?.musicVolume ?? 0.25;
+    this.musicGain.gain.cancelScheduledValues(now);
+    this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, now);
+    this.musicGain.gain.linearRampToValueAtTime(base * factor, now + 0.035);
+    this.musicGain.gain.linearRampToValueAtTime(base, now + duration);
+  }
+
+  private createImpulseResponse(seconds: number, decay: number): AudioBuffer | null {
+    if (!this.ctx) return null;
+    const rate = this.ctx.sampleRate;
+    const length = Math.max(1, Math.floor(rate * seconds));
+    const impulse = this.ctx.createBuffer(2, length, rate);
+    for (let channel = 0; channel < impulse.numberOfChannels; channel++) {
+      const data = impulse.getChannelData(channel);
+      for (let i = 0; i < length; i++) {
+        const t = i / length;
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+      }
+    }
+    return impulse;
   }
 }
+
+type AudioCategory = "bullet" | "explosion" | "enemy" | "ui" | "alert" | "reward";

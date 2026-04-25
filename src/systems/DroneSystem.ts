@@ -34,7 +34,7 @@ export class DroneSystem {
   buy(type: DroneType): Drone | null {
     if (!this.canBuy(type)) return null;
     const cost = this.nextCost(type);
-    this.game.core.credits -= cost;
+    if (!this.game.spendCredits(cost)) return null;
     const core = this.game.grid.corePos;
     const d = new Drone(type, core.x + rnd(-30, 30), core.y + rnd(-30, 30));
     this.list.push(d);
@@ -78,14 +78,12 @@ export class DroneSystem {
         d.timer = d.cooldown;
       }
     } else {
-      steer = this.wander(d);
+      steer = this.idleSteer(d);
       const core = this.game.grid.corePos;
       if (d.pos.dist(core) > 180) steer = steer.add(this.seek(d, core).mult(2));
     }
     steer = steer.add(this.separate(d).mult(1.4));
-    d.vel = d.vel.add(steer.mult(dt));
-    if (d.vel.mag() > d.maxSpeed) d.vel = d.vel.normalize().mult(d.maxSpeed);
-    d.pos = d.pos.add(d.vel.mult(dt));
+    this.applySteering(d, steer, dt);
   }
 
   private updateScanner(d: Drone, dt: number): void {
@@ -106,12 +104,10 @@ export class DroneSystem {
         }
       }
     } else {
-      steer = this.wander(d);
+      steer = this.idleSteer(d);
     }
     steer = steer.add(this.separate(d).mult(1.2));
-    d.vel = d.vel.add(steer.mult(dt));
-    if (d.vel.mag() > d.maxSpeed) d.vel = d.vel.normalize().mult(d.maxSpeed);
-    d.pos = d.pos.add(d.vel.mult(dt));
+    this.applySteering(d, steer, dt);
   }
 
   private updateGuardian(d: Drone, dt: number): void {
@@ -120,9 +116,7 @@ export class DroneSystem {
     const core = this.game.grid.corePos;
     const targetPos = new Vector2(core.x + Math.cos(d.orbit) * 70, core.y + Math.sin(d.orbit) * 70);
     const steer = this.seek(d, targetPos);
-    d.vel = d.vel.add(steer.mult(dt));
-    if (d.vel.mag() > d.maxSpeed) d.vel = d.vel.normalize().mult(d.maxSpeed);
-    d.pos = d.pos.add(d.vel.mult(dt));
+    this.applySteering(d, steer, dt);
 
     // Intercept enemies very close to core.
     let target = null as null | typeof this.game.enemies.list[number];
@@ -162,6 +156,33 @@ export class DroneSystem {
     let force = circleCenter.add(displacement);
     if (force.mag() > d.maxForce) force = force.normalize().mult(d.maxForce);
     return force;
+  }
+
+  private idleSteer(d: Drone): Vector2 {
+    const formation = this.formationTarget(d);
+    if (!formation) return this.wander(d);
+    return this.seek(d, formation).add(this.wander(d).mult(0.25));
+  }
+
+  private formationTarget(d: Drone): Vector2 | null {
+    const same = this.list.filter((other) => other.type === d.type);
+    if (same.length < 3) return null;
+    const index = same.indexOf(d);
+    if (index < 0) return null;
+
+    const core = this.game.grid.corePos;
+    const sides = same.length === 3 ? 3 : 4;
+    const slot = index % sides;
+    const ring = index >= sides ? 96 : 62;
+    const angle = this.game.time.elapsed * 0.18 + (slot / sides) * Math.PI * 2;
+    return new Vector2(core.x + Math.cos(angle) * ring, core.y + Math.sin(angle) * ring);
+  }
+
+  private applySteering(d: Drone, steer: Vector2, dt: number): void {
+    d.acc = Vector2.lerp(d.acc, steer, Math.min(1, dt * 4));
+    d.vel = d.vel.add(d.acc.mult(dt));
+    if (d.vel.mag() > d.maxSpeed) d.vel = d.vel.normalize().mult(d.maxSpeed);
+    d.pos = d.pos.add(d.vel.mult(dt));
   }
 
   private separate(d: Drone): Vector2 {

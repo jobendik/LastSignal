@@ -4,15 +4,20 @@ import type { EnemyType } from "../core/Types";
 import { Vector2 } from "../core/Vector2";
 import { rnd } from "../core/Random";
 import { enemyDefinitions } from "../data/enemies";
+import { VIEW_WIDTH, VIEW_HEIGHT } from "../core/Config";
 
 /** Enemy update, damage routing, boss phases, heal/phase/spawn behavior. */
 export class EnemySystem {
   list: Enemy[] = [];
+  private killTimestamps: number[] = [];
+  private lastKillStreakAnnounced = 0;
 
   constructor(private readonly game: Game) {}
 
   reset(): void {
     this.list.length = 0;
+    this.killTimestamps.length = 0;
+    this.lastKillStreakAnnounced = 0;
   }
 
   spawn(type: EnemyType, x: number, y: number, hpScale = 1): Enemy {
@@ -21,15 +26,46 @@ export class EnemySystem {
     const endless = this.game.endless;
     const endlessHp = endless.active ? endless.hpScale : 1;
     const endlessSpeed = endless.active ? endless.speedScale : 1;
-    const finalHp = def.hp * hpScale * diff.enemyHpMul * endlessHp;
+
+    // Collect run modifier multipliers.
+    let modHpMul = 1;
+    let modSpeedMul = 1;
+    let modArmorAdd = 0;
+    for (const m of this.game.core.activeModifiers) {
+      if (m.enemyHpMul) modHpMul *= m.enemyHpMul;
+      if (m.enemySpeedMul) modSpeedMul *= m.enemySpeedMul;
+      if (m.enemyArmorAdd) modArmorAdd += m.enemyArmorAdd;
+    }
+
+    const finalHp = def.hp * hpScale * diff.enemyHpMul * endlessHp * modHpMul;
     const enemy = new Enemy(type, x, y, finalHp);
-    enemy.baseSpeed = def.speed * diff.enemySpeedMul * endlessSpeed;
+    enemy.baseSpeed = def.speed * diff.enemySpeedMul * endlessSpeed * modSpeedMul;
+    enemy.extraArmor = modArmorAdd;
     enemy.phaseVisibilityBonus = this.game.core.upgrades.phantomVisibleBonus;
     this.list.push(enemy);
     this.game.codex.onEncounter(type);
+
+    // Elite variant: 6% chance on non-boss enemies at wave 5+, 150% HP.
+    if (!enemy.isBoss && this.game.core.waveIndex >= 4 && Math.random() < 0.06) {
+      enemy.isElite = true;
+      enemy.hp = enemy.hp * 1.5;
+      enemy.maxHp = enemy.hp;
+    }
+
     if (enemy.isBoss) {
+      enemy.bossEntranceTimer = enemy.bossEntranceMax;
       this.game.audio.sfxBossAlert();
+      this.game.audio.setMusicIntensity(2);
       this.game.bus.emit("boss:spawned", enemy);
+      // Dramatic boss arrival FX.
+      this.game.particles.spawnScreenFlash("#ff1a00", 0.5, 0.7);
+      this.game.core.shake = Math.max(this.game.core.shake, 22);
+      this.game.core.shakeRot = Math.max(this.game.core.shakeRot, 0.06);
+      this.game.core.slowMo = Math.max(this.game.core.slowMo, 0.45);
+      this.game.particles.spawnRing(x, y, 90, "#ff1a00");
+      this.game.particles.spawnFloatingText(x, y - 54, "LEVIATHAN DETECTED", "#ff1a00", 3.2, 16);
+    } else {
+      this.game.audio.sfxEnemyArrival(type);
     }
     return enemy;
   }
@@ -38,13 +74,43 @@ export class EnemySystem {
     // Codex alert timers.
     this.game.codex.update(dt);
 
+    // Precompute modifier heal rate once per frame.
+    const modHealPerSec = this.game.core.activeModifiers.reduce(
+      (sum, m) => sum + (m.enemyHealPerSec ?? 0), 0
+    );
+
     for (const e of this.list) {
       if (!e.active) continue;
       e.timer += dt;
+      if (e.freezeFxTimer > 0) e.freezeFxTimer = Math.max(0, e.freezeFxTimer - dt);
+      if (e.spawnFxTimer > 0) e.spawnFxTimer = Math.max(0, e.spawnFxTimer - dt);
+
+      // Boss entrance: freeze movement until the portal animation finishes.
+      if (e.isBoss && e.bossEntranceTimer > 0) {
+        e.bossEntranceTimer = Math.max(0, e.bossEntranceTimer - dt);
+        continue;
+      }
+
+      // Modifier: haunted signal — enemies regenerate HP each frame.
+      if (modHealPerSec > 0 && !e.isBoss) {
+        e.hp = Math.min(e.maxHp, e.hp + modHealPerSec * dt);
+      }
+
+      // Saboteur cooldown decay.
+      if (e.type === "saboteur" && e.saboteurCooldown > 0) {
+        e.saboteurCooldown = Math.max(0, e.saboteurCooldown - dt);
+      }
+
+      // Tunneler: dive/surface cycle.
+      if (e.ability === "tunnel") {
+        this.updateTunneler(e, dt);
+      }
 
       // Phase toggling.
       if (e.ability === "phase") {
-        e.isPhased = !e.visible;
+        const nextPhased = !e.visible;
+        if (nextPhased !== e.isPhased) this.game.audio.sfxEnemyAbility("phase");
+        e.isPhased = nextPhased;
       }
 
       // Slow/stun decay.
@@ -74,29 +140,51 @@ export class EnemySystem {
       const spd = e.currentSpeed;
       if (spd > 0) {
         const dir = this.game.grid.getVector(e.pos.x, e.pos.y);
+        let desired = dir.mult(spd);
         // Small wobble for visual variety (not used for phased or boss to keep them readable).
         if (!e.isBoss) {
           const wob = new Vector2(Math.cos(e.timer * 5) * 6, Math.sin(e.timer * 4) * 6);
-          e.pos.x += (dir.x * spd + wob.x * dt) * dt;
-          e.pos.y += (dir.y * spd + wob.y * dt) * dt;
-        } else {
-          e.pos.x += dir.x * spd * dt;
-          e.pos.y += dir.y * spd * dt;
+          desired = desired.add(wob.mult(dt));
+          desired = desired.add(this.separate(e).mult(95));
         }
+        // Swarm boid flocking: cohesion toward nearby swarm center of mass.
+        if (e.type === "swarm") {
+          desired = desired.add(this.swarmCohesion(e).mult(18));
+        }
+        e.vel = Vector2.lerp(e.vel, desired, Math.min(1, dt * 5.5));
+      } else {
+        e.vel = e.vel.mult(Math.max(0, 1 - dt * 7));
+      }
+
+      e.pos.x += (e.vel.x + e.knockbackVel.x) * dt;
+      e.pos.y += (e.vel.y + e.knockbackVel.y) * dt;
+      e.knockbackVel = e.knockbackVel.mult(Math.max(0, 1 - dt * 6));
+      if (e.knockbackVel.magSq() < 4) e.knockbackVel.set(0, 0);
+
+      // Saboteur: disable nearest in-range tower when passing by.
+      if (e.type === "saboteur" && e.saboteurCooldown <= 0) {
+        this.updateSaboteur(e);
       }
 
       // Check breach (near the core).
       const distToCore = e.pos.dist(this.game.grid.corePos);
       if (distToCore < 20) {
-        this.game.damageCore(e.breach, e.type, e.pos.x, e.pos.y);
-        this.onDeath(e, false);
+        if (e.type === "cache") {
+          // Data Cache just escapes — no core damage, no reward.
+          e.breached = true;
+          e.active = false;
+        } else {
+          this.game.damageCore(e.breach, e.type, e.pos.x, e.pos.y);
+          e.breached = true;
+          e.active = false;
+        }
         continue;
       }
     }
 
     // Cleanup dead enemies.
     for (const e of this.list) {
-      if (!e.active) this.onDeath(e, true);
+      if (!e.active) this.onDeath(e, !e.breached);
     }
     this.list = this.list.filter((e) => e.active);
   }
@@ -112,12 +200,19 @@ export class EnemySystem {
     }
     // Vulnerability multiplier: from stasis "vulnerabilityPulse" global.
     const slowedMul = e.slowTimer > 0 ? this.game.core.upgrades.slowedEnemyDamageMul : 1;
-    e.damage(amount * slowedMul, src);
+    const prevHp = e.hp;
+    const dealt = e.damage(amount * slowedMul, src);
+
+    // Hit-stop: freeze simulation for ~4 frames on kills that deal ≥35% max HP.
+    const killed = prevHp > 0 && e.hp <= 0;
+    if (killed && !e.isBoss && dealt >= e.maxHp * 0.35) {
+      this.game.core.hitStopTimer = Math.max(this.game.core.hitStopTimer, 0.07);
+    }
 
     if (this.game.core.settings.showDamageNumbers && amount >= 1) {
-      const finalAmt = Math.round(amount * slowedMul);
+      const finalAmt = Math.round(dealt);
       // Tier by damage relative to enemy max HP.
-      const pct = amount / e.maxHp;
+      const pct = dealt / e.maxHp;
       let color: string;
       let size: number;
       let life: number;
@@ -137,9 +232,61 @@ export class EnemySystem {
       this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - e.size - 4, finalAmt, color, life, size);
     }
 
-    if (src?.type === "tower") {
-      this.game.stats.recordDamage(src.towerType, amount);
+    if (dealt >= 1) {
+      const angle = src?.type === "tower" && src.tower
+        ? Math.atan2(e.pos.y - src.tower.pos.y, e.pos.x - src.tower.pos.x)
+        : rnd(0, Math.PI * 2);
+      const color = src?.type === "tower" && src.tower ? src.tower.def.color : e.color;
+      const intensity = Math.max(0.6, Math.min(1.8, (dealt / e.maxHp) * 10));
+      this.game.particles.spawnImpactBurst(e.pos.x, e.pos.y, angle, color, intensity);
+      if (src?.type === "tower" && src.tower && src.towerType === "railgun") {
+        this.knockback(e, src.tower.pos.x, src.tower.pos.y, 190);
+      } else if (dealt > e.maxHp * 0.18 && src?.type === "tower" && src.tower) {
+        this.knockback(e, src.tower.pos.x, src.tower.pos.y, 95);
+      }
     }
+
+    if (src?.type === "tower") {
+      this.game.stats.recordDamage(src.towerType, dealt);
+      if (src.tower) src.tower.totalDamage += dealt;
+    }
+  }
+
+  private updateTunneler(e: Enemy, dt: number): void {
+    e.tunnelTimer += dt;
+    if (e.isTunneling) {
+      e.tunnelTransitionProg = Math.min(1, e.tunnelTransitionProg + dt * 5);
+      if (e.tunnelTimer >= 1.5) {
+        e.isTunneling = false;
+        e.tunnelTimer = 0;
+        e.tunnelInterval = 3.5 + Math.random() * 2;
+        e.speedMul = 1;
+        this.game.particles.spawnBurst(e.pos.x, e.pos.y, "#8d6e63", 12, { speed: 85, life: 0.45, size: 2 });
+      }
+    } else {
+      e.tunnelTransitionProg = Math.max(0, e.tunnelTransitionProg - dt * 5);
+      if (e.tunnelTimer >= e.tunnelInterval) {
+        e.isTunneling = true;
+        e.tunnelTimer = 0;
+        e.speedMul = 3;
+        this.game.particles.spawnBurst(e.pos.x, e.pos.y, "#8d6e63", 8, { speed: 55, life: 0.3, size: 1.5 });
+      }
+    }
+  }
+
+  private updateSaboteur(e: Enemy): void {
+    const RANGE = 38;
+    let nearest = null;
+    let best = Infinity;
+    for (const t of this.game.towers.list) {
+      const d = t.pos.dist(e.pos);
+      if (d < RANGE && d < best) { best = d; nearest = t; }
+    }
+    if (!nearest) return;
+    this.game.towers.disableTower(nearest, 3);
+    e.saboteurCooldown = 8;
+    this.game.particles.spawnBurst(nearest.pos.x, nearest.pos.y, "#ff6f00", 10, { speed: 65, life: 0.4, size: 2 });
+    this.game.particles.spawnFloatingText(nearest.pos.x, nearest.pos.y - 16, "DISABLED", "#ff6f00", 1.0, 11);
   }
 
   private doHeal(weaver: Enemy): void {
@@ -155,6 +302,7 @@ export class EnemySystem {
     }
     if (healed > 0) {
       this.game.particles.spawnRing(weaver.pos.x, weaver.pos.y, 80, "#ff80ab");
+      this.game.audio.sfxEnemyAbility("heal");
     }
   }
 
@@ -206,8 +354,48 @@ export class EnemySystem {
     if (m) {
       this.game.bus.emit("boss:phase", { phase, text: m });
       this.game.particles.spawnFloatingText(boss.pos.x, boss.pos.y - 34, m, "#ff5252", 2.5, 14);
+      this.game.particles.spawnScreenFlash("#ffffff", 0.28, 0.62);
+      this.game.core.slowMo = Math.max(this.game.core.slowMo, 0.5);
+      if (this.game.core.settings.screenShake) {
+        this.game.core.shake = Math.max(this.game.core.shake, 13);
+        this.game.core.shakeRot = Math.max(this.game.core.shakeRot, 0.04);
+      }
       this.game.audio.sfxBossAlert();
     }
+  }
+
+  knockback(e: Enemy, fromX: number, fromY: number, speed: number): void {
+    if (!e.active || e.isBoss) return;
+    const dir = e.pos.sub(new Vector2(fromX, fromY)).normalize();
+    e.knockbackVel = e.knockbackVel.add(dir.mult(speed));
+  }
+
+  private separate(e: Enemy): Vector2 {
+    let steer = new Vector2();
+    let count = 0;
+    const desired = e.size * 2.1;
+    for (const other of this.list) {
+      if (other === e || !other.active) continue;
+      const dist = e.pos.dist(other.pos);
+      if (dist > 0 && dist < desired) {
+        steer = steer.add(e.pos.sub(other.pos).normalize().mult((desired - dist) / desired));
+        count++;
+      }
+    }
+    return count > 0 ? steer.mult(1 / count) : steer;
+  }
+
+  private swarmCohesion(e: Enemy): Vector2 {
+    const RADIUS = 55;
+    let cx = 0, cy = 0, count = 0;
+    for (const other of this.list) {
+      if (other === e || !other.active || other.type !== "swarm") continue;
+      const d = e.pos.dist(other.pos);
+      if (d > 0 && d < RADIUS) { cx += other.pos.x; cy += other.pos.y; count++; }
+    }
+    if (count === 0) return new Vector2();
+    cx /= count; cy /= count;
+    return new Vector2(cx - e.pos.x, cy - e.pos.y).normalize();
   }
 
   private summonFromSides(boss: Enemy, type: EnemyType, count: number): void {
@@ -246,11 +434,21 @@ export class EnemySystem {
   private onDeath(e: Enemy, killed: boolean): void {
     // killed = HP reached 0 from damage. Otherwise it was a breach.
     if (killed) {
-      // Reward credits.
-      this.game.addCredits(e.reward);
-      this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 12, `+${e.reward}`, "#ffeb3b", 0.9, 12);
+      // Reward credits (boosted by enemyRewardMul modifiers).
+      let rewardMul = 1;
+      for (const m of this.game.core.activeModifiers) {
+        if (m.enemyRewardMul) rewardMul *= m.enemyRewardMul;
+      }
+      const reward = Math.round(e.reward * rewardMul);
+      this.game.addCredits(reward);
+      this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 12, `+${reward}`, "#ffeb3b", 0.9, 12);
       this.game.stats.recordKill(e.type);
-      this.game.audio.sfxDeath();
+      this.game.waves.recordKill(e.type);
+      if (e.lastDamageSource?.type === "tower" && e.lastDamageSource.tower) {
+        e.lastDamageSource.tower.kills++;
+      }
+      this.game.audio.sfxEnemyDeath(e.type);
+      this.checkKillStreak(e.isBoss);
 
       // Death burst.
       this.game.particles.spawnBurst(e.pos.x, e.pos.y, e.color, e.isBoss ? 40 : 8, {
@@ -259,24 +457,117 @@ export class EnemySystem {
         size: e.isBoss ? 4 : 2.5,
       });
 
-      // Carrier death: spawn scouts.
-      if (e.ability === "spawn") {
+      // Carrier death: spawn scouts + fear response (nearby scouts scatter briefly).
+      if (e.ability === "spawn" && e.type === "carrier") {
+        this.game.audio.sfxEnemyAbility("spawn");
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, 58, "#ff8a65", 0.26);
         for (let i = 0; i < 3; i++) {
           const ang = rnd(0, Math.PI * 2);
           const x = e.pos.x + Math.cos(ang) * 12;
           const y = e.pos.y + Math.sin(ang) * 12;
-          this.spawn("scout", x, y);
+          const scout = this.spawn("scout", x, y);
+          scout.spawnFxTimer = scout.spawnFxMax;
+          this.game.particles.spawnInwardBurst(x, y, scout.color, 10, 22);
+        }
+        // Fear response: nearby scouts scatter for ~1.2s before resuming.
+        for (const other of this.list) {
+          if (!other.active || other.type !== "scout") continue;
+          if (other.pos.dist(e.pos) < 130) {
+            const ang = Math.atan2(other.pos.y - e.pos.y, other.pos.x - e.pos.x) + rnd(-0.8, 0.8);
+            other.knockbackVel.x += Math.cos(ang) * 160;
+            other.knockbackVel.y += Math.sin(ang) * 160;
+            other.stunTimer = Math.max(other.stunTimer, 1.2);
+          }
         }
       }
 
-      // Boss death: slow-mo + big ring.
+      // Carrier/Splitter: generic spawn ability.
+      if (e.ability === "spawn" && e.type === "splitter") {
+        this.game.audio.sfxEnemyAbility("spawn");
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, 58, "#ff8a65", 0.26);
+        for (let i = 0; i < 3; i++) {
+          const ang = rnd(0, Math.PI * 2);
+          const x = e.pos.x + Math.cos(ang) * 12;
+          const y = e.pos.y + Math.sin(ang) * 12;
+          const scout = this.spawn("scout", x, y);
+          scout.spawnFxTimer = scout.spawnFxMax;
+          this.game.particles.spawnInwardBurst(x, y, scout.color, 10, 22);
+        }
+      }
+
+      // Boss death: kill-cam slow-mo + big concentric rings.
       if (e.isBoss) {
-        this.game.core.slowMo = 1.5;
-        this.game.particles.spawnRing(e.pos.x, e.pos.y, 160, "#ff5252");
+        this.game.core.slowMoScale = 0.12;
+        this.game.core.slowMo = 2.2;
+        this.game.particles.spawnScreenFlash("#ffffff", 0.7, 0.5);
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, 80,  "#ff5252");
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, 160, "#ffffff");
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, 240, "#ff5252");
+        this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 50, "SIGNAL ELIMINATED", "#ffffff", 3.0, 20);
+        this.game.audio.setMusicIntensity(1);
         this.game.bus.emit("boss:killed");
       }
 
-      this.game.bus.emit("enemy:killed", { type: e.type });
+      this.game.bus.emit("enemy:killed", {
+        type: e.type,
+        towerType: e.lastDamageSource?.type === "tower" ? e.lastDamageSource.towerType : e.lastDamageSource?.type ?? "unknown",
+        damage: Math.round(e.damageTakenThisWave),
+        isBoss: e.isBoss,
+      });
+    } else {
+      this.game.particles.spawnBurst(e.pos.x, e.pos.y, "#ff5252", 6, { speed: 90, life: 0.35, size: 2 });
+      this.game.bus.emit("enemy:breached", { type: e.type });
+    }
+  }
+
+  private checkKillStreak(isBossKill: boolean): void {
+    const now = this.game.time.elapsed;
+    const windowSeconds = 2;
+    this.killTimestamps.push(now);
+
+    while (
+      this.killTimestamps.length > 0 &&
+      now - this.killTimestamps[0]! > windowSeconds
+    ) {
+      this.killTimestamps.shift();
+    }
+
+    const streak = this.killTimestamps.length;
+    if (streak < 5) {
+      this.lastKillStreakAnnounced = 0;
+      return;
+    }
+
+    const shouldAnnounce =
+      this.lastKillStreakAnnounced < 5 ||
+      streak - this.lastKillStreakAnnounced >= 3 ||
+      isBossKill;
+
+    if (!shouldAnnounce) return;
+    this.lastKillStreakAnnounced = streak;
+
+    const cx = VIEW_WIDTH / 2;
+    const cy = VIEW_HEIGHT / 2;
+    const color = streak >= 8 ? "#ff5252" : "#ffeb3b";
+    this.game.particles.spawnFloatingText(
+      cx,
+      cy - 26,
+      `CHAIN KILL ×${streak}`,
+      color,
+      1.2,
+      streak >= 8 ? 22 : 18
+    );
+    this.game.particles.spawnRing(cx, cy, streak >= 8 ? 180 : 130, color);
+    this.game.particles.spawnBurst(cx, cy, color, streak >= 8 ? 28 : 18, {
+      speed: streak >= 8 ? 220 : 160,
+      life: 0.45,
+      size: streak >= 8 ? 3 : 2,
+    });
+    this.game.bus.emit("kill:streak", { streak });
+
+    if (this.game.core.settings.screenShake) {
+      this.game.core.shake = Math.min(14, this.game.core.shake + (streak >= 8 ? 5 : 3));
+      this.game.core.shakeRot = Math.min(0.035, this.game.core.shakeRot + 0.012);
     }
   }
 }

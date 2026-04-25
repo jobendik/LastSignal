@@ -356,9 +356,9 @@ export const towerSpecializations: Record<TowerType, SpecializationTree> = {
       },
       {
         id: "barrier_reflect",
-        name: "Reflect",
-        description: "Reflects 25% of breach damage back as score.",
-        mod: { flags: { relayNode: true } },
+        name: "Deflector Grid",
+        description: "Projects a shield over the core, reducing each breach by 1.",
+        mod: { flags: { deflectorGrid: true } },
       },
       {
         id: "barrier_stasis_core",

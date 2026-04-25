@@ -85,4 +85,22 @@ export const codexEntries: Record<EnemyType, CodexEntry> = {
     counters: ["Tesla chain", "Stasis + focus fire", "Barrier"],
     tip: "Break its escort first. The Overlord itself is slow — punish it.",
   },
+  tunneler: {
+    enemyId: "tunneler",
+    threatHeadline: "Dives underground — untargetable while tunneling.",
+    counters: ["Area coverage", "Mortar splash", "Scanner Drone"],
+    tip: "Use dense coverage zones so it can't surface without taking fire. Mortar hits the area.",
+  },
+  saboteur: {
+    enemyId: "saboteur",
+    threatHeadline: "Disables towers it walks past for 3s.",
+    counters: ["Kill on approach", "Barrier slow field", "Railgun"],
+    tip: "High-priority. A Saboteur near a tower cluster can shut down your entire defense.",
+  },
+  cache: {
+    enemyId: "cache",
+    threatHeadline: "Credit bounty — fast and fragile.",
+    counters: ["Stasis", "Blaster burst", "Any tower"],
+    tip: "Worth 50 credits but moves fast. Slow it with Stasis and finish with any tower.",
+  },
 };

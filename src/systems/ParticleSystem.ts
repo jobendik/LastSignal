@@ -33,6 +33,8 @@ export interface BeamFX {
   life: number;
   maxLife: number;
   active: boolean;
+  kind: "standard" | "railgun";
+  width: number;
 }
 
 export interface MuzzleFlashFX {
@@ -40,6 +42,24 @@ export interface MuzzleFlashFX {
   y: number;
   angle: number;
   color: string;
+  life: number;
+  maxLife: number;
+  active: boolean;
+}
+
+export interface ScorchDecalFX {
+  x: number;
+  y: number;
+  radius: number;
+  color: string;
+  life: number;
+  maxLife: number;
+  active: boolean;
+}
+
+export interface ScreenFlashFX {
+  color: string;
+  alpha: number;
   life: number;
   maxLife: number;
   active: boolean;
@@ -53,6 +73,8 @@ export class ParticleSystem {
   rings: BlastRingFX[] = [];
   beams: BeamFX[] = [];
   muzzleFlashes: MuzzleFlashFX[] = [];
+  scorchDecals: ScorchDecalFX[] = [];
+  screenFlashes: ScreenFlashFX[] = [];
 
   constructor(private readonly game: Game) {}
 
@@ -64,20 +86,31 @@ export class ParticleSystem {
     this.rings.length = 0;
     this.beams.length = 0;
     this.muzzleFlashes.length = 0;
+    this.scorchDecals.length = 0;
+    this.screenFlashes.length = 0;
   }
 
   spawnMuzzleFlash(x: number, y: number, angle: number, color: string): void {
     this.muzzleFlashes.push({ x, y, angle, color, life: 0.08, maxLife: 0.08, active: true });
   }
 
-  spawnBurst(x: number, y: number, color: string, count: number, opts: { speed?: number; life?: number; size?: number } = {}): void {
+  spawnBurst(
+    x: number,
+    y: number,
+    color: string,
+    count: number,
+    opts: { speed?: number; life?: number; size?: number; gravity?: number; angle?: number } = {}
+  ): void {
     if (this.particles.length > PARTICLE_CAP) return;
-    for (let i = 0; i < count; i++) {
+    const finalCount = Math.max(1, Math.ceil(count * this.effectBudgetFactor()));
+    for (let i = 0; i < finalCount; i++) {
       if (this.particles.length >= PARTICLE_CAP) break;
       this.particles.push(new Particle(x, y, color, {
         speed: opts.speed ?? rnd(60, 180),
         life: opts.life ?? rnd(0.3, 0.9),
         size: opts.size ?? rnd(1.5, 3),
+        gravity: opts.gravity ?? 0,
+        angle: opts.angle,
       }));
     }
   }
@@ -88,12 +121,115 @@ export class ParticleSystem {
     this.floatingText.push(new FloatingText(x, y, text, color, life, size));
   }
 
-  spawnRing(x: number, y: number, radius: number, color: string): void {
-    this.rings.push({ x, y, radius: 0, maxRadius: radius, color, life: 0.3, maxLife: 0.3, active: true });
+  spawnRing(x: number, y: number, radius: number, color: string, life = 0.3): void {
+    this.rings.push({ x, y, radius: 0, maxRadius: radius, color, life, maxLife: life, active: true });
   }
 
-  spawnBeam(x1: number, y1: number, x2: number, y2: number, color: string, life = 0.18): void {
-    this.beams.push({ fromX: x1, fromY: y1, toX: x2, toY: y2, color, life, maxLife: life, active: true });
+  spawnBeam(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    color: string,
+    life = 0.18,
+    opts: { kind?: "standard" | "railgun"; width?: number } = {}
+  ): void {
+    this.beams.push({
+      fromX: x1,
+      fromY: y1,
+      toX: x2,
+      toY: y2,
+      color,
+      life,
+      maxLife: life,
+      active: true,
+      kind: opts.kind ?? "standard",
+      width: opts.width ?? 4,
+    });
+  }
+
+  spawnImpactBurst(x: number, y: number, angle: number, color: string, intensity = 1): void {
+    if (this.particles.length > PARTICLE_CAP) return;
+    const reduced = this.game.core.settings.reducedFlashing || this.game.core.settings.reducedMotion;
+    const count = reduced ? 2 : Math.max(3, Math.round(5 * intensity * this.effectBudgetFactor()));
+    const palette = [color, "#ffffff", "#ffeb3b"];
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length >= PARTICLE_CAP) break;
+      const sparkAngle = angle + rnd(-0.75, 0.75);
+      const spark = new Particle(x, y, palette[i % palette.length]!, {
+        angle: sparkAngle,
+        speed: rnd(90, 220) * Math.max(0.6, intensity),
+        life: rnd(0.1, 0.24),
+        size: rnd(1, 2.2),
+        gravity: 35,
+      });
+      this.particles.push(spark);
+    }
+  }
+
+  spawnMortarExplosion(x: number, y: number, radius: number, color: string): void {
+    const reduced = this.game.core.settings.reducedFlashing || this.game.core.settings.reducedMotion;
+    this.spawnRing(x, y, radius * 0.55, "#ffffff", reduced ? 0.18 : 0.14);
+    if (!reduced) {
+      this.spawnRing(x, y, radius * 0.9, color, 0.26);
+      this.spawnRing(x, y, radius * 1.18, "#ffb300", 0.4);
+    }
+
+    const count = reduced ? 6 : Math.ceil(18 * this.effectBudgetFactor());
+    const palette = [color, "#ffb300", "#6d4c41", "#ffffff"];
+    for (let i = 0; i < count; i++) {
+      if (this.particles.length >= PARTICLE_CAP) break;
+      const debris = new Particle(x, y, palette[i % palette.length]!, {
+        angle: rnd(0, Math.PI * 2),
+        speed: rnd(80, 260),
+        life: rnd(0.35, 0.85),
+        size: rnd(1.5, 3.5),
+        gravity: rnd(180, 360),
+      });
+      this.particles.push(debris);
+    }
+
+    this.scorchDecals.push({
+      x,
+      y,
+      radius: Math.max(12, radius * 0.62),
+      color: "rgba(45, 29, 20, 1)",
+      life: 6,
+      maxLife: 6,
+      active: true,
+    });
+  }
+
+  spawnInwardBurst(x: number, y: number, color: string, count = 10, radius = 18): void {
+    if (this.particles.length > PARTICLE_CAP) return;
+    const finalCount = Math.max(2, Math.ceil(count * this.effectBudgetFactor()));
+    for (let i = 0; i < finalCount; i++) {
+      if (this.particles.length >= PARTICLE_CAP) break;
+      const angle = (i / count) * Math.PI * 2 + rnd(-0.18, 0.18);
+      const px = x + Math.cos(angle) * radius;
+      const py = y + Math.sin(angle) * radius;
+      this.particles.push(new Particle(px, py, color, {
+        angle: angle + Math.PI + rnd(-0.2, 0.2),
+        speed: rnd(80, 160),
+        life: rnd(0.16, 0.3),
+        size: rnd(1.5, 2.8),
+      }));
+    }
+  }
+
+  spawnScreenFlash(color = "#ffffff", life = 0.28, alpha = 0.65): void {
+    const reduce = this.game.core.settings.reducedFlashing || this.game.core.settings.reducedMotion;
+    const finalAlpha = reduce ? Math.min(alpha, 0.12) : alpha;
+    this.screenFlashes.push({ color, alpha: finalAlpha, life, maxLife: life, active: true });
+  }
+
+  private effectBudgetFactor(): number {
+    if (this.game.core.settings.reducedMotion) return 0.35;
+    switch (this.game.core.settings.graphicsQuality) {
+      case "low": return 0.35;
+      case "medium": return 0.65;
+      default: return 1;
+    }
   }
 
   spawnLightning(points: { x: number; y: number }[], color: string): void {
@@ -210,6 +346,20 @@ export class ParticleSystem {
       if (b.life <= 0) b.active = false;
     }
     this.beams = this.beams.filter((b) => b.active);
+
+    // Scorch decals
+    for (const s of this.scorchDecals) {
+      s.life -= dt;
+      if (s.life <= 0) s.active = false;
+    }
+    this.scorchDecals = this.scorchDecals.filter((s) => s.active);
+
+    // Screen flashes
+    for (const f of this.screenFlashes) {
+      f.life -= dt;
+      if (f.life <= 0) f.active = false;
+    }
+    this.screenFlashes = this.screenFlashes.filter((f) => f.active);
 
     // Lightning jitter
     for (const l of this.lightning) {

@@ -4,10 +4,14 @@ import type {
   EnemyType,
   TowerType,
 } from "../core/Types";
+import type { Tower } from "./Tower";
 import { enemyDefinitions } from "../data/enemies";
 import { clamp, rnd } from "../core/Random";
 
-export type DamageSource = { type: "tower"; towerType: TowerType } | { type: "drone" } | { type: "other" };
+export type DamageSource =
+  | { type: "tower"; towerType: TowerType; tower?: Tower }
+  | { type: "drone" }
+  | { type: "other" };
 
 /** Runtime enemy entity. All behavior that depends on the world lives in EnemySystem. */
 export class Enemy {
@@ -15,6 +19,7 @@ export class Enemy {
   def: EnemyDefinition;
   pos: Vector2;
   vel = new Vector2();
+  knockbackVel = new Vector2();
 
   hp: number;
   maxHp: number;
@@ -39,14 +44,42 @@ export class Enemy {
   phaseVisibilityBonus = 0; // added to visible window fraction
   healCooldown = rnd(0.4, 1.2);
   lastDamageSource: DamageSource | null = null;
+  damageTakenThisWave = 0;
+  freezeFxTimer = 0;
+  freezeFxMax = 1;
+  spawnFxTimer = 0;
+  spawnFxMax = 0.35;
+  breached = false;
 
   // Boss-only phase tracker.
   bossPhase = 0;
   bossPhaseTimer = 0;
   bossRushing = false;
+  /** Seconds remaining in the boss entrance cinematic (boss is frozen while > 0). */
+  bossEntranceTimer = 0;
+  readonly bossEntranceMax = 2.2;
 
   // Specialization marks.
   signalMarked = false;
+
+  /** Extra armor added by run modifiers (flat 0..1, stacked with def.armor). */
+  extraArmor = 0;
+
+  // Tunneler-specific state.
+  isTunneling = false;
+  /** Counts up; triggers underground dive when it reaches tunnelInterval. */
+  tunnelTimer = 0;
+  /** Randomized interval (seconds) between tunnel dives. */
+  tunnelInterval = 3.5 + Math.random() * 2;
+  /** 0..1 — animation progress for dive/surface transitions. */
+  tunnelTransitionProg = 0;
+
+  // Saboteur-specific state.
+  /** Seconds remaining until this Saboteur can disable another tower. */
+  saboteurCooldown = 0;
+
+  /** True if this enemy is an elite mini-boss variant (150% HP, glowing border). */
+  isElite = false;
 
   constructor(type: EnemyType, x: number, y: number, hpOverride?: number) {
     const def = enemyDefinitions[type];
@@ -71,12 +104,14 @@ export class Enemy {
     return s;
   }
 
-  damage(amount: number, source: DamageSource | null): void {
-    const armor = this.def.armor ?? 0;
+  damage(amount: number, source: DamageSource | null): number {
+    const armor = Math.min(0.95, (this.def.armor ?? 0) + this.extraArmor);
     const actual = amount * (1 - armor);
     this.hp -= actual;
+    this.damageTakenThisWave += actual;
     this.lastDamageSource = source ?? this.lastDamageSource;
     if (this.hp <= 0) this.active = false;
+    return actual;
   }
 
   applySlow(duration: number, strength: number): void {

@@ -6,6 +6,7 @@ function statsSummary(g: Game): string {
   const rows: string[] = [];
   rows.push(`Enemies destroyed: <b>${s.enemiesKilled}</b>`);
   rows.push(`Credits earned: <b>${s.creditsEarned}</b>`);
+  rows.push(`Credits spent: <b>${s.creditsSpent}</b>`);
   rows.push(`Core damage taken: <b>${Math.round(s.coreDamageTaken)}</b>`);
   if (s.bestTowerType) {
     rows.push(`Best tower: <b>${s.bestTowerType.toUpperCase()} L${s.bestTowerLevel}</b>`);

@@ -13,6 +13,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { CodexPanel } from "./CodexPanel";
 import { MetaPanel } from "./MetaPanel";
 import { AchievementToast } from "./AchievementToast";
+import { KillFeed } from "./KillFeed";
 
 /**
  * Orchestrates all UI panels. Each panel is a small DOM component that
@@ -34,6 +35,7 @@ export class UIManager {
   codexPanel: CodexPanel;
   metaPanel: MetaPanel;
   achievementToast: AchievementToast;
+  killFeed: KillFeed;
 
   constructor(private readonly game: Game) {
     this.root = game.uiRoot;
@@ -52,6 +54,7 @@ export class UIManager {
     this.codexPanel = new CodexPanel(game);
     this.metaPanel = new MetaPanel(game);
     this.achievementToast = new AchievementToast(game);
+    this.killFeed = new KillFeed(game);
   }
 
   attach(): void {
@@ -69,8 +72,21 @@ export class UIManager {
       this.settingsPanel.el,
       this.codexPanel.el,
       this.metaPanel.el,
+      this.killFeed.el,
       this.achievementToast.el
     );
+    this.root.addEventListener("pointerover", (e) => {
+      const target = e.target as Element | null;
+      const button = target?.closest("button");
+      if (!button) return;
+      const related = e.relatedTarget as Node | null;
+      if (related && button.contains(related)) return;
+      this.game.audio.sfxUiHover();
+    });
+    this.root.addEventListener("click", (e) => {
+      const target = e.target as Element | null;
+      if (target?.closest("button")) this.game.audio.sfxUiClick();
+    });
     this.game.bus.on<{ prev: string; next: string }>("state:changed", (p) => this.onState(p));
     this.game.bus.on("ui:mainMenuConfirm", () => this.game.setState("SECTOR_SELECT"));
     this.game.bus.on("ui:toggleWavePreview", () => this.wavePreview.toggle());
@@ -82,6 +98,7 @@ export class UIManager {
       this.mainMenu, this.sectorSelect, this.hud, this.buildMenu, this.towerPanel,
       this.wavePreview, this.rewardScreen, this.pauseMenu, this.gameOver,
       this.victory, this.settingsPanel, this.codexPanel, this.metaPanel,
+      this.killFeed,
     ];
     for (const p of all) p.el.classList.remove("visible");
 
@@ -98,6 +115,7 @@ export class UIManager {
       case "WAVE_ACTIVE":
         this.hud.el.classList.add("visible");
         this.buildMenu.el.classList.add("visible");
+        this.killFeed.el.classList.add("visible");
         this.hud.refresh();
         this.buildMenu.refresh();
         break;
@@ -114,6 +132,7 @@ export class UIManager {
       case "WAVE_COMPLETE":
         this.hud.el.classList.add("visible");
         this.buildMenu.el.classList.add("visible");
+        this.killFeed.el.classList.add("visible");
         break;
       case "GAME_OVER":
         this.gameOver.el.classList.add("visible");
@@ -128,22 +147,28 @@ export class UIManager {
 
   openSettings(): void {
     this.settingsPanel.el.classList.add("visible");
+    this.game.audio.sfxPanel(true);
   }
   closeSettings(): void {
     this.settingsPanel.el.classList.remove("visible");
+    this.game.audio.sfxPanel(false);
   }
   openCodex(): void {
     this.codexPanel.el.classList.add("visible");
     this.codexPanel.refresh();
+    this.game.audio.sfxPanel(true);
   }
   closeCodex(): void {
     this.codexPanel.el.classList.remove("visible");
+    this.game.audio.sfxPanel(false);
   }
   openMeta(): void {
     this.metaPanel.el.classList.add("visible");
     this.metaPanel.refresh();
+    this.game.audio.sfxPanel(true);
   }
   closeMeta(): void {
     this.metaPanel.el.classList.remove("visible");
+    this.game.audio.sfxPanel(false);
   }
 }
