@@ -294,6 +294,29 @@ export interface RunStats {
   bestTowerLevel: number;
 }
 
+export type RunResult = "victory" | "defeat";
+
+export interface RunJournalEntry {
+  id: string;
+  result: RunResult;
+  sectorId: string;
+  sectorName: string;
+  difficulty: DifficultyId;
+  startedAt: number;
+  endedAt: number;
+  durationSec: number;
+  waveReached: number;
+  totalWaves: number;
+  endless: boolean;
+  coreRemainingPct: number;
+  enemiesKilled: number;
+  creditsEarned: number;
+  creditsSpent: number;
+  bestTowerType: TowerType | null;
+  bestTowerLevel: number;
+  modifiers: string[];
+}
+
 export interface PersistedProfile {
   bestSectorCleared: number;
   bestWaveReached: number;
@@ -304,6 +327,7 @@ export interface PersistedProfile {
   achievementsUnlocked: string[];
   endlessBestWave: number;
   lastDifficulty: DifficultyId;
+  runHistory: RunJournalEntry[];
 }
 
 // ---------- Difficulty ----------

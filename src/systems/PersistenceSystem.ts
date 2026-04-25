@@ -29,6 +29,7 @@ export const defaultProfile: PersistedProfile = {
   achievementsUnlocked: [],
   endlessBestWave: 0,
   lastDifficulty: "standard",
+  runHistory: [],
 };
 
 export class PersistenceSystem {
@@ -54,7 +55,7 @@ export class PersistenceSystem {
   loadProfile(): PersistedProfile {
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      if (!raw) return { ...defaultProfile, codexSeen: [], researchUnlocked: [], achievementsUnlocked: [] };
+      if (!raw) return this.emptyProfile();
       const parsed = JSON.parse(raw) as Partial<PersistedProfile>;
       return {
         ...defaultProfile,
@@ -62,9 +63,10 @@ export class PersistenceSystem {
         codexSeen: parsed.codexSeen ?? [],
         researchUnlocked: parsed.researchUnlocked ?? [],
         achievementsUnlocked: parsed.achievementsUnlocked ?? [],
+        runHistory: (parsed.runHistory ?? []).slice(0, 12),
       };
     } catch {
-      return { ...defaultProfile, codexSeen: [], researchUnlocked: [], achievementsUnlocked: [] };
+      return this.emptyProfile();
     }
   }
 
@@ -74,5 +76,15 @@ export class PersistenceSystem {
     } catch {
       /* ignore */
     }
+  }
+
+  private emptyProfile(): PersistedProfile {
+    return {
+      ...defaultProfile,
+      codexSeen: [],
+      researchUnlocked: [],
+      achievementsUnlocked: [],
+      runHistory: [],
+    };
   }
 }

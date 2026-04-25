@@ -83,7 +83,7 @@ export class ProjectileSystem {
     // Splash damage or direct hit.
     if (p.splashRadius > 0) {
       this.game.particles.spawnMortarExplosion(impactX, impactY, p.splashRadius, p.color);
-      this.game.audio.sfxExplosion(0.35);
+      this.game.audio.sfxExplosion(0.35, { x: impactX });
       for (const e of this.game.enemies.list) {
         if (!e.active) continue;
         if (e.isPhased && !p.owner.tower?.flags.phaseDisruptor) continue;

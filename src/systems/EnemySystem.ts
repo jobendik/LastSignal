@@ -54,7 +54,7 @@ export class EnemySystem {
 
     if (enemy.isBoss) {
       enemy.bossEntranceTimer = enemy.bossEntranceMax;
-      this.game.audio.sfxBossAlert();
+      this.game.audio.sfxBossAlert(enemy.pos);
       this.game.audio.setMusicIntensity(2);
       this.game.bus.emit("boss:spawned", enemy);
       // Dramatic boss arrival FX.
@@ -65,7 +65,7 @@ export class EnemySystem {
       this.game.particles.spawnRing(x, y, 90, "#ff1a00");
       this.game.particles.spawnFloatingText(x, y - 54, "LEVIATHAN DETECTED", "#ff1a00", 3.2, 16);
     } else {
-      this.game.audio.sfxEnemyArrival(type);
+      this.game.audio.sfxEnemyArrival(type, enemy.pos);
     }
     return enemy;
   }
@@ -109,7 +109,7 @@ export class EnemySystem {
       // Phase toggling.
       if (e.ability === "phase") {
         const nextPhased = !e.visible;
-        if (nextPhased !== e.isPhased) this.game.audio.sfxEnemyAbility("phase");
+        if (nextPhased !== e.isPhased) this.game.audio.sfxEnemyAbility("phase", e.pos);
         e.isPhased = nextPhased;
       }
 
@@ -302,7 +302,7 @@ export class EnemySystem {
     }
     if (healed > 0) {
       this.game.particles.spawnRing(weaver.pos.x, weaver.pos.y, 80, "#ff80ab");
-      this.game.audio.sfxEnemyAbility("heal");
+      this.game.audio.sfxEnemyAbility("heal", weaver.pos);
     }
   }
 
@@ -360,7 +360,7 @@ export class EnemySystem {
         this.game.core.shake = Math.max(this.game.core.shake, 13);
         this.game.core.shakeRot = Math.max(this.game.core.shakeRot, 0.04);
       }
-      this.game.audio.sfxBossAlert();
+      this.game.audio.sfxBossAlert(boss.pos);
     }
   }
 
@@ -447,7 +447,7 @@ export class EnemySystem {
       if (e.lastDamageSource?.type === "tower" && e.lastDamageSource.tower) {
         e.lastDamageSource.tower.kills++;
       }
-      this.game.audio.sfxEnemyDeath(e.type);
+      this.game.audio.sfxEnemyDeath(e.type, e.pos);
       this.checkKillStreak(e.isBoss);
 
       // Death burst.
@@ -459,7 +459,7 @@ export class EnemySystem {
 
       // Carrier death: spawn scouts + fear response (nearby scouts scatter briefly).
       if (e.ability === "spawn" && e.type === "carrier") {
-        this.game.audio.sfxEnemyAbility("spawn");
+        this.game.audio.sfxEnemyAbility("spawn", e.pos);
         this.game.particles.spawnRing(e.pos.x, e.pos.y, 58, "#ff8a65", 0.26);
         for (let i = 0; i < 3; i++) {
           const ang = rnd(0, Math.PI * 2);
@@ -483,7 +483,7 @@ export class EnemySystem {
 
       // Carrier/Splitter: generic spawn ability.
       if (e.ability === "spawn" && e.type === "splitter") {
-        this.game.audio.sfxEnemyAbility("spawn");
+        this.game.audio.sfxEnemyAbility("spawn", e.pos);
         this.game.particles.spawnRing(e.pos.x, e.pos.y, 58, "#ff8a65", 0.26);
         for (let i = 0; i < 3; i++) {
           const ang = rnd(0, Math.PI * 2);

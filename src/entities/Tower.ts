@@ -29,6 +29,8 @@ export class Tower {
   burstCount = 0; // for Pulse triple burst
   /** Heat accumulated by Flamer while firing (decays when idle). Drives overheat visual. */
   heatTimer = 0;
+  /** Construction animation: counts 0→1 over 0.4s. Tower is disabled while < 1. */
+  buildProgress = 0;
   specId: string | null = null;
   flags: Partial<Record<TowerFlag, boolean>> = {};
   mods: TowerMod[] = [];

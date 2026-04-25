@@ -125,6 +125,9 @@ export class RenderSystem {
     if (quality !== "low" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
       this.drawCRTOverlay(ctx);
     }
+    if (quality === "high" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
+      this.drawChromaticAberration(ctx);
+    }
     this.drawScreenFlashes(ctx);
   }
 
@@ -267,6 +270,23 @@ export class RenderSystem {
     ctx.translate(-ox, -oy);
     ctx.fillStyle = pattern;
     ctx.fillRect(0, 0, VIEW_WIDTH + this.noiseCanvas.width, VIEW_HEIGHT + this.noiseCanvas.height);
+    ctx.restore();
+  }
+
+  private drawChromaticAberration(ctx: CanvasRenderingContext2D): void {
+    // Subtle fringe: draw previous frame twice with tiny horizontal offsets at
+    // screen blend, creating the illusion of R/B channel separation.
+    const lowCore = this.game.core.coreIntegrity / this.game.core.coreMax < 0.3;
+    const offset = lowCore ? 2.2 : 1.0;
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = 0.055;
+    ctx.drawImage(this.previousFrameCanvas, -offset, 0);
+    ctx.restore();
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = 0.045;
+    ctx.drawImage(this.previousFrameCanvas, offset, 0);
     ctx.restore();
   }
 
@@ -579,6 +599,31 @@ export class RenderSystem {
 
   private drawTower(ctx: CanvasRenderingContext2D, t: Tower): void {
     ctx.save();
+
+    // Construction animation: scale in with part-flyby streaks.
+    if (t.buildProgress < 1) {
+      const prog = t.buildProgress;
+      const eased = prog * prog * (3 - 2 * prog); // smoothstep
+      ctx.translate(t.pos.x, t.pos.y);
+      ctx.scale(eased, eased);
+      ctx.globalAlpha = eased;
+      ctx.fillStyle = t.def.color;
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = t.def.color;
+      // Flying parts converging to center.
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        const dist = (1 - prog) * 22;
+        ctx.save();
+        ctx.globalAlpha = (1 - prog) * 0.7;
+        ctx.fillRect(Math.cos(a) * dist - 2, Math.sin(a) * dist - 2, 4, 4);
+        ctx.restore();
+      }
+      ctx.fillRect(-8, -8, 16, 16);
+      ctx.restore();
+      return;
+    }
+
     const disabled = this.game.towers["disabled"].has(t);
     // Check jammer aura — show yellow interference halo.
     const jammed = !disabled && this.game.enemies.list.some(

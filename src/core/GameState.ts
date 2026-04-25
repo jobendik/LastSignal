@@ -100,7 +100,7 @@ export function createEmptyStats(): RunStats {
     damageByTowerType: {},
     damageByEnemyType: {},
     killsByEnemyType: {},
-    startedAt: performance.now(),
+    startedAt: Date.now(),
     bestTowerType: null,
     bestTowerLevel: 0,
   };

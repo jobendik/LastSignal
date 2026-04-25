@@ -219,6 +219,6 @@ export class DroneSystem {
         ownerType: "drone",
       })
     );
-    this.game.audio.sfxShoot(1.5, 0.12);
+    this.game.audio.sfxShoot(1.5, 0.12, "bullet", d.pos);
   }
 }

@@ -1,5 +1,43 @@
 import type { Game } from "../core/Game";
+import type { RunJournalEntry } from "../core/Types";
 import { el, clear } from "./dom";
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return mins > 0 ? `${mins}m ${secs.toString().padStart(2, "0")}s` : `${secs}s`;
+}
+
+function formatDate(ts: number): string {
+  return new Date(ts).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function runEntryCard(entry: RunJournalEntry): HTMLElement {
+  const result = entry.result.toUpperCase();
+  const tower = entry.bestTowerType ? `${entry.bestTowerType.toUpperCase()} L${entry.bestTowerLevel}` : "NONE";
+  const waveLabel = entry.endless
+    ? `Wave ${entry.waveReached} / ENDLESS`
+    : `Wave ${entry.waveReached} / ${entry.totalWaves}`;
+  const card = el("div", { class: `ls-run-entry ${entry.result}` });
+  card.append(
+    el("div", { class: "ls-run-entry-top" }, [
+      el("span", { class: "ls-run-result", text: result }),
+      el("span", { class: "ls-run-date", text: formatDate(entry.endedAt) }),
+    ]),
+    el("div", { class: "ls-run-sector", text: entry.sectorName }),
+    el("div", { class: "ls-run-meta", text: `${waveLabel} / Core ${entry.coreRemainingPct}% / ${formatDuration(entry.durationSec)}` }),
+    el("div", { class: "ls-run-meta", text: `Kills ${entry.enemiesKilled} / Earned ${entry.creditsEarned} / Best ${tower}` })
+  );
+  if (entry.modifiers.length > 0) {
+    card.append(el("div", { class: "ls-run-mods", text: entry.modifiers.slice(0, 2).join(" / ") }));
+  }
+  return card;
+}
 
 export class MainMenu {
   el: HTMLElement;
@@ -18,9 +56,27 @@ export class MainMenu {
         `<div>Best wave reached: <strong>${p.bestWaveReached}</strong></div>` +
         `<div>Codex entries: <strong>${p.codexSeen.length}</strong> / 14</div>` +
         `<div>Research points: <strong>${p.researchPoints}</strong></div>` +
-        `<div>Endless best wave: <strong>${p.endlessBestWave}</strong></div>`,
+        `<div>Endless best wave: <strong>${p.endlessBestWave}</strong></div>` +
+        `<div>Recorded runs: <strong>${p.runHistory.length}</strong></div>`,
       }),
     );
+
+    if (p.runHistory.length > 0) {
+      const last = p.runHistory[0]!;
+      this.el.append(el("div", {
+        class: `ls-last-run ${last.result}`,
+        text: `LAST RUN: ${last.result.toUpperCase()} / ${last.sectorName} / Wave ${last.waveReached} / Core ${last.coreRemainingPct}%`,
+      }));
+
+      const journal = el("div", { class: "ls-run-journal" });
+      journal.append(el("div", { class: "ls-run-journal-title", text: "RUN JOURNAL" }));
+      const list = el("div", { class: "ls-run-list" });
+      for (const entry of p.runHistory.slice(0, 4)) {
+        list.append(runEntryCard(entry));
+      }
+      journal.append(list);
+      this.el.append(journal);
+    }
 
     const actions = el("div", { class: "ls-actions" });
     const startBtn = el("button", { class: "ls-btn ls-btn-primary", text: "START MISSION" });

@@ -60,7 +60,7 @@ export class TowerSystem {
     const t = new Tower(type, c, r, cost);
     this.list.push(t);
     this.game.grid.placeTower(c, r, type, Boolean(def.isEco));
-    this.game.audio.sfxBuild();
+    this.game.audio.sfxBuild(t.pos);
     this.game.particles.spawnBurst(t.pos.x, t.pos.y, def.color, 10, { speed: 80, life: 0.5 });
     if (comboDiscount) {
       this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 24, "COMBO -10%", "#00e676", 0.9, 12);
@@ -76,7 +76,7 @@ export class TowerSystem {
     if (!this.game.spendCredits(cost)) return false;
     t.level++;
     t.totalInvested += cost;
-    this.game.audio.sfxUpgrade();
+    this.game.audio.sfxUpgrade(t.pos);
     // Dramatic level-up FX.
     this.game.particles.spawnRing(t.pos.x, t.pos.y, 36, "#ffd700");
     this.game.particles.spawnRing(t.pos.x, t.pos.y, 20, t.def.color);
@@ -94,7 +94,7 @@ export class TowerSystem {
     this.game.grid.removeTower(t.c, t.r, Boolean(def.requiresCrystal));
     this.list = this.list.filter((x) => x !== t);
     if (this.selected === t) this.selected = null;
-    this.game.audio.sfxSell();
+    this.game.audio.sfxSell(t.pos);
     this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 20, `+${refund}`, "#ffeb3b");
     this.game.bus.emit("credits:changed", this.game.core.credits);
     this.game.bus.emit("tower:sold", t);
@@ -103,6 +103,14 @@ export class TowerSystem {
   applySpecialization(t: Tower, specId: string): void {
     t.applySpecialization(specId);
     this.game.bus.emit("tower:specialized", t);
+    // Dramatic specialization FX: slow-mo pop + radial burst.
+    this.game.core.slowMoScale = 0.22;
+    this.game.core.slowMo = 0.55;
+    this.game.particles.spawnRing(t.pos.x, t.pos.y, 22, t.def.color);
+    this.game.particles.spawnRing(t.pos.x, t.pos.y, 44, "#ffffff");
+    this.game.particles.spawnBurst(t.pos.x, t.pos.y, t.def.color, 20, { speed: 180, life: 0.65, size: 3 });
+    this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 28, "SPEC LOCKED", t.def.color, 1.4, 13);
+    this.game.audio.sfxUpgrade(t.pos);
   }
 
   disableTower(t: Tower, duration: number): void {
@@ -190,7 +198,7 @@ export class TowerSystem {
     }
 
     if (!didFire) {
-      this.game.audio.sfxShoot(0.5, 0.08);
+      this.game.audio.sfxShoot(0.5, 0.08, "bullet", t.pos);
       return false;
     }
 
@@ -210,6 +218,12 @@ export class TowerSystem {
       this.game.core.coreIntegrity / this.game.core.coreMax <= up.lowCoreThreshold;
 
     for (const t of this.list) {
+      // Construction: advance build animation, skip firing until complete.
+      if (t.buildProgress < 1) {
+        t.buildProgress = Math.min(1, t.buildProgress + dt / 0.4);
+        continue;
+      }
+
       if (t.manualCooldown > 0) t.manualCooldown = Math.max(0, t.manualCooldown - dt);
 
       // Handle disables.
@@ -307,7 +321,7 @@ export class TowerSystem {
 
       const income = Math.round(stats.income * this.game.core.upgrades.harvesterIncomeMul * modIncomeMul);
       this.game.addCredits(income);
-      this.game.audio.sfxCredit();
+      this.game.audio.sfxCredit(t.pos);
       this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 18, `+${income}`, "#00e676", 0.8, 12);
       this.game.particles.spawnRing(t.pos.x, t.pos.y, 22, "#00e676");
     }
@@ -334,7 +348,7 @@ export class TowerSystem {
   }
 
   private applyStasisPulse(t: Tower, target: Enemy, _stats: ReturnType<TowerSystem["effectiveStats"]>): void {
-    this.game.audio.sfxTowerFire(t.type);
+    this.game.audio.sfxTowerFire(t.type, t.pos);
     t.recoil = 4;
     const strength = t.flags.deepFreeze ? 0.3 : 0.55;
     const duration = t.flags.deepFreeze ? 3.4 : 2.6;
@@ -469,7 +483,7 @@ export class TowerSystem {
   }
 
   private fire(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
-    this.game.audio.sfxTowerFire(t.type);
+    this.game.audio.sfxTowerFire(t.type, t.pos);
 
     switch (t.type) {
       case "pulse": this.firePulse(t, target, stats); break;

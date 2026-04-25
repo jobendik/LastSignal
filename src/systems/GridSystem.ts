@@ -10,6 +10,7 @@ export class GridSystem {
   flow: Int32Array = new Int32Array(COLS * ROWS); // next-cell index, -1 if none
   dist: Float32Array = new Float32Array(COLS * ROWS);
   coreCells: number[] = [];
+  crystalCells: number[] = [];
   corePos = new Vector2();
   spawners: SpawnerDefinition[] = [];
 
@@ -38,6 +39,7 @@ export class GridSystem {
     this.flow.fill(-1);
     this.dist.fill(Infinity);
     this.coreCells = [];
+    this.crystalCells = [];
     this.spawners = [];
     this.placementCacheDirty = true;
   }
@@ -58,6 +60,7 @@ export class GridSystem {
             break;
           case "C":
             this.cells[i] = CellKind.Crystal;
+            this.crystalCells.push(i);
             break;
           case "X":
             this.cells[i] = CellKind.Core;

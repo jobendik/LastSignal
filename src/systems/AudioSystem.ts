@@ -1,3 +1,4 @@
+import { VIEW_WIDTH } from "../core/Config";
 import type { GameSettings } from "../core/Types";
 
 /**
@@ -29,6 +30,7 @@ export class AudioSystem {
     ui: [],
     alert: [],
     reward: [],
+    world: [],
   };
 
   init(): void {
@@ -175,22 +177,23 @@ export class AudioSystem {
 
   // ---- SFX: per-tower procedural sounds ----
 
-  sfxTowerFire(type: string): void {
+  sfxTowerFire(type: string, position?: AudioPosition): void {
     switch (type) {
-      case "tesla":    this.sfxTesla(); break;
-      case "railgun":  this.sfxRailgun(); break;
-      case "mortar":   this.sfxMortar(); break;
-      case "flamer":   this.sfxFlamer(); break;
-      case "stasis":   this.sfxStasis(); break;
-      case "blaster":  this.sfxShoot(1.35, 0.14); break;
+      case "tesla":    this.sfxTesla(position); break;
+      case "railgun":  this.sfxRailgun(position); break;
+      case "mortar":   this.sfxMortar(position); break;
+      case "flamer":   this.sfxFlamer(position); break;
+      case "stasis":   this.sfxStasis(position); break;
+      case "blaster":  this.sfxShoot(1.35, 0.14, "bullet", position); break;
       case "barrier":  break; // barrier is silent on pulse
-      default:         this.sfxShoot(1, 0.17); break;
+      default:         this.sfxShoot(1, 0.17, "bullet", position); break;
     }
   }
 
-  sfxTesla(): void {
+  sfxTesla(position?: AudioPosition): void {
     if (!this.ready() || !this.beginVoice("bullet", 0.12)) return;
     const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("bullet", position, 0.14);
     // Sharp electric crack: burst of noise + high-pitch oscillator.
     const bufSize = Math.max(1, Math.floor(this.ctx!.sampleRate * 0.05));
     const buf = this.ctx!.createBuffer(1, bufSize, this.ctx!.sampleRate);
@@ -205,7 +208,7 @@ export class AudioSystem {
     const gain = this.ctx!.createGain();
     gain.gain.setValueAtTime(0.45, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
-    noise.connect(flt); flt.connect(gain); gain.connect(this.sfxGain!);
+    noise.connect(flt); flt.connect(gain); gain.connect(out);
     noise.start(now);
     // Add a sharp high ping.
     const osc = this.ctx!.createOscillator();
@@ -215,13 +218,14 @@ export class AudioSystem {
     osc.frequency.exponentialRampToValueAtTime(400, now + 0.07);
     og.gain.setValueAtTime(0.18, now);
     og.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-    osc.connect(og); og.connect(this.sfxGain!);
+    osc.connect(og); og.connect(out);
     osc.start(now); osc.stop(now + 0.09);
   }
 
-  sfxRailgun(): void {
+  sfxRailgun(position?: AudioPosition): void {
     if (!this.ready() || !this.beginVoice("bullet", 0.24)) return;
     const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("bullet", position, 0.28);
     // Deep crack + high snap.
     const osc = this.ctx!.createOscillator();
     const gain = this.ctx!.createGain();
@@ -230,7 +234,7 @@ export class AudioSystem {
     osc.frequency.exponentialRampToValueAtTime(30, now + 0.18);
     gain.gain.setValueAtTime(0.55, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-    osc.connect(gain); gain.connect(this.sfxGain!);
+    osc.connect(gain); gain.connect(out);
     osc.start(now); osc.stop(now + 0.24);
     // High transient click for snap.
     const osc2 = this.ctx!.createOscillator();
@@ -240,13 +244,14 @@ export class AudioSystem {
     osc2.frequency.exponentialRampToValueAtTime(300, now + 0.04);
     g2.gain.setValueAtTime(0.3, now);
     g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
-    osc2.connect(g2); g2.connect(this.sfxGain!);
+    osc2.connect(g2); g2.connect(out);
     osc2.start(now); osc2.stop(now + 0.06);
   }
 
-  sfxMortar(): void {
+  sfxMortar(position?: AudioPosition): void {
     if (!this.ready() || !this.beginVoice("bullet", 0.32)) return;
     const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("bullet", position, 0.36);
     // Deep low-frequency thump.
     const osc = this.ctx!.createOscillator();
     const gain = this.ctx!.createGain();
@@ -255,13 +260,14 @@ export class AudioSystem {
     osc.frequency.exponentialRampToValueAtTime(25, now + 0.28);
     gain.gain.setValueAtTime(0.5, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-    osc.connect(gain); gain.connect(this.sfxGain!);
+    osc.connect(gain); gain.connect(out);
     osc.start(now); osc.stop(now + 0.32);
   }
 
-  sfxFlamer(): void {
+  sfxFlamer(position?: AudioPosition): void {
     if (!this.ready() || !this.beginVoice("bullet", 0.12)) return;
     const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("bullet", position, 0.16);
     // Hissing roar: filtered noise with low-pass sweep.
     const bufSize = Math.max(1, Math.floor(this.ctx!.sampleRate * 0.12));
     const buf = this.ctx!.createBuffer(1, bufSize, this.ctx!.sampleRate);
@@ -276,13 +282,14 @@ export class AudioSystem {
     const gain = this.ctx!.createGain();
     gain.gain.setValueAtTime(0.35, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
-    noise.connect(flt); flt.connect(gain); gain.connect(this.sfxGain!);
+    noise.connect(flt); flt.connect(gain); gain.connect(out);
     noise.start(now);
   }
 
-  sfxStasis(): void {
+  sfxStasis(position?: AudioPosition): void {
     if (!this.ready() || !this.beginVoice("bullet", 0.22)) return;
     const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("bullet", position, 0.3);
     // Crystalline ascending chime.
     const freqs = [880, 1320, 1760];
     freqs.forEach((f, i) => {
@@ -292,16 +299,17 @@ export class AudioSystem {
       osc.frequency.setValueAtTime(f, now + i * 0.04);
       gain.gain.setValueAtTime(0.1, now + i * 0.04);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.04 + 0.18);
-      osc.connect(gain); gain.connect(this.sfxGain!);
+      osc.connect(gain); gain.connect(out);
       osc.start(now + i * 0.04); osc.stop(now + i * 0.04 + 0.2);
     });
   }
 
   // ---- SFX: procedural helpers ----
 
-  sfxShoot(pitch = 1, volume = 0.2, category: AudioCategory = "bullet"): void {
+  sfxShoot(pitch = 1, volume = 0.2, category: AudioCategory = "bullet", position?: AudioPosition): void {
     if (!this.ready() || !this.beginVoice(category, 0.12)) return;
     const now = this.ctx!.currentTime;
+    const out = this.spatialOutput(category, position, 0.16);
     const osc = this.ctx!.createOscillator();
     const gain = this.ctx!.createGain();
     osc.type = "square";
@@ -310,14 +318,15 @@ export class AudioSystem {
     gain.gain.setValueAtTime(volume, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
     osc.connect(gain);
-    gain.connect(this.outputFor(category));
+    gain.connect(out);
     osc.start(now);
     osc.stop(now + 0.12);
   }
 
-  sfxExplosion(volume = 0.4): void {
+  sfxExplosion(volume = 0.4, position?: AudioPosition): void {
     if (!this.ready() || !this.beginVoice("explosion", 0.36)) return;
     const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("explosion", position, 0.45);
     const bufferSize = Math.max(1, Math.floor(this.ctx!.sampleRate * 0.35));
     const buffer = this.ctx!.createBuffer(1, bufferSize, this.ctx!.sampleRate);
     const data = buffer.getChannelData(0);
@@ -333,19 +342,20 @@ export class AudioSystem {
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
     noise.connect(filter);
     filter.connect(gain);
-    gain.connect(this.sfxGain!);
+    gain.connect(out);
     if (this.reverb) gain.connect(this.reverb);
     noise.start(now);
   }
 
-  sfxDeath(pitch = 0.5): void {
-    this.sfxShoot(pitch, 0.15, "enemy");
+  sfxDeath(pitch = 0.5, position?: AudioPosition): void {
+    this.sfxShoot(pitch, 0.15, "enemy", position);
   }
 
-  sfxCoreHit(): void {
+  sfxCoreHit(position?: AudioPosition): void {
     if (!this.ready() || !this.beginVoice("alert", 0.32)) return;
     this.duckMusic(0.45, 0.45);
     const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("alert", position, 0.38);
     const osc = this.ctx!.createOscillator();
     const gain = this.ctx!.createGain();
     osc.type = "triangle";
@@ -354,21 +364,21 @@ export class AudioSystem {
     gain.gain.setValueAtTime(0.35, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
     osc.connect(gain);
-    gain.connect(this.sfxGain!);
+    gain.connect(out);
     osc.start(now);
     osc.stop(now + 0.32);
   }
 
-  sfxBuild(): void {
-    this.sfxShoot(1.4, 0.15, "ui");
+  sfxBuild(position?: AudioPosition): void {
+    this.sfxShoot(1.4, 0.15, "world", position);
   }
 
-  sfxUpgrade(): void {
-    this.sfxShoot(1.8, 0.2, "ui");
+  sfxUpgrade(position?: AudioPosition): void {
+    this.sfxShoot(1.8, 0.2, "world", position);
   }
 
-  sfxSell(): void {
-    this.sfxShoot(0.7, 0.15, "ui");
+  sfxSell(position?: AudioPosition): void {
+    this.sfxShoot(0.7, 0.15, "world", position);
   }
 
   sfxWaveStart(): void {
@@ -387,10 +397,11 @@ export class AudioSystem {
     osc.stop(now + 0.42);
   }
 
-  sfxBossAlert(): void {
+  sfxBossAlert(position?: AudioPosition): void {
     if (!this.ready() || !this.beginVoice("alert", 1.05)) return;
     this.duckMusic(1.15, 0.32);
     const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("alert", position, 1.15);
     for (let i = 0; i < 3; i++) {
       const osc = this.ctx!.createOscillator();
       const gain = this.ctx!.createGain();
@@ -400,7 +411,7 @@ export class AudioSystem {
       gain.gain.setValueAtTime(0.3, now + i * 0.3);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.3 + 0.25);
       osc.connect(gain);
-      gain.connect(this.sfxGain!);
+      gain.connect(out);
       osc.start(now + i * 0.3);
       osc.stop(now + i * 0.3 + 0.3);
     }
@@ -480,24 +491,24 @@ export class AudioSystem {
     this.sfxShoot(2.6, 0.055, "ui");
   }
 
-  sfxCredit(): void {
-    this.sfxShoot(2.05, 0.08, "reward");
+  sfxCredit(position?: AudioPosition): void {
+    this.sfxShoot(2.05, 0.08, "reward", position);
   }
 
-  sfxEnemyArrival(type: string): void {
+  sfxEnemyArrival(type: string, position?: AudioPosition): void {
     const pitch = type === "brute" || type === "carrier" ? 0.62 : type === "phantom" ? 1.45 : 0.92;
-    this.sfxShoot(pitch, 0.07, "enemy");
+    this.sfxShoot(pitch, 0.07, "enemy", position);
   }
 
-  sfxEnemyAbility(kind: "heal" | "phase" | "spawn"): void {
-    if (kind === "heal") this.sfxShoot(1.65, 0.08, "enemy");
-    else if (kind === "phase") this.sfxShoot(1.9, 0.055, "enemy");
-    else this.sfxShoot(0.75, 0.1, "enemy");
+  sfxEnemyAbility(kind: "heal" | "phase" | "spawn", position?: AudioPosition): void {
+    if (kind === "heal") this.sfxShoot(1.65, 0.08, "enemy", position);
+    else if (kind === "phase") this.sfxShoot(1.9, 0.055, "enemy", position);
+    else this.sfxShoot(0.75, 0.1, "enemy", position);
   }
 
-  sfxEnemyDeath(type: string): void {
+  sfxEnemyDeath(type: string, position?: AudioPosition): void {
     const pitch = type === "brute" || type === "juggernaut" ? 0.38 : type === "phantom" ? 1.25 : 0.58;
-    this.sfxDeath(pitch);
+    this.sfxDeath(pitch, position);
   }
 
   private ready(): boolean {
@@ -506,6 +517,26 @@ export class AudioSystem {
 
   private outputFor(category: AudioCategory): GainNode {
     return category === "ui" ? this.uiGain! : this.sfxGain!;
+  }
+
+  private spatialOutput(category: AudioCategory, position: AudioPosition | undefined, duration: number): AudioNode {
+    const output = this.outputFor(category);
+    if (!position || category === "ui" || !this.ctx || typeof this.ctx.createStereoPanner !== "function") return output;
+    const pan = this.panFromPosition(position);
+    if (Math.abs(pan) < 0.01) return output;
+    const panner = this.ctx.createStereoPanner();
+    panner.pan.value = pan;
+    panner.connect(output);
+    window.setTimeout(() => {
+      try { panner.disconnect(); } catch { /* ignore */ }
+    }, Math.ceil((duration + 0.2) * 1000));
+    return panner;
+  }
+
+  private panFromPosition(position: AudioPosition): number {
+    const x = typeof position === "number" ? position : position.x;
+    const normalized = (x / VIEW_WIDTH) * 2 - 1;
+    return Math.max(-0.9, Math.min(0.9, normalized));
   }
 
   private ensureStartedForGesture(): void {
@@ -531,6 +562,7 @@ export class AudioSystem {
       case "ui": return 6;
       case "alert": return 3;
       case "reward": return 4;
+      case "world": return 8;
     }
   }
 
@@ -560,4 +592,5 @@ export class AudioSystem {
   }
 }
 
-type AudioCategory = "bullet" | "explosion" | "enemy" | "ui" | "alert" | "reward";
+type AudioCategory = "bullet" | "explosion" | "enemy" | "ui" | "alert" | "reward" | "world";
+type AudioPosition = number | { x: number };

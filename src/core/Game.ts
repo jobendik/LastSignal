@@ -302,7 +302,7 @@ export class Game {
       const len = Math.hypot(fromX - cx, fromY - cy) || 1;
       this.core.shakeDir = { x: (fromX - cx) / len, y: (fromY - cy) / len };
     }
-    this.audio.sfxCoreHit();
+    this.audio.sfxCoreHit(this.grid.corePos);
     this.bus.emit("core:damaged", { amount, by: byType });
     if (this.core.coreIntegrity <= 0) {
       this.core.coreIntegrity = 0;
@@ -359,7 +359,7 @@ export class Game {
     this.particles.spawnRing(x, y, 240, "#66fcf1");
     this.particles.spawnBurst(x, y, "#66fcf1", 34, { speed: 230, life: 0.65, size: 2.5 });
     this.particles.spawnFloatingText(x, y - 42, "CORE EMP", "#66fcf1", 1.1, 17);
-    this.audio.sfxStasis();
+    this.audio.sfxStasis(this.grid.corePos);
     this.bus.emit("core:ability", { affected });
     return true;
   }
@@ -410,6 +410,7 @@ export class Game {
   private commitProfile(): void {
     const p = this.core.profile;
     if (!this.core.sector) return;
+    const result = this.state === "VICTORY" ? "victory" : "defeat";
     const sectorIndex =
       sectorDefinitions.findIndex((s) => s.id === this.core.sector!.id) + 1;
     if (this.state === "VICTORY") {
@@ -420,6 +421,10 @@ export class Game {
       (this.core.coreIntegrity / this.core.coreMax) * 100
     );
     p.bestCoreRemaining = Math.max(p.bestCoreRemaining, corePct);
+    p.runHistory = [
+      this.stats.createJournalEntry(result),
+      ...(p.runHistory ?? []),
+    ].slice(0, 12);
     this.persistence.saveProfile(p);
   }
 
@@ -448,6 +453,15 @@ export class Game {
       this.core.coreAbilityCooldown = Math.max(0, this.core.coreAbilityCooldown - dt);
     }
     this.updateEmergencyProtocol(dt);
+
+    // Crystal ambient sparkles — Poisson rate ~0.6/s per crystal.
+    if (this.grid.crystalCells.length > 0 && Math.random() < 0.6 * dt * this.grid.crystalCells.length) {
+      const idx = this.grid.crystalCells[Math.floor(Math.random() * this.grid.crystalCells.length)]!;
+      const { c, r } = this.grid.coords(idx);
+      const px = c * 32 + 16 + (Math.random() - 0.5) * 14;
+      const py = r * 32 + 16 + (Math.random() - 0.5) * 14;
+      this.particles.spawnBurst(px, py, "#00e676", 1, { speed: 14, life: 0.9, size: 1.5 });
+    }
 
     // Only tick simulation during active wave / wave-complete / victory fanfare.
     const active = this.state === "WAVE_ACTIVE" || this.state === "WAVE_COMPLETE";
@@ -504,7 +518,7 @@ export class Game {
         16
       );
       this.particles.spawnRing(this.grid.corePos.x, this.grid.corePos.y, 180, "#ff5252");
-      this.audio.sfxBossAlert();
+      this.audio.sfxBossAlert(this.grid.corePos);
       this.bus.emit("core:emergency", { active: true });
     }
 

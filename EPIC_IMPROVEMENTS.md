@@ -4,6 +4,8 @@
 
 This document is the master checklist for every improvement needed to make the game feel truly epic. Each section covers a domain; each item is a discrete, implementable task.
 
+Status audited against the current codebase on 2026-04-25; `npm run typecheck` passes.
+
 ---
 
 ## ✅ PHASE 1 COMPLETED — 2026-04-24
@@ -68,6 +70,12 @@ Phase 3 "Gameplay Depth & UX":
 | 4-C | **Adaptive music** | Tension layer (dissonant triangle oscillator at 82.5Hz with HP filter) cross-fades over 1.8s when wave starts; boss spawn kicks to level 2 (louder); beat pulse layer fires every 1.8s during waves; `setMusicIntensity(0/1/2)` driven by state machine |
 | 4-D | **Elite variant spawning** | 6% chance at wave 5+ for non-boss enemies to spawn as elite (150% HP); golden glow border already wired in RenderSystem |
 | 4-E | **Swarm boid flocking** | Cohesion force pulls swarm enemies toward nearby swarm center-of-mass (radius 55px); creates natural cluster-and-split organic movement |
+| 4-F | **Chromatic aberration pass** | High-quality CRT mode applies subtle screen-blend fringe offsets from `previousFrameCanvas`, stronger when core integrity is low |
+| 4-G | **Tower construction animation** | Newly placed towers are disabled for 0.4s while scaling in; four glowing parts converge into the final tower body |
+| 4-H | **Specialization unlock FX pass** | Specialization applies a 0.55s slow-mo pop, tower-color burst, dual rings, upgrade SFX, and "SPEC LOCKED" floating text |
+| 4-I | **Crystal ambient sparkles** | `GridSystem.crystalCells` tracks crystal tiles; `Game.update()` emits idle green sparkle particles from crystal positions |
+| 4-J | **Escalation reinforcements** | From wave 3 onward, one mid-wave reinforcement group spawns at ~65% kills using the wave's dominant enemy type |
+| 4-K | **Spatial audio panning** | World SFX accept optional screen positions and pan through Web Audio `StereoPannerNode` for tower shots, enemy events, explosions, boss alerts, and core hits |
 
 **Next: Continue Phase 4**
 
@@ -99,7 +107,7 @@ The game uses Canvas 2D with procedural geometry. The CRT aesthetic is a strong 
 ### 1.1 Shader-Like Canvas Post-Processing
 - [x] Replace the basic CRT scanline (3px stripes, 10% opacity) with a **true scanline shader simulation**: alternating dark/bright horizontal bands with sub-pixel curvature distortion applied to the canvas via `ctx.transform` *(animated brightness variation per row)*
 - [ ] Add **barrel distortion** by rendering the game to an off-screen canvas and using `ctx.drawImage` with a warped quad (approximate via stepped horizontal strips) to simulate CRT screen curve
-- [ ] Add a **chromatic aberration pass**: draw the game frame 3 times with tiny R/G/B channel offsets using `globalCompositeOperation: 'screen'`
+- [x] Add a **chromatic aberration pass**: draw subtle screen-blend fringe offsets in high-quality mode using `previousFrameCanvas` *(disabled by reduced flashing / reduced motion; stronger when core integrity is low)*
 - [x] Add a **phosphor persistence / motion blur effect**: draw the previous frame at low opacity before the current frame using a dedicated ghost canvas *(previous-frame canvas composited with screen blend)*
 - [x] Add a **noise/film grain overlay**: every frame sample a pre-generated 256×256 noise texture at a random offset *(256px procedural noise texture sampled at random offsets in CRT pass)*
 - [x] Make the vignette **animated** — pulse it on core damage events, breathe it slowly at idle *(vignette deepens when core < 30%)*
@@ -118,7 +126,7 @@ The game uses Canvas 2D with procedural geometry. The CRT aesthetic is a strong 
 - [x] Add **firing animations**: fire-burst `shadowBlur` spike via `t.recoil`; Railgun charge fill glows when ready *(recoil state on Tower, decays each frame)*
 - [ ] Level-up towers gain **visual complexity**: new geometric elements added at each level (extra antenna, wider base, more barrel ports)
 - [ ] Specialization visuals: applying a specialization **changes the tower silhouette** — e.g. Focus Lens Pulse gains a visible lens ring, Chain Storm Tesla grows additional coil nodes
-- [ ] Tower **construction animation**: when placed, tower assembles from parts flying in from off-screen over 0.4s
+- [x] Tower **construction animation**: when placed, tower assembles from parts flying inward over 0.4s *(new `buildProgress` field; towers do not fire until the animation completes)*
 
 ### 1.4 Enemy Visual Overhaul
 - [ ] Replace single-color circle/polygon enemies with **multi-part procedural designs**: body core + leg/wing/fin appendages that animate during movement
@@ -134,7 +142,7 @@ The game uses Canvas 2D with procedural geometry. The CRT aesthetic is a strong 
 ### 1.5 Environment & Map
 - [x] **Animated grid**: grid lines pulse with a sinusoidal wave that travels across columns/rows driven by `elapsed` *(per-line alpha varies 0.015–0.065 via sin wave)*
 - [ ] **Terrain variety**: rocks have procedurally varied shapes (not all the same polygon) with cracks and shadow edges
-- [ ] **Crystal clusters**: crystals animate with a slow rotation and emit faint sparkle particles at idle
+- [ ] **Crystal clusters**: crystals animate with a slow rotation and emit faint sparkle particles at idle *(sparkle particles are implemented via `GridSystem.crystalCells`; slow crystal rotation still pending)*
 - [x] **Spawner portals**: spawner cells should be vivid glowing portals with a rotating ring and energy tendrils — not static markers *(rotating segmented ring, pulsing red core, 6 energy tendrils)*
 - [x] **Core redesign**: the 2×2 core is a multi-layered signal node — outer ring with HP arc + tick marks, counter-rotating inner ring, 4 antenna arms, 8-sector orb (sectors darken as HP drops), radial inner glow *(full drawCore() rewrite)*
 - [x] Add a **background star field** layer to reinforce the sci-fi space feel *(120 twinkling stars drawn with per-star sinusoidal alpha variation)*
@@ -170,7 +178,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 
 ### 2.4 Upgrade & Economy FX
 - [x] **Level-up**: tower level-up triggers an expanding golden ring + floating "LEVEL 2" text + brief particle shower *(gold ring + tower-color ring + particle shower + floating LEVEL text)*
-- [ ] **Specialization unlock**: dramatic slow-motion zoom-in on the tower with a radial burst and color shift
+- [x] **Specialization unlock FX pass**: specialization applies a slow-motion pop, radial burst, dual rings, color-matched particles, upgrade SFX, and "SPEC LOCKED" floating text *(camera zoom/color-shift variant still available as future polish)*
 - [ ] **Credit gain**: harvester income spawns credit coin icons that fly from harvester to the HUD credit counter
 - [x] **Kill streak**: after 5 kills in 2 seconds, display a "CHAIN KILL ×5" floating text in the center with a color flash *(center-screen text, burst, expanding ring, escalates every +3 kills)*
 
@@ -390,7 +398,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 - [x] **Tower-type SFX**: each of the 9 towers should have a unique procedurally generated sound — Railgun is a powerful crack/thud, Flamer is a roaring sizzle, Stasis is a crystalline chime, Tesla is an electric snap *(sfxTesla, sfxRailgun, sfxMortar, sfxFlamer, sfxStasis all implemented with distinct timbres)*
 - [x] **Enemy SFX**: enemies make sounds on arrival (portal entry), on special ability use (Weaver heal hum, Phantom phase toggle shimmer), and on death (type-specific death sounds) *(spawn, heal, phase, carrier spawn, and death calls wired through EnemySystem)*
 - [x] **UI SFX**: button hover, button click, panel open/close, achievement unlock, reward card flip — all need short punchy SFX *(UIManager event delegation + toast/card/panel sounds)*
-- [ ] **Spatial audio**: use the **Web Audio API PannerNode** to pan sounds left/right based on the X position of the event on screen
+- [x] **Spatial audio**: world SFX pan left/right based on screen X using Web Audio `StereoPannerNode` *(tower fire/build/upgrade/sell, enemy arrival/death/abilities, boss alerts, core hits, drone fire, and mortar explosions pass positions into AudioSystem)*
 - [x] **Reverb tail**: add a convolver reverb effect to explosion SFX for depth *(short procedural impulse response mixed into explosion wet path)*
 - [x] **Credit pickup sound**: a satisfying "cha-ching" style SFX when credits are collected from harvesters *(harvester ticks call sfxCredit)*
 
@@ -433,7 +441,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 ### 12.2 New Wave Events
 - [ ] **"Blitz" waves**: all enemies spawn simultaneously (no stagger) — tests AoE capability
 - [ ] **"Silence" waves**: no new enemies, but existing surviving enemies get healed to full — tests cleanup efficiency
-- [ ] **"Escalation" sub-events**: mid-wave reinforcement drops at the 50% enemy-killed mark — keeps waves from winding down too early
+- [x] **"Escalation" sub-events**: mid-wave reinforcement drops once per wave from wave 3 onward near the 65% enemy-killed mark *(spawns 2 + waveIndex/2 reinforcements of the wave's dominant enemy type at a random spawner)*
 - [ ] **"Boss Rush"**: wave 15 sends all unique enemy types in sequence — a gauntlet finale
 
 ### 12.3 Environmental Hazards
@@ -522,8 +530,8 @@ Juice is the difference between "functional" and "epic." Every action should hav
 ### Phase 4 — Content & Meta
 1. Sector 2 map + theme
 2. Research tree visual overhaul
-3. Adaptive music layers
-4. Spatial audio (pannerNode)
+3. Adaptive music layers (done)
+4. Spatial audio panning (done)
 5. Run journal / history
 6. Daily challenge / seeded runs
 7. New tower types (Reflector, Amplifier)
@@ -542,4 +550,4 @@ Juice is the difference between "functional" and "epic." Every action should hav
 ---
 
 *Total improvement items: ~150 discrete tasks across 14 categories.*
-*Document version: 1.0 — 2026-04-24*
+*Document version: 1.1 — 2026-04-25*
