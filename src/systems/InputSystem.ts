@@ -70,6 +70,19 @@ export class InputSystem {
   private onClick(e: MouseEvent): void {
     if (!this.isBuildingState()) return;
     const cell = this.cellFromEvent(e);
+
+    // Kill zone designation: set the clicked cell as the kill zone.
+    if (this.game.core.killZoneMode) {
+      this.game.core.killZone = { c: cell.c, r: cell.r };
+      this.game.core.killZoneMode = false;
+      const px = (cell.c + 0.5) * TILE_SIZE;
+      const py = (cell.r + 0.5) * TILE_SIZE;
+      this.game.particles.spawnFloatingText(px, py - 20, "KILL ZONE SET", "#ff9800", 1.2, 12);
+      this.game.particles.spawnRing(px, py, 28, "#ff9800");
+      this.game.bus.emit("killzone:set", this.game.core.killZone);
+      return;
+    }
+
     if (this.selectedTowerType) {
       this.tryBuild(cell, e.shiftKey);
       return;
@@ -227,6 +240,22 @@ export class InputSystem {
       case "KeyH":
         this.game.core.showHeatmap = !this.game.core.showHeatmap;
         e.preventDefault();
+        break;
+      case "KeyK":
+        if (this.isBuildingState()) {
+          this.game.core.killZoneMode = !this.game.core.killZoneMode;
+          e.preventDefault();
+        }
+        break;
+      case "KeyT":
+        if (this.game.state === "WAVE_ACTIVE" && this.game.core.upgrades.tacticalPause && this.game.core.tacticalPauseCharges > 0) {
+          this.game.core.tacticalPauseCharges--;
+          this.game.core.slowMoScale = 0.28;
+          this.game.core.slowMo = 3.0;
+          this.game.particles.spawnScreenFlash("#b3e5fc", 0.22, 0.35);
+          this.game.particles.spawnFloatingText(this.game.grid.corePos.x, this.game.grid.corePos.y - 30, "TACTICAL PAUSE", "#b3e5fc", 1.8, 12);
+          e.preventDefault();
+        }
         break;
     }
   }

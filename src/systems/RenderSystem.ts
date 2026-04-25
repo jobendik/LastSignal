@@ -92,6 +92,7 @@ export class RenderSystem {
     if (this.game.core.debug.showFlow) this.drawFlowDebug(ctx);
     this.drawPathPreview(ctx);
     if (this.game.core.showHeatmap) this.drawHeatmap(ctx);
+    this.drawKillZone(ctx);
     this.drawCore(ctx);
     this.drawDamageZones(ctx);
     this.drawScorchDecals(ctx);
@@ -129,6 +130,7 @@ export class RenderSystem {
       this.drawChromaticAberration(ctx);
     }
     this.drawScreenFlashes(ctx);
+    this.drawPlanningTimerArc(ctx);
   }
 
   private buildLightLayer(): void {
@@ -373,26 +375,96 @@ export class RenderSystem {
         const x = c * TILE_SIZE;
         const y = r * TILE_SIZE;
         if (k === CellKind.Rock) {
+          // Deterministic varied polygon per tile.
+          const rng = (n: number) => Math.abs(Math.sin((c * 31 + r * 17) * 13.7 + n * 7.3));
+          const cx = x + TILE_SIZE / 2;
+          const cy = y + TILE_SIZE / 2;
+          const pts = 7;
+          ctx.beginPath();
+          for (let i = 0; i < pts; i++) {
+            const ang = (i / pts) * Math.PI * 2 - Math.PI / 2 + rng(i + 20) * 0.3;
+            const rad = 8 + rng(i) * 5;
+            const px = cx + Math.cos(ang) * rad;
+            const py = cy + Math.sin(ang) * rad;
+            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+          }
+          ctx.closePath();
           ctx.fillStyle = "#232a33";
-          ctx.fillRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+          ctx.fill();
           ctx.strokeStyle = "#0e1216";
-          ctx.strokeRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          // Highlight edge.
+          ctx.beginPath();
+          for (let i = 0; i < 2; i++) {
+            const ang = (i / pts) * Math.PI * 2 - Math.PI / 2 + rng(i + 20) * 0.3;
+            const rad = 8 + rng(i) * 5;
+            const px = cx + Math.cos(ang) * rad;
+            const py = cy + Math.sin(ang) * rad;
+            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+          }
+          ctx.strokeStyle = "rgba(70, 90, 110, 0.5)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
         } else if (k === CellKind.Crystal) {
+          const cx = x + TILE_SIZE / 2;
+          const cy = y + TILE_SIZE / 2;
+          const rot = this.game.time.elapsed * 0.45 + (c * 7 + r * 13) * 0.9;
           ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(rot);
           ctx.fillStyle = "#00e676";
-          ctx.globalAlpha = 0.7;
+          ctx.globalAlpha = 0.72;
           ctx.shadowBlur = 12;
           ctx.shadowColor = "#00e676";
           ctx.beginPath();
-          const cx = x + TILE_SIZE / 2;
-          const cy = y + TILE_SIZE / 2;
-          ctx.moveTo(cx, cy - 8);
-          ctx.lineTo(cx + 6, cy);
-          ctx.lineTo(cx, cy + 8);
-          ctx.lineTo(cx - 6, cy);
+          ctx.moveTo(0, -8);
+          ctx.lineTo(6, 0);
+          ctx.lineTo(0, 8);
+          ctx.lineTo(-6, 0);
           ctx.closePath();
           ctx.fill();
+          // Inner bright core.
+          ctx.globalAlpha = 0.45;
+          ctx.beginPath();
+          ctx.moveTo(0, -4);
+          ctx.lineTo(3, 0);
+          ctx.lineTo(0, 4);
+          ctx.lineTo(-3, 0);
+          ctx.closePath();
+          ctx.fillStyle = "#b9f6ca";
+          ctx.fill();
           ctx.restore();
+        }
+      }
+    }
+
+    // Ambient occlusion: dark shadow on tiles adjacent to rocks.
+    const AO_DEPTH = 12;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const k = grid.cells[grid.idx(c, r)];
+        if (k !== CellKind.Rock && k !== CellKind.Crystal) continue;
+        // For each neighbor open tile, paint a shadow gradient at the shared edge.
+        const checks = [[-1, 0], [1, 0], [0, -1], [0, 1]] as const;
+        for (const [dc, dr] of checks) {
+          const nc = c + dc;
+          const nr = r + dr;
+          if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+          const nk = grid.cells[grid.idx(nc, nr)];
+          if (nk === CellKind.Rock || nk === CellKind.Crystal) continue;
+          const nx = nc * TILE_SIZE;
+          const ny = nr * TILE_SIZE;
+          // Shadow source (at the shared edge, facing into the open tile).
+          const sx = nx + (dc === -1 ? TILE_SIZE : 0);
+          const sy = ny + (dr === -1 ? TILE_SIZE : 0);
+          const ex = sx + dc * -AO_DEPTH;
+          const ey = sy + dr * -AO_DEPTH;
+          const aoGrd = ctx.createLinearGradient(sx, sy, ex, ey);
+          aoGrd.addColorStop(0, "rgba(0,0,0,0.4)");
+          aoGrd.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = aoGrd;
+          ctx.fillRect(nx, ny, TILE_SIZE, TILE_SIZE);
         }
       }
     }
@@ -779,6 +851,40 @@ export class RenderSystem {
       ctx.arc(0, 0, 12, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
+    } else if (t.type === "amplifier") {
+      // Octagonal base.
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
+        const rad = 8;
+        const px = Math.cos(a) * rad;
+        const py = Math.sin(a) * rad;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      // Three rotating signal rings pulsing outward.
+      const ampBoost = t.flags.resonanceCore ? 0.25 : 0.15;
+      const ringR = t.flags.resonanceCore ? 2 : 1;
+      const ringCount = 3;
+      for (let i = 0; i < ringCount; i++) {
+        const phase = (elapsed * 1.4 + i * (1 / ringCount)) % 1;
+        const r2 = 10 + phase * (ringR === 2 ? 60 : 30);
+        const alpha = (1 - phase) * 0.55;
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = t.def.color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(0, 0, r2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // Center label.
+      ctx.fillStyle = t.def.color;
+      ctx.font = "bold 7px Courier New";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`+${Math.round(ampBoost * 100)}%`, 0, 0);
     } else {
       ctx.fillRect(-3 - (t.recoil || 0), -7, 14, 14);
     }
@@ -1027,17 +1133,51 @@ export class RenderSystem {
         }
         break;
       }
-      case "weaver":
+      case "weaver": {
+        // Pulsing body.
+        const weavePulse = 0.85 + Math.sin(e.timer * 3.5) * 0.15;
         ctx.beginPath();
-        ctx.arc(0, 0, e.size, 0, Math.PI * 2);
+        ctx.arc(0, 0, e.size * weavePulse, 0, Math.PI * 2);
         ctx.fill();
+        // Outer glow ring.
+        ctx.globalAlpha = 0.3 + Math.sin(e.timer * 2.8) * 0.1;
         ctx.strokeStyle = "#ff80ab";
-        ctx.setLineDash([2, 2]);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, e.size * 1.6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        // 3 orbiting heal orbs.
+        const healPhase = 1 - Math.max(0, e.healCooldown) / 1.35;
+        const orbitR = e.size + 7;
+        for (let hi = 0; hi < 3; hi++) {
+          const baseAng = e.timer * 1.8 + hi * (Math.PI * 2 / 3);
+          const orbX = Math.cos(baseAng) * orbitR;
+          const orbY = Math.sin(baseAng) * orbitR;
+          // Orbs fly outward briefly during heal.
+          const flyDist = healPhase > 0.8 ? (healPhase - 0.8) / 0.2 * 30 : 0;
+          const flyX = orbX + Math.cos(baseAng) * flyDist;
+          const flyY = orbY + Math.sin(baseAng) * flyDist;
+          ctx.fillStyle = "#ff80ab";
+          ctx.globalAlpha = 0.7 + Math.sin(e.timer * 4 + hi) * 0.15;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = "#ff80ab";
+          ctx.beginPath();
+          ctx.arc(flyX, flyY, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        // Heal range indicator (dimmed dashed ring).
+        ctx.strokeStyle = "rgba(255,128,171,0.2)";
+        ctx.setLineDash([2, 3]);
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(0, 0, 80, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
         break;
+      }
       case "phantom": {
         ctx.beginPath();
         ctx.arc(0, 0, e.size, 0, Math.PI * 2);
@@ -1064,11 +1204,30 @@ export class RenderSystem {
         }
         break;
       }
-      case "carrier":
+      case "carrier": {
+        // Main body — wide rectangular hull.
         ctx.fillRect(-e.size, -e.size * 0.7, e.size * 2, e.size * 1.4);
+        // Hatch: opens as HP drops (wider gap at lower HP).
+        const hatchPct = 1 - Math.max(0, e.hp / e.maxHp);
+        const hatchOpen = hatchPct * e.size * 0.8;
         ctx.fillStyle = "#ff8a65";
-        ctx.fillRect(-4, -4, 8, 8);
+        // Top hatch panel.
+        ctx.fillRect(-5, -e.size * 0.7 + 1, 10, e.size * 0.4 - hatchOpen);
+        // Bottom hatch panel.
+        ctx.fillRect(-5, hatchOpen * 0.5, 10, e.size * 0.4 - hatchOpen * 0.5);
+        // Scout dots inside the hatch bay.
+        const scoutCount = Math.max(0, Math.round(3 * (1 - hatchPct)));
+        for (let si = 0; si < scoutCount; si++) {
+          const sy = -e.size * 0.2 + si * 5;
+          ctx.fillStyle = "#ff5252";
+          ctx.globalAlpha = 0.7;
+          ctx.beginPath();
+          ctx.arc(0, sy, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
         break;
+      }
       case "leviathan": {
         // Multi-segment rotating rings.
         const ringData = [
@@ -1647,6 +1806,55 @@ export class RenderSystem {
     }
   }
 
+  private drawPlanningTimerArc(ctx: CanvasRenderingContext2D): void {
+    if (this.game.state !== "PLANNING") return;
+    const w = this.game.waves;
+    if (w.planningCountdown <= 0 || !w.hasMoreWaves) return;
+
+    const pct = Math.max(0, Math.min(1, w.planningCountdown / w.planningDuration));
+    const secs = Math.ceil(w.planningCountdown);
+    const cx = VIEW_WIDTH / 2;
+    const cy = 28;
+    const R = 20;
+    const start = -Math.PI / 2;
+    const end = start + Math.PI * 2 * pct;
+    const color = pct < 0.25 ? "#f44336" : pct < 0.5 ? "#ffb300" : "#66fcf1";
+
+    ctx.save();
+
+    // Track ring (dimmed).
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.1)";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Filled arc.
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, start, end);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = color;
+    ctx.stroke();
+
+    // Center number.
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = color;
+    ctx.font = "bold 11px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${secs}`, cx, cy);
+
+    // Label above arc.
+    ctx.fillStyle = "rgba(200,230,255,0.55)";
+    ctx.font = "8px 'Courier New', monospace";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("AUTO-START", cx, cy - R - 4);
+
+    ctx.restore();
+  }
+
   private drawBuildSynergyHighlights(ctx: CanvasRenderingContext2D): void {
     const type = this.game.input.selectedTowerType;
     if (!type) return;
@@ -1696,6 +1904,9 @@ export class RenderSystem {
     if ((type === "barrier" && tower.type === "harvester") || (type === "harvester" && tower.type === "barrier")) return 1;
     if (type !== "harvester" && tower.type === "harvester" && tower.flags.relayNode) return 3;
     if (type === "harvester" && !tower.isEco) return 3;
+    // Amplifier boosts adjacent towers.
+    if (type === "amplifier" && tower.type !== "amplifier" && tower.type !== "harvester") return 1;
+    if (tower.type === "amplifier" && type !== "amplifier" && type !== "harvester") return 1;
     return 0;
   }
 
@@ -1735,7 +1946,7 @@ export class RenderSystem {
     ctx.arc(0, 0, 10, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = ok ? 0.38 : 0.5;
-    if (t === "mortar" || t === "barrier") {
+    if (t === "mortar" || t === "barrier" || t === "amplifier") {
       ctx.strokeRect(-9, -9, 18, 18);
     } else if (t === "tesla" || t === "stasis") {
       ctx.beginPath();
@@ -1822,6 +2033,74 @@ export class RenderSystem {
       ctx.stroke();
     }
     ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  private drawKillZone(ctx: CanvasRenderingContext2D): void {
+    const kz = this.game.core.killZone;
+    const kzMode = this.game.core.killZoneMode;
+    const t = this.game.time.elapsed;
+
+    if (kzMode) {
+      // Show hover cell indicator when in kill zone designation mode.
+      const over = this.game.input.overCell;
+      if (over) {
+        const x = over.c * TILE_SIZE, y = over.r * TILE_SIZE;
+        ctx.save();
+        const pulse = 0.55 + 0.35 * Math.sin(t * 8);
+        ctx.strokeStyle = `rgba(255, 152, 0, ${pulse})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        ctx.setLineDash([]);
+        ctx.fillStyle = `rgba(255, 152, 0, ${pulse * 0.18})`;
+        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "9px Courier New";
+        ctx.textAlign = "center";
+        ctx.fillText("KILL ZONE [K]", VIEW_WIDTH / 2, VIEW_HEIGHT - 8);
+        ctx.restore();
+      }
+      return;
+    }
+
+    if (!kz) return;
+
+    const x = kz.c * TILE_SIZE, y = kz.r * TILE_SIZE;
+    const pulse = 0.5 + 0.35 * Math.sin(t * 4);
+    ctx.save();
+
+    // Fill.
+    ctx.fillStyle = `rgba(255, 152, 0, ${0.12 + pulse * 0.08})`;
+    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+    // Animated border.
+    ctx.strokeStyle = `rgba(255, 152, 0, ${0.6 + pulse * 0.35})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+
+    // Corner brackets.
+    const s = 5;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#ffb300";
+    [[x, y], [x + TILE_SIZE, y], [x, y + TILE_SIZE], [x + TILE_SIZE, y + TILE_SIZE]].forEach(([cx, cy], idx) => {
+      const dx = idx % 2 === 0 ? 1 : -1;
+      const dy = idx < 2 ? 1 : -1;
+      ctx.beginPath();
+      ctx.moveTo(cx! + dx * s, cy!);
+      ctx.lineTo(cx!, cy!);
+      ctx.lineTo(cx!, cy! + dy * s);
+      ctx.stroke();
+    });
+
+    // "+20%" label in center of tile.
+    ctx.fillStyle = `rgba(255, 179, 0, ${0.7 + pulse * 0.25})`;
+    ctx.font = "bold 9px Courier New";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("+20%", x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+    ctx.textBaseline = "alphabetic";
+
     ctx.restore();
   }
 

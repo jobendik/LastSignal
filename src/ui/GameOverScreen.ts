@@ -3,7 +3,26 @@ import { el, clear } from "./dom";
 
 function statsSummary(g: Game): string {
   const s = g.core.stats;
+  const p = g.core.profile;
+  const sector = g.core.sector;
   const rows: string[] = [];
+
+  // High score comparison.
+  const currentWave = g.core.waveIndex;
+  const bestWave = p.bestWaveReached;
+  if (bestWave > 0 && currentWave > 0) {
+    const diff = currentWave - bestWave;
+    const cmp = diff > 0
+      ? `<span style="color:#66bb6a">▲ +${diff} above personal best</span>`
+      : diff < 0
+      ? `<span style="color:#ef9a9a">▼ ${Math.abs(diff)} below personal best (${bestWave})</span>`
+      : `<span style="color:#ffb300">= Personal best</span>`;
+    rows.push(`Wave reached: <b>${currentWave}</b> ${cmp}`);
+  } else {
+    rows.push(`Wave reached: <b>${currentWave}</b>`);
+  }
+  if (sector) rows.push(`Core remaining: <b>${Math.round(g.core.coreIntegrity / g.core.coreMax * 100)}%</b>`);
+
   rows.push(`Enemies destroyed: <b>${s.enemiesKilled}</b>`);
   rows.push(`Credits earned: <b>${s.creditsEarned}</b>`);
   rows.push(`Credits spent: <b>${s.creditsSpent}</b>`);
@@ -16,8 +35,73 @@ function statsSummary(g: Game): string {
     .slice(0, 3)
     .map(([k, v]) => `${k}: ${v}`)
     .join(" · ");
-  if (topKills) rows.push(`Kills: ${topKills}`);
+  if (topKills) rows.push(`Top kills: ${topKills}`);
   return rows.map((r) => `<div>${r}</div>`).join("");
+}
+
+/** Canvas-based pixelation disintegration drawn on top of the game canvas. */
+function runDisintegration(canvas: HTMLCanvasElement, onDone: () => void): void {
+  const overlay = document.createElement("canvas");
+  overlay.width = canvas.width;
+  overlay.height = canvas.height;
+  overlay.style.cssText = `
+    position:absolute; inset:0; pointer-events:none;
+    z-index:99; width:100%; height:100%;
+  `;
+  canvas.parentElement?.appendChild(overlay);
+  const ctx = overlay.getContext("2d")!;
+
+  // Capture current frame.
+  ctx.drawImage(canvas, 0, 0);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  let blockSize = 2;
+  let frame = 0;
+  const totalFrames = 38;
+
+  const tick = () => {
+    frame++;
+    const progress = frame / totalFrames;
+    blockSize = 2 + Math.floor(progress * progress * 28);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw pixelated blocks from original image.
+    for (let y = 0; y < canvas.height; y += blockSize) {
+      for (let x = 0; x < canvas.width; x += blockSize) {
+        // Skip some blocks for dissolution effect.
+        if (Math.random() < progress * 0.65) continue;
+        const px = (Math.floor(y / blockSize) * blockSize * canvas.width + Math.floor(x / blockSize) * blockSize) * 4;
+        const r = imageData.data[px] ?? 0;
+        const g = imageData.data[px + 1] ?? 0;
+        const b = imageData.data[px + 2] ?? 0;
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x, y, blockSize, blockSize);
+      }
+    }
+
+    // Add red scan-line wash as progress increases.
+    ctx.fillStyle = `rgba(180, 0, 0, ${progress * 0.55})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Horizontal glitch bars.
+    if (Math.random() < progress * 0.7) {
+      const glitchY = Math.floor(Math.random() * canvas.height);
+      const glitchH = 2 + Math.floor(Math.random() * 8);
+      const glitchShift = (Math.random() - 0.5) * 30 * progress;
+      ctx.drawImage(canvas, 0, glitchY, canvas.width, glitchH,
+        glitchShift, glitchY, canvas.width, glitchH);
+    }
+
+    if (frame < totalFrames) {
+      requestAnimationFrame(tick);
+    } else {
+      overlay.remove();
+      onDone();
+    }
+  };
+
+  requestAnimationFrame(tick);
 }
 
 export class GameOverScreen {
@@ -27,21 +111,36 @@ export class GameOverScreen {
   }
   refresh(): void {
     clear(this.el);
-    this.el.append(
-      el("div", { class: "ls-overlay-title", text: "CORE OFFLINE" }),
-      el("div", { class: "ls-overlay-subtitle", text: "The signal has been lost." }),
-      el("div", { class: "ls-stats", html: statsSummary(this.game) }),
-    );
-    const row = el("div", { class: "ls-overlay-actions" });
-    const retry = el("button", { class: "ls-btn ls-btn-primary", text: "Retry Sector" });
-    retry.onclick = () => {
-      const s = this.game.core.sector;
-      if (s) this.game.beginSector(s);
+    const content = () => {
+      this.el.append(
+        el("div", { class: "ls-overlay-title ls-gameover-title", text: "CORE OFFLINE" }),
+        el("div", { class: "ls-overlay-subtitle", text: "The signal has been lost." }),
+        el("div", { class: "ls-stats", html: statsSummary(this.game) }),
+      );
+      const row = el("div", { class: "ls-overlay-actions" });
+      const retry = el("button", { class: "ls-btn ls-btn-primary", text: "Retry Sector" });
+      retry.onclick = () => {
+        const s = this.game.core.sector;
+        if (s) this.game.beginSector(s);
+      };
+      const menu = el("button", { class: "ls-btn", text: "Main Menu" });
+      menu.onclick = () => this.game.returnToMenu();
+      row.append(retry, menu);
+      this.el.append(row);
     };
-    const menu = el("button", { class: "ls-btn", text: "Main Menu" });
-    menu.onclick = () => this.game.returnToMenu();
-    row.append(retry, menu);
-    this.el.append(row);
+
+    if (this.game.core.settings.reducedMotion) {
+      content();
+      return;
+    }
+
+    // Briefly hide the overlay while the disintegration plays, then reveal.
+    this.el.style.opacity = "0";
+    runDisintegration(this.game.canvas, () => {
+      content();
+      this.el.style.opacity = "";
+      this.el.classList.add("ls-gameover-enter");
+    });
   }
 }
 
@@ -52,7 +151,20 @@ export class VictoryScreen {
   }
   refresh(): void {
     clear(this.el);
-    this.el.append(
+
+    // Ripple rings element (CSS-animated).
+    if (!this.game.core.settings.reducedMotion) {
+      const ripples = el("div", { class: "ls-victory-ripples" });
+      for (let i = 0; i < 3; i++) {
+        const ring = el("div", { class: "ls-victory-ring" });
+        ring.style.animationDelay = `${i * 0.4}s`;
+        ripples.append(ring);
+      }
+      this.el.append(ripples);
+    }
+
+    const content = el("div", { class: "ls-victory-content" });
+    content.append(
       el("div", { class: "ls-overlay-title", text: "SIGNAL HELD" }),
       el("div", { class: "ls-overlay-subtitle", text: "The Leviathan is destroyed. The relay endures." }),
       el("div", { class: "ls-stats", html: statsSummary(this.game) }),
@@ -63,6 +175,7 @@ export class VictoryScreen {
     const menu = el("button", { class: "ls-btn", text: "Main Menu" });
     menu.onclick = () => this.game.returnToMenu();
     row.append(again, menu);
-    this.el.append(row);
+    content.append(row);
+    this.el.append(content);
   }
 }

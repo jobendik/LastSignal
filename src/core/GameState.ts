@@ -22,6 +22,8 @@ export interface UpgradeAggregate {
   sellRefundMul: number;
   lowCoreFireRateMul: number;
   lowCoreThreshold: number;
+  /** Whether the player has the Tactical Pause upgrade (1 slow-mo per wave). */
+  tacticalPause: boolean;
   appliedUpgradeIds: string[];
 }
 
@@ -44,6 +46,7 @@ export function createEmptyUpgradeAggregate(): UpgradeAggregate {
     sellRefundMul: 0.5,
     lowCoreFireRateMul: 1,
     lowCoreThreshold: 0,
+    tacticalPause: false,
     appliedUpgradeIds: [],
   };
 }
@@ -89,6 +92,18 @@ export interface GameCoreState {
   activeModifiers: RunModifier[];
   /** Seconds of simulation freeze remaining after a big kill (hit-stop effect). */
   hitStopTimer: number;
+  /** Whether the one-per-sector tower recall ability has been used. */
+  towerRecallUsed: boolean;
+  /** Player-designated kill zone tile: all enemies on this cell take +20% damage. Cleared at each wave start. */
+  killZone: { c: number; r: number } | null;
+  /** While true, the next map click designates the kill zone rather than selecting/placing. */
+  killZoneMode: boolean;
+  /** Extra reward cards to show at the next reward screen (from milestone achievements). */
+  bonusUpgradeCount: number;
+  /** Milestone IDs already achieved this run (prevents re-triggering). */
+  achievedMilestones: Set<string>;
+  /** Number of Tactical Pause slow-mo uses remaining this wave. */
+  tacticalPauseCharges: number;
 }
 
 export function createEmptyStats(): RunStats {
@@ -140,4 +155,5 @@ export function applyUpgradeEffect(
   if (effect.lowCoreThreshold != null) {
     agg.lowCoreThreshold = Math.max(agg.lowCoreThreshold, effect.lowCoreThreshold);
   }
+  if (effect.tacticalPause) agg.tacticalPause = true;
 }

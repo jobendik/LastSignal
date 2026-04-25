@@ -100,6 +100,26 @@ export class TowerSystem {
     this.game.bus.emit("tower:sold", t);
   }
 
+  /** One-per-sector tower recall: refunds 100% of invested credits. */
+  recall(t: Tower): boolean {
+    if (this.game.core.towerRecallUsed) return false;
+    const refund = t.totalInvested;
+    this.game.core.credits += refund;
+    const def = t.def;
+    this.game.grid.removeTower(t.c, t.r, Boolean(def.requiresCrystal));
+    this.list = this.list.filter((x) => x !== t);
+    if (this.selected === t) this.selected = null;
+    this.game.core.towerRecallUsed = true;
+    this.game.audio.sfxSell(t.pos);
+    this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 28, `RECALLED +${refund}`, "#66fcf1", 1.5, 13);
+    this.game.particles.spawnBurst(t.pos.x, t.pos.y, "#66fcf1", 18, { speed: 140, life: 0.7, size: 3 });
+    this.game.particles.spawnRing(t.pos.x, t.pos.y, 24, "#66fcf1");
+    this.game.particles.spawnRing(t.pos.x, t.pos.y, 44, "#ffffff");
+    this.game.bus.emit("credits:changed", this.game.core.credits);
+    this.game.bus.emit("tower:sold", t);
+    return true;
+  }
+
   applySpecialization(t: Tower, specId: string): void {
     t.applySpecialization(specId);
     this.game.bus.emit("tower:specialized", t);
@@ -152,7 +172,7 @@ export class TowerSystem {
 
   unlockWave(type: TowerType): number {
     if (type === "railgun") return 6;
-    if (type === "tesla" || type === "mortar" || type === "flamer" || type === "barrier") return 3;
+    if (type === "tesla" || type === "mortar" || type === "flamer" || type === "barrier" || type === "amplifier") return 3;
     return 1;
   }
 
@@ -257,6 +277,9 @@ export class TowerSystem {
         continue;
       }
 
+      // Amplifier: purely passive — no firing, no update needed.
+      if (t.type === "amplifier") continue;
+
       // Flamer heat management.
       if (t.type === "flamer") {
         t.heatTimer = Math.max(0, t.heatTimer - dt * 0.6);
@@ -274,6 +297,12 @@ export class TowerSystem {
       }
       // Jammer aura: nearby Jammer enemies suppress fire rate by 30%.
       if (this.isInJammerAura(t)) fireRateMul *= 0.7;
+      // Amplifier Overclock specialization: adjacent amplifiers with overclockAdjacent give +10% fire rate.
+      for (const amp of this.list) {
+        if (amp.type === "amplifier" && amp.flags.overclockAdjacent) {
+          if (Math.max(Math.abs(amp.c - t.c), Math.abs(amp.r - t.r)) <= 1) fireRateMul *= 1.1;
+        }
+      }
 
       const stats = this.effectiveStats(t);
       const target = this.findTarget(t, stats.range);

@@ -1,17 +1,21 @@
 import type { Game } from "../core/Game";
+import type { SectorDefinition } from "../core/Types";
 import { sectorDefinitions } from "../data/sectors";
 import { difficultyDefinitions, difficultyOrder } from "../data/difficulty";
+import { loadoutDefinitions, type LoadoutDefinition } from "../data/loadouts";
 import { el, clear } from "./dom";
 
 export class SectorSelect {
   el: HTMLElement;
   private endlessRequested = false;
+  private pendingSector: SectorDefinition | null = null;
 
   constructor(private readonly game: Game) {
     this.el = el("div", { class: "ls-panel ls-sector-select" });
   }
 
   refresh(): void {
+    this.pendingSector = null;
     clear(this.el);
     this.el.append(
       el("div", { class: "ls-title", text: "Select Sector" }),
@@ -32,8 +36,7 @@ export class SectorSelect {
           html: `<span>${s.waves.length} waves</span> · <span>Core ${s.coreIntegrity}</span> · <span>Credits ${s.startingCredits}</span>`,
         })
       );
-      card.onclick = () =>
-        this.game.beginSector(s, { endless: this.endlessRequested });
+      card.onclick = () => this.showLoadoutPicker(s);
       grid.append(card);
     }
     this.el.append(grid);
@@ -66,6 +69,48 @@ export class SectorSelect {
     research.onclick = () => this.game.ui.openMeta();
     buttons.append(back, research);
     this.el.append(buttons);
+  }
+
+  private showLoadoutPicker(sector: SectorDefinition): void {
+    this.pendingSector = sector;
+    clear(this.el);
+
+    this.el.append(
+      el("div", { class: "ls-title ls-title-sm", text: "CHOOSE LOADOUT" }),
+      el("div", { class: "ls-subtitle", text: `Deploying to: ${sector.name}` })
+    );
+
+    const grid = el("div", { class: "ls-loadout-grid" });
+    for (const loadout of loadoutDefinitions) {
+      grid.append(this.buildLoadoutCard(loadout, sector));
+    }
+    this.el.append(grid);
+
+    const backBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "← Back to Sectors" });
+    backBtn.onclick = () => this.refresh();
+    const wrap = el("div", { class: "ls-sector-buttons" });
+    wrap.append(backBtn);
+    this.el.append(wrap);
+  }
+
+  private buildLoadoutCard(loadout: LoadoutDefinition, sector: SectorDefinition): HTMLElement {
+    const card = el("button", { class: "ls-loadout-card" });
+    card.style.setProperty("--loadout-color", loadout.accentColor);
+    card.style.borderColor = loadout.accentColor;
+
+    card.append(
+      el("div", { class: "ls-loadout-name", text: loadout.name }),
+      el("div", { class: "ls-loadout-desc", text: loadout.description }),
+      el("div", { class: "ls-loadout-detail", text: loadout.detail }),
+      el("div", { class: "ls-loadout-flavor", text: `"${loadout.flavor}"` })
+    );
+    card.onclick = () => {
+      this.game.beginSector(sector, {
+        endless: this.endlessRequested,
+        loadoutId: loadout.id,
+      });
+    };
+    return card;
   }
 
   private buildDifficultyPicker(): HTMLElement {

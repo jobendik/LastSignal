@@ -37,7 +37,8 @@ export type TowerType =
   | "harvester"
   | "railgun"
   | "flamer"
-  | "barrier";
+  | "barrier"
+  | "amplifier";
 
 /** How a tower selects its next target. */
 export type TargetMode = "closest_to_core" | "weakest" | "strongest" | "fastest";
@@ -84,7 +85,9 @@ export type TowerFlag =
   | "crystalStabilizer"
   | "relayNode"
   | "signalMarker"
-  | "deflectorGrid";
+  | "deflectorGrid"
+  | "resonanceCore"
+  | "overclockAdjacent";
 
 export interface TowerMod {
   rangeMul?: number;
@@ -226,9 +229,11 @@ export interface UpgradeEffect {
   sellRefundMul?: number;
   lowCoreFireRateMul?: number;
   lowCoreThreshold?: number;
+  /** Grants the Tactical Pause ability (1 slow-mo per wave). */
+  tacticalPause?: boolean;
 }
 
-export type UpgradeRarity = "common" | "uncommon" | "rare" | "legendary";
+export type UpgradeRarity = "common" | "uncommon" | "rare" | "legendary" | "cursed";
 
 export interface UpgradeDefinition {
   id: string;
@@ -238,6 +243,8 @@ export interface UpgradeDefinition {
   rarity?: UpgradeRarity;
   synergyHint?: string;
   effect: UpgradeEffect;
+  /** If set, choosing this upgrade also adds a permanent debuff modifier for the rest of the run. */
+  curse?: RunModifier;
 }
 
 // ---------- Drones ----------

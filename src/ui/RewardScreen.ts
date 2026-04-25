@@ -1,5 +1,26 @@
 import type { Game } from "../core/Game";
+import type { UpgradeDefinition } from "../core/Types";
 import { el, clear } from "./dom";
+
+function buildCard(u: UpgradeDefinition, idx: number, onClick: () => void): HTMLElement {
+  const rarity = u.rarity ?? "common";
+  const card = el("button", { class: `ls-reward-card ${rarity}` });
+  card.style.animationDelay = `${idx * 0.15}s`;
+  card.append(
+    el("div", { class: "ls-reward-rarity", text: rarity.toUpperCase() }),
+    el("div", { class: "ls-reward-name", text: u.name }),
+    el("div", { class: "ls-reward-target", text: u.target.toUpperCase() }),
+    el("div", { class: "ls-reward-desc", text: u.description }),
+  );
+  if (u.rarity === "cursed" && u.curse) {
+    const warning = el("div", { class: "ls-reward-curse-warn", text: `⚠ CURSE: ${u.curse.description}` });
+    card.append(warning);
+  } else if (u.synergyHint) {
+    card.append(el("div", { class: "ls-reward-hint", text: u.synergyHint }));
+  }
+  card.onclick = onClick;
+  return card;
+}
 
 /** Full-screen overlay shown at reward-eligible wave ends. */
 export class RewardScreen {
@@ -14,25 +35,34 @@ export class RewardScreen {
       el("div", { class: "ls-overlay-title", text: "SIGNAL UPGRADE" }),
       el("div", { class: "ls-overlay-subtitle", text: "Choose one upgrade to persist through the rest of this run." }),
     );
+
     const row = el("div", { class: "ls-reward-row" });
     this.game.rewards.currentChoices.forEach((u, i) => {
-      const rarity = u.rarity ?? "common";
-      const card = el("button", { class: `ls-reward-card ${rarity}` });
-      card.style.animationDelay = `${i * 0.15}s`;
-      card.append(
-        el("div", { class: "ls-reward-rarity", text: rarity.toUpperCase() }),
-        el("div", { class: "ls-reward-name", text: u.name }),
-        el("div", { class: "ls-reward-target", text: u.target.toUpperCase() }),
-        el("div", { class: "ls-reward-desc", text: u.description }),
-        el("div", { class: "ls-reward-hint", text: u.synergyHint ?? "" }),
-      );
-      card.onclick = () => {
+      row.append(buildCard(u, i, () => {
         this.game.rewards.choose(u.id);
         this.game.waves.goToNextOrVictory();
-      };
-      row.append(card);
+      }));
       window.setTimeout(() => this.game.audio.sfxCardFlip(), i * 150);
     });
+
+    // Cursed card shown in a separate section after the main choices.
+    const curse = this.game.rewards.currentCurse;
+    if (curse) {
+      const divider = el("div", { class: "ls-reward-divider" });
+      divider.append(
+        el("span", { class: "ls-reward-divider-line" }),
+        el("span", { class: "ls-reward-divider-text", text: "OR MAKE A DEAL" }),
+        el("span", { class: "ls-reward-divider-line" }),
+      );
+      row.append(divider);
+      const cardIdx = this.game.rewards.currentChoices.length;
+      row.append(buildCard(curse, cardIdx, () => {
+        this.game.rewards.choose(curse.id);
+        this.game.waves.goToNextOrVictory();
+      }));
+      window.setTimeout(() => this.game.audio.sfxCardFlip(), cardIdx * 150);
+    }
+
     this.el.append(row);
 
     const actions = el("div", { class: "ls-overlay-actions" });

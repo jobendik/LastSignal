@@ -1,6 +1,6 @@
 import type { Game } from "../core/Game";
 import type { WaveDefinition, EnemyType, SpawnerDefinition } from "../core/Types";
-import { EARLY_START_BONUS } from "../core/Config";
+import { EARLY_START_BONUS, COLS, ROWS, TILE_SIZE } from "../core/Config";
 
 interface PendingGroup {
   type: EnemyType;
@@ -20,6 +20,9 @@ export class WaveSystem {
   private waveStartCoreDamageTaken = 0;
   private dataCacheTriggered = false;
   private escalationTriggered = false;
+  private chokepointHeat = new Float32Array(COLS * ROWS);
+  private chokepointTriggered = false;
+  private chokepointSampleTimer = 0;
 
   constructor(private readonly game: Game) {}
 
@@ -31,6 +34,9 @@ export class WaveSystem {
     this.waveStartCoreDamageTaken = 0;
     this.dataCacheTriggered = false;
     this.escalationTriggered = false;
+    this.chokepointHeat.fill(0);
+    this.chokepointTriggered = false;
+    this.chokepointSampleTimer = 0;
     this.planningCountdown = 0;
     this.endlessCurrent = null;
   }
@@ -102,12 +108,19 @@ export class WaveSystem {
       );
     }
 
+    // Clear per-wave state.
+    this.game.core.killZone = null;
+    this.game.core.killZoneMode = false;
+
     // Build pending groups.
     this.pending = [];
     this.activeWaveTotals = {};
     this.activeWaveKills = {};
     this.dataCacheTriggered = false;
     this.escalationTriggered = false;
+    this.chokepointHeat.fill(0);
+    this.chokepointTriggered = false;
+    this.chokepointSampleTimer = 0;
     for (const lane of wave.lanes) {
       const spawner = this.game.grid.spawners.find((s) => s.id === lane.spawnerId) ?? this.game.grid.spawners[0];
       if (!spawner) continue;
@@ -129,6 +142,8 @@ export class WaveSystem {
     this.allSpawned = false;
     this.waveStartCoreDamageTaken = this.game.core.stats.coreDamageTaken;
 
+    // Reset per-wave abilities.
+    if (this.game.core.upgrades.tacticalPause) this.game.core.tacticalPauseCharges = 1;
     this.game.setState("WAVE_ACTIVE");
     this.game.audio.sfxWaveStart();
     this.game.bus.emit("wave:started", wave);
@@ -144,6 +159,7 @@ export class WaveSystem {
 
     this.game.addCredits(wave.rewardCredits);
     this.game.economy.onWaveComplete();
+    this.checkMilestones();
     this.game.setState("WAVE_COMPLETE");
     this.game.audio.sfxReward();
     this.game.bus.emit("wave:complete", wave);
@@ -157,8 +173,9 @@ export class WaveSystem {
     setTimeout(() => {
       if (this.game.state !== "WAVE_COMPLETE") return;
       if (wave.rewardChoice) {
-        // Offer upgrade choices.
+        // Offer upgrade choices (and optionally a curse card from wave 2 onward).
         const choices = this.game.rewards.rollChoices(3);
+        this.game.rewards.rollCurseCard();
         if (choices.length > 0) {
           this.game.setState("REWARD_CHOICE");
           return;
@@ -210,6 +227,34 @@ export class WaveSystem {
     }
     this.pending = this.pending.filter((g) => g.remaining > 0);
     this.allSpawned = this.pending.length === 0;
+
+    // Chokepoint tracking: sample enemy positions every 0.5s and accumulate tile heat.
+    if (!this.chokepointTriggered) {
+      this.chokepointSampleTimer += dt;
+      if (this.chokepointSampleTimer >= 0.5) {
+        this.chokepointSampleTimer = 0;
+        for (const e of this.game.enemies.list) {
+          if (!e.active) continue;
+          const c = Math.floor(e.pos.x / TILE_SIZE);
+          const r = Math.floor(e.pos.y / TILE_SIZE);
+          if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+            this.chokepointHeat[r * COLS + c] = (this.chokepointHeat[r * COLS + c] ?? 0) + 1;
+          }
+        }
+        // Check if any tile crossed the chokepoint threshold (10 enemy-samples).
+        let maxHeat = 0, maxIdx = 0;
+        for (let i = 0; i < this.chokepointHeat.length; i++) {
+          if ((this.chokepointHeat[i] ?? 0) > maxHeat) {
+            maxHeat = this.chokepointHeat[i]!;
+            maxIdx = i;
+          }
+        }
+        if (maxHeat >= 10) {
+          this.chokepointTriggered = true;
+          this.spawnChokepointBonus(maxIdx);
+        }
+      }
+    }
   }
 
   recordKill(type: EnemyType): void {
@@ -262,6 +307,55 @@ export class WaveSystem {
       "ESCALATION!", "#ff5252", 2.0, 13
     );
     this.game.bus.emit("wave:escalation", { type, count });
+  }
+
+  private checkMilestones(): void {
+    const c = this.game.core;
+    const achieved = c.achievedMilestones;
+    const coreX = this.game.grid.corePos.x;
+    const coreY = this.game.grid.corePos.y;
+
+    const grant = (id: string, label: string, bonusSlot: boolean) => {
+      if (achieved.has(id)) return;
+      achieved.add(id);
+      if (bonusSlot) c.bonusUpgradeCount++;
+      const cr = bonusSlot ? 0 : 40;
+      if (cr > 0) this.game.addCredits(cr);
+      const detail = bonusSlot ? "BONUS UPGRADE UNLOCKED" : `+${cr}CR`;
+      this.game.particles.spawnFloatingText(coreX, coreY - 40, `✦ ${label}`, "#ffeb3b", 3.0, 13);
+      this.game.particles.spawnFloatingText(coreX, coreY - 24, detail, "#ffffff", 2.5, 11);
+      this.game.particles.spawnRing(coreX, coreY, 55, "#ffeb3b", 0.4);
+      this.game.bus.emit("wave:milestone" as never, { id, label } as never);
+    };
+
+    // "Iron Core": reach wave 5 with core above 85%.
+    if (c.waveIndex >= 4 && c.coreIntegrity / c.coreMax >= 0.85) {
+      grant("iron_core", "IRON CORE", true);
+    }
+    // "Veteran": survive 10 waves.
+    if (c.waveIndex >= 9) {
+      grant("veteran", "VETERAN", true);
+    }
+    // "Economy Engine": earn 500+ total credits by wave 4.
+    if (c.waveIndex >= 3 && c.stats.creditsEarned >= 500) {
+      grant("economy_engine", "ECONOMY ENGINE", false);
+    }
+    // "Destroyer": kill 200+ enemies this run.
+    if (c.stats.enemiesKilled >= 200) {
+      grant("destroyer", "DESTROYER", false);
+    }
+  }
+
+  private spawnChokepointBonus(tileIdx: number): void {
+    const c = tileIdx % COLS;
+    const r = Math.floor(tileIdx / COLS);
+    const x = c * TILE_SIZE + TILE_SIZE / 2;
+    const y = r * TILE_SIZE + TILE_SIZE / 2;
+    const bonus = 25 + Math.floor(this.game.core.waveIndex * 5);
+    this.game.addCredits(bonus);
+    this.game.particles.spawnFloatingText(x, y - 28, `CHOKEPOINT +${bonus}CR`, "#ffab40", 2.5, 13);
+    this.game.particles.spawnRing(x, y, 36, "#ffab40", 0.3);
+    this.game.particles.spawnRing(x, y, 52, "#ffab40", 0.18);
   }
 
   /** Spawner telegraph signs for RenderSystem: groups about to spawn within 1.5s. */

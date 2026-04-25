@@ -345,23 +345,42 @@ export class EnemySystem {
   }
 
   private onBossPhaseEnter(boss: Enemy, phase: number): void {
-    const msgs: Record<number, string> = {
-      2: "BOSS PHASE 2: SUMMONING ESCORT",
-      3: "BOSS PHASE 3: TOWER DISRUPTION",
-      4: "BOSS PHASE 4: FINAL RUSH",
+    const phaseData: Record<number, { text: string; color: string; flashColor: string }> = {
+      2: { text: "PHASE II — ESCORT SUMMONED", color: "#ff9800", flashColor: "#ff9800" },
+      3: { text: "PHASE III — SYSTEMS DISRUPTED", color: "#ab47bc", flashColor: "#ce93d8" },
+      4: { text: "PHASE IV — FINAL RUSH", color: "#ff1744", flashColor: "#ffffff" },
     };
-    const m = msgs[phase];
-    if (m) {
-      this.game.bus.emit("boss:phase", { phase, text: m });
-      this.game.particles.spawnFloatingText(boss.pos.x, boss.pos.y - 34, m, "#ff5252", 2.5, 14);
-      this.game.particles.spawnScreenFlash("#ffffff", 0.28, 0.62);
-      this.game.core.slowMo = Math.max(this.game.core.slowMo, 0.5);
-      if (this.game.core.settings.screenShake) {
-        this.game.core.shake = Math.max(this.game.core.shake, 13);
-        this.game.core.shakeRot = Math.max(this.game.core.shakeRot, 0.04);
-      }
-      this.game.audio.sfxBossAlert(boss.pos);
+    const pd = phaseData[phase];
+    if (!pd) return;
+
+    this.game.bus.emit("boss:phase", { phase, text: pd.text });
+
+    // Big floating phase alert above boss.
+    this.game.particles.spawnFloatingText(boss.pos.x, boss.pos.y - 50, pd.text, pd.color, 3.0, 15);
+
+    // Screen flash colored to phase.
+    this.game.particles.spawnScreenFlash(pd.flashColor, 0.35, 0.7);
+
+    // Slow-mo dip.
+    this.game.core.slowMoScale = Math.min(this.game.core.slowMoScale, 0.18);
+    this.game.core.slowMo = Math.max(this.game.core.slowMo, 0.65);
+
+    // Shake.
+    if (this.game.core.settings.screenShake) {
+      this.game.core.shake = Math.max(this.game.core.shake, 16);
+      this.game.core.shakeRot = Math.max(this.game.core.shakeRot, 0.055);
     }
+
+    // Telegraph rings: 3 expanding rings in phase color, staggered.
+    const r = boss.size * 1.8;
+    this.game.particles.spawnRing(boss.pos.x, boss.pos.y, r, pd.color);
+    this.game.particles.spawnRing(boss.pos.x, boss.pos.y, r * 1.7, pd.color);
+    this.game.particles.spawnRing(boss.pos.x, boss.pos.y, r * 2.5, "#ffffff");
+
+    // Radial particle burst in phase color.
+    this.game.particles.spawnBurst(boss.pos.x, boss.pos.y, pd.color, 28, { speed: 220, life: 0.8, size: 3 });
+
+    this.game.audio.sfxBossAlert(boss.pos);
   }
 
   knockback(e: Enemy, fromX: number, fromY: number, speed: number): void {
@@ -450,12 +469,17 @@ export class EnemySystem {
       this.game.audio.sfxEnemyDeath(e.type, e.pos);
       this.checkKillStreak(e.isBoss);
 
-      // Death burst.
-      this.game.particles.spawnBurst(e.pos.x, e.pos.y, e.color, e.isBoss ? 40 : 8, {
-        speed: e.isBoss ? 260 : 140,
-        life: e.isBoss ? 1.2 : 0.6,
-        size: e.isBoss ? 4 : 2.5,
+      // Death burst — body-color particles + expanding ring.
+      const isBoss = e.isBoss;
+      this.game.particles.spawnBurst(e.pos.x, e.pos.y, e.color, isBoss ? 40 : 16, {
+        speed: isBoss ? 260 : 165,
+        life: isBoss ? 1.2 : 0.7,
+        size: isBoss ? 4 : 2.5,
       });
+      this.game.particles.spawnRing(e.pos.x, e.pos.y, isBoss ? 80 : e.size * 2.2, e.color, isBoss ? 0.45 : 0.3);
+      if (e.isElite) {
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, e.size * 3.5, "#ffd600", 0.35);
+      }
 
       // Carrier death: spawn scouts + fear response (nearby scouts scatter briefly).
       if (e.ability === "spawn" && e.type === "carrier") {
@@ -499,6 +523,10 @@ export class EnemySystem {
       if (e.isBoss) {
         this.game.core.slowMoScale = 0.12;
         this.game.core.slowMo = 2.2;
+        // Bass drop: 1-frame pure black punch before white flash.
+        if (!this.game.core.settings.reducedFlashing) {
+          this.game.particles.spawnScreenFlash("#000000", 0.9, 0.055);
+        }
         this.game.particles.spawnScreenFlash("#ffffff", 0.7, 0.5);
         this.game.particles.spawnRing(e.pos.x, e.pos.y, 80,  "#ff5252");
         this.game.particles.spawnRing(e.pos.x, e.pos.y, 160, "#ffffff");

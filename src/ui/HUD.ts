@@ -43,7 +43,12 @@ export class HUD {
     bus.on("tower:built", () => this.refresh());
     bus.on("tower:upgraded", () => this.refresh());
     bus.on("tower:sold", () => this.refresh());
-    bus.on("speed:changed", () => this.refresh());
+    bus.on("speed:changed", () => {
+      this.refresh();
+      this.speedEl.classList.remove("ls-speed-flash");
+      void this.speedEl.offsetWidth; // reflow
+      this.speedEl.classList.add("ls-speed-flash");
+    });
     bus.on("wave:started", () => this.refresh());
     bus.on("wave:complete", () => this.refresh());
     bus.on("boss:spawned", () => this.refresh());

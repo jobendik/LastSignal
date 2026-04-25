@@ -18,6 +18,9 @@ import type {
 } from "./Types";
 
 import { AudioSystem } from "../systems/AudioSystem";
+import { loadoutDefinitions } from "../data/loadouts";
+import { upgradeDefinitions } from "../data/upgrades";
+import { rng } from "./Random";
 import { GridSystem } from "../systems/GridSystem";
 import { EnemySystem } from "../systems/EnemySystem";
 import { TowerSystem } from "../systems/TowerSystem";
@@ -118,6 +121,12 @@ export class Game {
       emergencyOverheatTimer: 0,
       activeModifiers: [],
       hitStopTimer: 0,
+      towerRecallUsed: false,
+      killZone: null,
+      killZoneMode: false,
+      bonusUpgradeCount: 0,
+      achievedMilestones: new Set(),
+      tacticalPauseCharges: 0,
     };
 
     // Wire systems that need `this`.
@@ -179,12 +188,13 @@ export class Game {
 
   // ----- Lifecycle helpers called by UI -----
 
-  beginSector(sector: SectorDefinition, opts: { endless?: boolean } = {}): void {
+  beginSector(sector: SectorDefinition, opts: { endless?: boolean; loadoutId?: string } = {}): void {
     const diff = this.difficulty.def;
     const meta = this.meta.aggregate();
+    const loadout = opts.loadoutId ? loadoutDefinitions.find((l) => l.id === opts.loadoutId) : null;
 
     this.core.sector = sector;
-    this.core.credits = sector.startingCredits + meta.startingCreditsAdd;
+    this.core.credits = sector.startingCredits + meta.startingCreditsAdd + (loadout?.creditsBonus ?? 0);
     this.core.coreMax = Math.round(
       sector.coreIntegrity * diff.coreIntegrityMul + meta.coreIntegrityAdd
     );
@@ -203,6 +213,12 @@ export class Game {
     this.core.emergencyTimer = 0;
     this.core.emergencyOverheatTimer = 0;
     this.core.hitStopTimer = 0;
+    this.core.towerRecallUsed = false;
+    this.core.killZone = null;
+    this.core.killZoneMode = false;
+    this.core.bonusUpgradeCount = 0;
+    this.core.achievedMilestones = new Set();
+    this.core.tacticalPauseCharges = 0;
     this.core.speed = 1;
     this.time.timeScale = 1;
 
@@ -229,12 +245,26 @@ export class Game {
     this.endless.reset();
     if (opts.endless) this.endless.enable();
 
+    // Apply starting loadout upgrade.
+    if (loadout) {
+      if (loadout.startUpgradeId === "random_rare") {
+        const pool = upgradeDefinitions.filter(
+          (u) => (u.rarity === "rare" || u.rarity === "legendary") && !u.curse
+        );
+        const chosen = rng.shuffle([...pool])[0];
+        if (chosen) this.applyUpgrade(chosen);
+      } else {
+        const u = upgradeDefinitions.find((u) => u.id === loadout.startUpgradeId);
+        if (u) this.applyUpgrade(u);
+      }
+    }
+
     this.audio.init();
     this.audio.resume();
     this.audio.startMusic();
 
     this.setState("PLANNING");
-    this.bus.emit("sector:started", sector);
+    this.bus.emit("sector:started", { sector, loadoutId: opts.loadoutId ?? null });
   }
 
   returnToMenu(): void {
@@ -273,6 +303,11 @@ export class Game {
         this.core.coreMax,
         this.core.coreIntegrity + u.effect.coreIntegrityAdd
       );
+    }
+    // Cursed upgrades also add a permanent debuff modifier for the rest of the run.
+    if (u.curse) {
+      this.core.activeModifiers.push(u.curse);
+      this.bus.emit("modifier:cursed", u.curse);
     }
     this.bus.emit("upgrade:applied", u);
   }

@@ -83,6 +83,10 @@ export class ProjectileSystem {
     // Splash damage or direct hit.
     if (p.splashRadius > 0) {
       this.game.particles.spawnMortarExplosion(impactX, impactY, p.splashRadius, p.color);
+      // Bass drop on large mortar explosions.
+      if (p.splashRadius >= 80 && !this.game.core.settings.reducedFlashing) {
+        this.game.particles.spawnScreenFlash("#000000", 0.55, 0.04);
+      }
       this.game.audio.sfxExplosion(0.35, { x: impactX });
       for (const e of this.game.enemies.list) {
         if (!e.active) continue;
@@ -93,6 +97,12 @@ export class ProjectileSystem {
           let dmg = p.damage * falloff;
           dmg *= this.globalMul(p);
           if (p.armorBreak && e.def.armor) dmg *= 1.6;
+          // Kill zone bonus applies to splash targets too.
+          const kzS = this.game.core.killZone;
+          if (kzS) {
+            const { c, r } = this.game.grid.worldToCell(e.pos.x, e.pos.y);
+            if (c === kzS.c && r === kzS.r) dmg *= 1.2;
+          }
           this.game.enemies.damage(e, dmg, this.sourceFor(p));
           const knock = 165 * Math.max(0, 1 - d / p.splashRadius);
           if (knock > 20) this.game.enemies.knockback(e, impactX, impactY, knock);
@@ -104,6 +114,12 @@ export class ProjectileSystem {
     } else if (direct) {
       let dmg = p.damage * this.globalMul(p);
       if (p.armorPierce && (direct.type === "brute" || direct.type === "carrier")) dmg *= 1.6;
+      // Kill zone bonus: +20% damage to enemies standing on the designated tile.
+      const kz = this.game.core.killZone;
+      if (kz) {
+        const { c, r } = this.game.grid.worldToCell(direct.pos.x, direct.pos.y);
+        if (c === kz.c && r === kz.r) dmg *= 1.2;
+      }
       this.game.enemies.damage(direct, dmg, this.sourceFor(p));
       if (p.slowOnHit > 0) direct.applySlow(p.slowOnHit, p.slowStrength);
       if (p.stunChance > 0 && Math.random() < p.stunChance) direct.applyStun(0.6);
@@ -133,6 +149,17 @@ export class ProjectileSystem {
       mul *= up.towerDamageMul;
       const spec = up.specificTowerDamageMul[p.owner.tower.type];
       if (spec) mul *= spec;
+
+      // Amplifier tower adjacency: +15% per adjacent amplifier (or +25% with Resonance Core).
+      const tc = p.owner.tower.c;
+      const tr = p.owner.tower.r;
+      for (const amp of this.game.towers.list) {
+        if (amp.type !== "amplifier") continue;
+        const tileRange = amp.flags.resonanceCore ? 2 : 1;
+        if (Math.max(Math.abs(amp.c - tc), Math.abs(amp.r - tr)) <= tileRange) {
+          mul *= amp.flags.resonanceCore ? 1.25 : 1.15;
+        }
+      }
     }
     // Low-core circuit.
     if (

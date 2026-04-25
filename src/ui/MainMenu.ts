@@ -2,6 +2,28 @@ import type { Game } from "../core/Game";
 import type { RunJournalEntry } from "../core/Types";
 import { el, clear } from "./dom";
 
+const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^█▓▒░▄▀■□";
+
+function glitchTitle(titleEl: HTMLElement): void {
+  const original = titleEl.textContent ?? "";
+  let frame = 0;
+  const totalFrames = 48;
+  const animate = () => {
+    frame++;
+    const progress = frame / totalFrames;
+    const locked = Math.floor(progress * original.length);
+    let text = original.slice(0, locked);
+    for (let i = locked; i < original.length; i++) {
+      if (original[i] === " ") { text += " "; continue; }
+      text += GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
+    }
+    titleEl.textContent = text;
+    if (frame < totalFrames) requestAnimationFrame(animate);
+    else titleEl.textContent = original;
+  };
+  requestAnimationFrame(animate);
+}
+
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -48,8 +70,9 @@ export class MainMenu {
     clear(this.el);
     const p = this.game.core.profile;
 
+    const titleEl = el("div", { class: "ls-title", text: "LAST SIGNAL" });
     this.el.append(
-      el("div", { class: "ls-title", text: "LAST SIGNAL" }),
+      titleEl,
       el("div", { class: "ls-subtitle", text: "Tactical Sci-Fi Roguelite Tower Defense" }),
       el("div", { class: "ls-profile", html:
         `<div>Best sector cleared: <strong>${p.bestSectorCleared}</strong></div>` +
@@ -98,6 +121,11 @@ export class MainMenu {
     this.el.append(actions);
 
     this.el.append(el("div", { class: "ls-hint", html:
-      "Hotkeys: <span>1-6</span> build, <span>U</span> upgrade, <span>S</span> sell, <span>D</span> drone, <span>Space</span> start wave / confirm, <span>Tab</span> wave preview, <span>P</span> pause, <span>+/-</span> speed, <span>F1</span> debug." }));
+      "Hotkeys: <span>1-6</span> build, <span>U</span> upgrade, <span>S</span> sell, <span>D</span> drone, <span>K</span> kill zone, <span>T</span> tactical pause, <span>Space</span> start wave / confirm, <span>Tab</span> wave preview, <span>P</span> pause, <span>+/-</span> speed, <span>F1</span> debug." }));
+
+    // Play glitch animation on title (skip if reduce motion is on).
+    if (!this.game.core.settings.reducedMotion) {
+      window.setTimeout(() => glitchTitle(titleEl), 120);
+    }
   }
 }

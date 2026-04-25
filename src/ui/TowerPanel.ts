@@ -99,6 +99,16 @@ export class TowerPanel {
     actions.append(upg, sell);
     this.el.append(actions);
 
+    // Recall button: one-per-sector full refund.
+    const recallUsed = this.game.core.towerRecallUsed;
+    const recall = el("button", {
+      class: "ls-btn ls-btn-recall" + (recallUsed ? " disabled" : ""),
+      text: recallUsed ? "RECALL USED" : `RECALL (${t.totalInvested}CR — 100%)`,
+    });
+    recall.title = recallUsed ? "Already used this sector" : "Full refund. Once per sector.";
+    if (!recallUsed) recall.onclick = () => this.game.towers.recall(t);
+    this.el.append(recall);
+
     const costRow = el("div", { class: "ls-tp-cost-row" });
     costRow.append(el("span", { class: "ls-hud-label", text: "NEXT" }));
     for (let i = 0; i < 3; i++) {

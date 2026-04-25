@@ -142,6 +142,20 @@ export const towerDefinitions: Record<TowerType, TowerDefinition> = {
     effect: "slow",
     hotkey: "9",
   },
+  amplifier: {
+    id: "amplifier",
+    name: "Amplifier",
+    role: "Support booster",
+    description:
+      "Doesn't fire. Boosts all towers within 1 tile by +15% damage. Stack strategically.",
+    cost: 110,
+    range: 48,
+    damage: 0,
+    cooldown: 99999,
+    color: "#ff6d00",
+    damageType: "none",
+    hotkey: "0",
+  },
 };
 
 export const towerOrder: TowerType[] = [
@@ -154,6 +168,7 @@ export const towerOrder: TowerType[] = [
   "railgun",
   "flamer",
   "barrier",
+  "amplifier",
 ];
 
 /**
@@ -365,6 +380,29 @@ export const towerSpecializations: Record<TowerType, SpecializationTree> = {
         name: "Stasis Core",
         description: "Enemies inside are briefly slowed.",
         mod: { flags: { cryoField: true } },
+      },
+    ],
+  },
+  amplifier: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "amplifier_overdrive",
+        name: "Overdrive Array",
+        description: "Boost radius extends to 2 tiles. More towers benefit.",
+        mod: { rangeMul: 2.0 },
+      },
+      {
+        id: "amplifier_resonance",
+        name: "Resonance Core",
+        description: "+25% damage boost instead of +15%.",
+        mod: { flags: { resonanceCore: true } },
+      },
+      {
+        id: "amplifier_fire_rate",
+        name: "Overclock",
+        description: "Also boosts adjacent tower fire rate by +10%.",
+        mod: { flags: { overclockAdjacent: true } },
       },
     ],
   },
