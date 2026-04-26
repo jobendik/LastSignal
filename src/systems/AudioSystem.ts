@@ -14,11 +14,8 @@ export class AudioSystem {
   limiter: DynamicsCompressorNode | null = null;
   reverb: ConvolverNode | null = null;
   reverbGain: GainNode | null = null;
-  bgmOsc: OscillatorNode | null = null;
-  private bgmBassGain: GainNode | null = null;
+  private musicStarted = false;
   private bgmMelodyInterval: ReturnType<typeof setInterval> | null = null;
-  /** Tension drone: fades in during waves, fades out during planning. */
-  private bgmTensionGain: GainNode | null = null;
   /** Beat pulse layer: sparse rhythmic clicks that intensify during waves. */
   private bgmBeatInterval: ReturnType<typeof setInterval> | null = null;
   private bgmIntensity = 0; // 0=calm, 1=wave, 2=boss
@@ -99,47 +96,10 @@ export class AudioSystem {
   }
 
   startMusic(): void {
-    if (!this.initialized || !this.ctx || !this.musicGain || this.bgmOsc) return;
-    const ctx = this.ctx;
+    if (!this.initialized || !this.ctx || !this.musicGain || this.musicStarted) return;
+    this.musicStarted = true;
 
-    // Base drone: deep sawtooth with slow LFO pitch wobble.
-    const osc = ctx.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.value = 55;
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.08;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 4;
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc.frequency);
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 260;
-    filter.Q.value = 3;
-    const g = ctx.createGain();
-    g.gain.value = 0.55;
-    osc.connect(filter);
-    filter.connect(g);
-    g.connect(this.musicGain);
-    osc.start();
-    lfo.start();
-    this.bgmOsc = osc;
-    this.bgmBassGain = g;
-
-    // Tension layer: higher-pitched dissonant overtone that cross-fades in during waves.
-    const tensionOsc = ctx.createOscillator();
-    tensionOsc.type = "triangle";
-    tensionOsc.frequency.value = 82.5; // minor third above 55Hz for tension
-    const tensionFilter = ctx.createBiquadFilter();
-    tensionFilter.type = "highpass";
-    tensionFilter.frequency.value = 120;
-    const tensionGain = ctx.createGain();
-    tensionGain.gain.value = 0; // starts silent
-    tensionOsc.connect(tensionFilter);
-    tensionFilter.connect(tensionGain);
-    tensionGain.connect(this.musicGain);
-    tensionOsc.start();
-    this.bgmTensionGain = tensionGain;
+    // Keep music as sparse pulses/arps only; continuous drone layers caused a background hum.
 
     // Beat pulse: occasional sparse rhythmic clicks during wave.
     this.bgmBeatInterval = setInterval(() => {
@@ -154,10 +114,7 @@ export class AudioSystem {
   }
 
   stopMusic(): void {
-    if (this.bgmOsc) {
-      try { this.bgmOsc.stop(); } catch { /* ignore */ }
-      this.bgmOsc = null;
-    }
+    this.musicStarted = false;
     if (this.bgmBeatInterval !== null) {
       clearInterval(this.bgmBeatInterval);
       this.bgmBeatInterval = null;
@@ -166,19 +123,11 @@ export class AudioSystem {
       clearInterval(this.bgmMelodyInterval);
       this.bgmMelodyInterval = null;
     }
-    this.bgmTensionGain = null;
-    this.bgmBassGain = null;
   }
 
   /** Set music intensity: 0=planning calm, 1=wave active, 2=boss fight. */
   setMusicIntensity(intensity: 0 | 1 | 2): void {
-    if (!this.initialized || !this.ctx || !this.bgmTensionGain) return;
     this.bgmIntensity = intensity;
-    const now = this.ctx.currentTime;
-    const targetGain = intensity === 0 ? 0 : intensity === 1 ? 0.18 : 0.35;
-    this.bgmTensionGain.gain.cancelScheduledValues(now);
-    this.bgmTensionGain.gain.setValueAtTime(this.bgmTensionGain.gain.value, now);
-    this.bgmTensionGain.gain.linearRampToValueAtTime(targetGain, now + (intensity > 0 ? 1.8 : 4.0));
   }
 
   private bgmPulse(): void {
