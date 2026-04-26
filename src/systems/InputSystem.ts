@@ -14,6 +14,10 @@ export class InputSystem {
   placementInvalidTimer = 0;
   private lastPreviewKey = "";
   private lastInvalidSoundTime = -Infinity;
+  private touchLongPress: ReturnType<typeof window.setTimeout> | null = null;
+  private gamepadCursor = { c: 12, r: 10 };
+  private gamepadButtons = new Set<number>();
+  private placementGuideSeen = new Set<TowerType>();
 
   constructor(private readonly game: Game) {}
 
@@ -30,23 +34,77 @@ export class InputSystem {
       e.preventDefault();
       this.onSecondaryButton(e);
     });
+    canvas.addEventListener("touchstart", (e) => this.onTouchStart(e), { passive: false });
+    canvas.addEventListener("touchmove", (e) => this.onTouchMove(e), { passive: false });
+    canvas.addEventListener("touchend", () => this.onTouchEnd(), { passive: false });
     window.addEventListener("keydown", (e) => this.onKey(e));
   }
 
   update(dt: number): void {
     if (this.placementSnapTimer > 0) this.placementSnapTimer = Math.max(0, this.placementSnapTimer - dt);
     if (this.placementInvalidTimer > 0) this.placementInvalidTimer = Math.max(0, this.placementInvalidTimer - dt);
+    this.updateGamepad(dt);
   }
 
   private cellFromEvent(e: MouseEvent): { c: number; r: number } {
+    return this.cellFromClient(e.clientX, e.clientY);
+  }
+
+  private cellFromClient(clientX: number, clientY: number): { c: number; r: number } {
     const rect = this.game.canvas.getBoundingClientRect();
     const scaleX = this.game.canvas.width / rect.width;
     const scaleY = this.game.canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
     this.mouseX = x;
     this.mouseY = y;
     return this.game.grid.worldToCell(x, y);
+  }
+
+  private onTouchStart(e: TouchEvent): void {
+    if (e.touches.length === 0) return;
+    e.preventDefault();
+    const t = e.touches[0]!;
+    this.overCell = this.cellFromClient(t.clientX, t.clientY);
+    this.showPlacementPreview = Boolean(this.placementTowerType) && this.isBuildingState();
+    this.touchLongPress = window.setTimeout(() => {
+      if (!this.overCell) return;
+      const tower = this.game.towers.findTowerAt(this.overCell.c, this.overCell.r);
+      if (tower) {
+        this.game.towers.selected = tower;
+        this.game.bus.emit("tower:selected", tower);
+      }
+    }, 450);
+  }
+
+  private onTouchMove(e: TouchEvent): void {
+    if (e.touches.length === 0) return;
+    e.preventDefault();
+    const t = e.touches[0]!;
+    this.overCell = this.cellFromClient(t.clientX, t.clientY);
+    this.showPlacementPreview = Boolean(this.placementTowerType) && this.isBuildingState();
+    this.updatePlacementFeedback();
+  }
+
+  private onTouchEnd(): void {
+    if (this.touchLongPress) window.clearTimeout(this.touchLongPress);
+    this.touchLongPress = null;
+    if (!this.overCell) return;
+    if (this.game.core.killZoneMode) {
+      const px = (this.overCell.c + 0.5) * TILE_SIZE;
+      const py = (this.overCell.r + 0.5) * TILE_SIZE;
+      this.game.core.killZone = { ...this.overCell };
+      this.game.core.killZoneMode = false;
+      this.game.particles.spawnFloatingText(px, py - 20, "KILL ZONE SET", "#ff9800", 1.2, 12);
+      this.game.particles.spawnRing(px, py, 28, "#ff9800");
+      this.game.bus.emit("killzone:set", this.game.core.killZone);
+    } else if (this.selectedTowerType) {
+      this.tryBuild(this.overCell, false);
+    } else {
+      const tower = this.game.towers.findTowerAt(this.overCell.c, this.overCell.r);
+      this.game.towers.selected = tower;
+      this.game.bus.emit("tower:selected", tower);
+    }
   }
 
   private onMouseMove(e: MouseEvent): void {
@@ -138,6 +196,7 @@ export class InputSystem {
 
   private tryBuild(cell: { c: number; r: number }, keepSelected: boolean): void {
     const type = this.selectedTowerType!;
+    this.game.recordReplayEvent("build_attempt", { type, cell });
     const res = this.game.towers.place(type, cell.c, cell.r);
     if (!res) {
       // Invalid — play a small rejection sound.
@@ -160,7 +219,20 @@ export class InputSystem {
     }
     this.showPlacementPreview = Boolean(this.selectedTowerType);
     this.updatePlacementFeedback(true);
+    if (this.selectedTowerType && !this.placementGuideSeen.has(this.selectedTowerType)) {
+      this.placementGuideSeen.add(this.selectedTowerType);
+      const def = this.selectedTowerType ? this.game.towers.buildCost(this.selectedTowerType) : 0;
+      this.game.particles.spawnFloatingText(
+        this.game.width / 2,
+        this.game.height - 42,
+        `${this.selectedTowerType.toUpperCase()} / RANGE PREVIEW / ${def}CR`,
+        "#66fcf1",
+        2.2,
+        11
+      );
+    }
     this.game.bus.emit("build:tool", this.selectedTowerType);
+    this.game.recordReplayEvent("build_tool", { type: this.selectedTowerType });
   }
 
   setHoverBuildTool(type: TowerType | null): void {
@@ -209,11 +281,12 @@ export class InputSystem {
   private onKey(e: KeyboardEvent): void {
     const key = e.key;
     const code = e.code;
+    const bindings = this.game.core.settings.keyBindings;
+    const isBound = (action: string) => code === bindings[action];
 
-    // Hotkeys 1-6 = tower types (by definition order).
-    if (key >= "1" && key <= "9") {
-      const idx = parseInt(key, 10) - 1;
-      const type = towerOrder[idx];
+    for (let i = 0; i < towerOrder.length; i++) {
+      if (!isBound(`build${i + 1}`)) continue;
+      const type = towerOrder[i];
       if (type) {
         this.setBuildTool(type);
         e.preventDefault();
@@ -221,29 +294,25 @@ export class InputSystem {
       }
     }
 
-    switch (key.toUpperCase()) {
-      case "D":
-        this.game.drones.buy("hunter");
-        break;
-      case "U":
-        if (this.game.towers.selected) this.game.towers.upgrade(this.game.towers.selected);
-        break;
-      case "S":
-        if (this.game.towers.selected) this.game.towers.sell(this.game.towers.selected);
-        break;
-      case "P":
-        this.game.togglePause();
-        break;
-      case "+": case "=":
-        this.game.cycleSpeed(1);
-        break;
-      case "-":
-        this.game.cycleSpeed(-1);
-        break;
-      case " ":
-        this.onSpace();
-        e.preventDefault();
-        break;
+    if (isBound("drone")) {
+      this.game.drones.buy("hunter");
+    } else if (isBound("upgrade")) {
+      if (this.game.towers.selected) this.game.towers.upgrade(this.game.towers.selected);
+    } else if (isBound("sell")) {
+      if (this.game.towers.selected) this.game.towers.sell(this.game.towers.selected);
+    } else if (isBound("pause")) {
+      this.game.togglePause();
+      this.game.recordReplayEvent("pause");
+    } else if (isBound("speedUp")) {
+      this.game.cycleSpeed(1);
+      this.game.recordReplayEvent("speed", { delta: 1 });
+    } else if (isBound("speedDown")) {
+      this.game.cycleSpeed(-1);
+      this.game.recordReplayEvent("speed", { delta: -1 });
+    } else if (isBound("start")) {
+      this.onSpace();
+      this.game.recordReplayEvent("confirm");
+      e.preventDefault();
     }
 
     switch (code) {
@@ -251,7 +320,7 @@ export class InputSystem {
         this.clearSelection();
         this.game.bus.emit("ui:esc");
         break;
-      case "Tab":
+      case bindings.wavePreview:
         this.game.bus.emit("ui:toggleWavePreview");
         e.preventDefault();
         break;
@@ -279,13 +348,13 @@ export class InputSystem {
         this.game.core.showHeatmap = !this.game.core.showHeatmap;
         e.preventDefault();
         break;
-      case "KeyK":
+      case bindings.killZone:
         if (this.isBuildingState()) {
           this.game.core.killZoneMode = !this.game.core.killZoneMode;
           e.preventDefault();
         }
         break;
-      case "KeyT":
+      case bindings.tacticalPause:
         if (this.game.state === "WAVE_ACTIVE" && this.game.core.upgrades.tacticalPause && this.game.core.tacticalPauseCharges > 0) {
           this.game.core.tacticalPauseCharges--;
           this.game.core.slowMoScale = 0.28;
@@ -308,6 +377,42 @@ export class InputSystem {
     } else if (this.game.state === "GAME_OVER" || this.game.state === "VICTORY") {
       this.game.returnToMenu();
     }
+  }
+
+  private updateGamepad(_dt: number): void {
+    if (!this.game.core.settings.gamepadEnabled || typeof navigator.getGamepads !== "function") return;
+    const pad = Array.from(navigator.getGamepads()).find(Boolean);
+    if (!pad) return;
+
+    const axisX = pad.axes[0] ?? 0;
+    const axisY = pad.axes[1] ?? 0;
+    if (Math.abs(axisX) > 0.6) this.gamepadCursor.c = Math.max(0, Math.min(24, this.gamepadCursor.c + Math.sign(axisX)));
+    if (Math.abs(axisY) > 0.6) this.gamepadCursor.r = Math.max(0, Math.min(19, this.gamepadCursor.r + Math.sign(axisY)));
+    this.overCell = { ...this.gamepadCursor };
+    this.mouseX = (this.gamepadCursor.c + 0.5) * TILE_SIZE;
+    this.mouseY = (this.gamepadCursor.r + 0.5) * TILE_SIZE;
+
+    const pressed = (idx: number) => Boolean(pad.buttons[idx]?.pressed);
+    const once = (idx: number, action: () => void) => {
+      if (pressed(idx)) {
+        if (!this.gamepadButtons.has(idx)) action();
+        this.gamepadButtons.add(idx);
+      } else {
+        this.gamepadButtons.delete(idx);
+      }
+    };
+
+    once(0, () => {
+      if (this.selectedTowerType) this.tryBuild(this.gamepadCursor, false);
+      else {
+        const tower = this.game.towers.findTowerAt(this.gamepadCursor.c, this.gamepadCursor.r);
+        this.game.towers.selected = tower;
+        this.game.bus.emit("tower:selected", tower);
+      }
+    });
+    once(1, () => this.clearSelection());
+    once(6, () => this.game.cycleSpeed(-1));
+    once(7, () => this.game.cycleSpeed(1));
   }
 
   get hoverCell(): { c: number; r: number } | null {

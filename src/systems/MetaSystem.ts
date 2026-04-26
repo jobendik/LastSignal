@@ -46,11 +46,28 @@ export class MetaSystem {
 
   addResearchPoints(amount: number): void {
     if (amount <= 0) return;
-    const mul = this.game.difficulty.def.researchMul;
+    const mul = this.game.difficulty.def.researchMul * this.game.core.profile.prestigeMultiplier;
     const gain = Math.max(1, Math.round(amount * mul));
     this.game.core.profile.researchPoints += gain;
     this.game.persistence.saveProfile(this.game.core.profile);
     this.game.bus.emit("meta:points", gain);
+  }
+
+  canPrestige(): boolean {
+    return this.game.core.profile.bestSectorCleared >= 4 && this.game.core.profile.researchUnlocked.length >= researchNodes.length;
+  }
+
+  prestige(): boolean {
+    if (!this.canPrestige()) return false;
+    const p = this.game.core.profile;
+    p.prestigeLevel += 1;
+    p.prestigeMultiplier = 1 + p.prestigeLevel * 0.12;
+    p.researchUnlocked = [];
+    p.researchPoints = 0;
+    this.game.persistence.saveProfile(p);
+    this.game.bus.emit("meta:points", 0);
+    this.game.bus.emit("meta:prestige", p.prestigeLevel);
+    return true;
   }
 
   /** Aggregate effect of all purchased research for this run. */

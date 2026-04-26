@@ -261,6 +261,22 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     size: 9,
     ability: "mirror",
   },
+  harbinger: {
+    id: "harbinger",
+    name: "Harbinger",
+    role: "Ranged artillery boss",
+    description:
+      "Holds near the map edge and launches artillery shells at tower clusters, forcing resilient spacing and long-range pressure.",
+    hp: 620,
+    speed: 12,
+    reward: 120,
+    breach: 38,
+    color: "#ff1744",
+    size: 20,
+    ability: "artillery",
+    isBoss: true,
+    armor: 0.16,
+  },
 };
 
 export const enemyOrder: EnemyType[] = [
@@ -282,4 +298,5 @@ export const enemyOrder: EnemyType[] = [
   "saboteur",
   "cache",
   "mirror",
+  "harbinger",
 ];

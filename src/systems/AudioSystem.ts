@@ -15,6 +15,8 @@ export class AudioSystem {
   reverb: ConvolverNode | null = null;
   reverbGain: GainNode | null = null;
   bgmOsc: OscillatorNode | null = null;
+  private bgmBassGain: GainNode | null = null;
+  private bgmMelodyInterval: ReturnType<typeof setInterval> | null = null;
   /** Tension drone: fades in during waves, fades out during planning. */
   private bgmTensionGain: GainNode | null = null;
   /** Beat pulse layer: sparse rhythmic clicks that intensify during waves. */
@@ -122,6 +124,7 @@ export class AudioSystem {
     osc.start();
     lfo.start();
     this.bgmOsc = osc;
+    this.bgmBassGain = g;
 
     // Tension layer: higher-pitched dissonant overtone that cross-fades in during waves.
     const tensionOsc = ctx.createOscillator();
@@ -143,6 +146,11 @@ export class AudioSystem {
       if (this.bgmIntensity < 1 || !this.ctx || !this.musicGain) return;
       this.bgmPulse();
     }, 1800);
+
+    this.bgmMelodyInterval = setInterval(() => {
+      if (!this.ctx || !this.musicGain) return;
+      this.bgmMelodyStep();
+    }, 2400);
   }
 
   stopMusic(): void {
@@ -154,7 +162,12 @@ export class AudioSystem {
       clearInterval(this.bgmBeatInterval);
       this.bgmBeatInterval = null;
     }
+    if (this.bgmMelodyInterval !== null) {
+      clearInterval(this.bgmMelodyInterval);
+      this.bgmMelodyInterval = null;
+    }
     this.bgmTensionGain = null;
+    this.bgmBassGain = null;
   }
 
   /** Set music intensity: 0=planning calm, 1=wave active, 2=boss fight. */
@@ -195,6 +208,32 @@ export class AudioSystem {
       case "barrier":  break; // barrier is silent on pulse
       default:         this.sfxShoot(1, 0.17, "bullet", position); break;
     }
+  }
+
+  private bgmMelodyStep(): void {
+    if (!this.initialized || !this.ctx || !this.musicGain) return;
+    const now = this.ctx.currentTime;
+    const scale = this.bgmIntensity === 2 ? [220, 233.08, 277.18, 329.63] : [164.81, 196, 220, 246.94];
+    scale.forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const g = this.ctx!.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.035 + this.bgmIntensity * 0.015, now + i * 0.18);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.18 + 0.32);
+      osc.connect(g);
+      g.connect(this.musicGain!);
+      osc.start(now + i * 0.18);
+      osc.stop(now + i * 0.18 + 0.34);
+    });
+  }
+
+  async loadExternalTrack(url: string): Promise<AudioBuffer | null> {
+    if (!this.initialized) this.init();
+    if (!this.ctx) return null;
+    const res = await fetch(url);
+    const data = await res.arrayBuffer();
+    return this.ctx.decodeAudioData(data.slice(0));
   }
 
   sfxTesla(position?: AudioPosition): void {

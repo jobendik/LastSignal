@@ -38,7 +38,10 @@ export type TowerType =
   | "railgun"
   | "flamer"
   | "barrier"
-  | "amplifier";
+  | "amplifier"
+  | "reflector"
+  | "snare"
+  | "overclock";
 
 /** How a tower selects its next target. */
 export type TargetMode = "closest_to_core" | "weakest" | "strongest" | "fastest";
@@ -88,7 +91,9 @@ export type TowerFlag =
   | "signalMarker"
   | "deflectorGrid"
   | "resonanceCore"
-  | "overclockAdjacent";
+  | "overclockAdjacent"
+  | "railRicochet"
+  | "pinnacle";
 
 export interface TowerMod {
   rangeMul?: number;
@@ -108,6 +113,8 @@ export interface SpecializationOption {
   description: string;
   /** Modifies tower runtime stats (additive / multiplicative, data-driven). */
   mod: TowerMod;
+  /** Optional second-stage max-level upgrade. */
+  pinnacle?: SpecializationOption;
 }
 
 export interface SpecializationTree {
@@ -135,9 +142,10 @@ export type EnemyType =
   | "tunneler"
   | "saboteur"
   | "cache"
-  | "mirror";
+  | "mirror"
+  | "harbinger";
 
-export type EnemyAbility = "none" | "heal" | "phase" | "spawn" | "boss" | "tunnel" | "mirror";
+export type EnemyAbility = "none" | "heal" | "phase" | "spawn" | "boss" | "tunnel" | "mirror" | "artillery";
 
 export interface EnemyDefinition {
   id: EnemyType;
@@ -204,6 +212,10 @@ export interface SectorDefinition {
   waves: WaveDefinition[];
   startingCredits: number;
   coreIntegrity: number;
+  /** Optional flavor text shown on the sector star map. */
+  lore?: string;
+  /** Darkness sectors dim the playfield; tower lights become strategic visibility pools. */
+  darkness?: boolean;
 }
 
 // ---------- Upgrades ----------
@@ -292,6 +304,9 @@ export interface GameSettings {
   highContrast: boolean;
   fontScale: number;
   graphicsQuality: "low" | "medium" | "high";
+  /** User-rebindable keyboard controls, stored as KeyboardEvent.code values. */
+  keyBindings: Record<string, string>;
+  gamepadEnabled: boolean;
 }
 
 export interface RunStats {
@@ -342,6 +357,10 @@ export interface PersistedProfile {
   endlessBestWave: number;
   lastDifficulty: DifficultyId;
   runHistory: RunJournalEntry[];
+  prestigeLevel: number;
+  prestigeMultiplier: number;
+  dailyBestScore: number;
+  dailyBestDate: string;
 }
 
 // ---------- Difficulty ----------

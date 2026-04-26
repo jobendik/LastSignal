@@ -88,6 +88,8 @@ export class ParticleSystem {
   scorchDecals: ScorchDecalFX[] = [];
   screenFlashes: ScreenFlashFX[] = [];
   creditOrbs: CreditOrbFX[] = [];
+  private particlePool: Particle[] = [];
+  private floatingTextPool: FloatingText[] = [];
 
   constructor(private readonly game: Game) {}
 
@@ -136,7 +138,7 @@ export class ParticleSystem {
     const finalCount = Math.max(1, Math.ceil(count * this.effectBudgetFactor()));
     for (let i = 0; i < finalCount; i++) {
       if (this.particles.length >= PARTICLE_CAP) break;
-      this.particles.push(new Particle(x, y, color, {
+      this.particles.push(this.acquireParticle(x, y, color, {
         speed: opts.speed ?? rnd(60, 180),
         life: opts.life ?? rnd(0.3, 0.9),
         size: opts.size ?? rnd(1.5, 3),
@@ -149,7 +151,42 @@ export class ParticleSystem {
   spawnFloatingText(x: number, y: number, text: string | number, color: string, life = 0.9, size = 13): void {
     if (!this.game.core.settings.showDamageNumbers && typeof text === "number") return;
     if (this.floatingText.length >= FLOATING_TEXT_CAP) this.floatingText.shift();
-    this.floatingText.push(new FloatingText(x, y, text, color, life, size));
+    this.floatingText.push(this.acquireFloatingText(x, y, text, color, life, size));
+  }
+
+  private acquireParticle(
+    x: number,
+    y: number,
+    color: string,
+    opts: { speed: number; life: number; size: number; gravity: number; angle?: number }
+  ): Particle {
+    const p = this.particlePool.pop() ?? new Particle(x, y, color, opts);
+    const angle = opts.angle ?? rnd(0, Math.PI * 2);
+    p.pos.x = x;
+    p.pos.y = y;
+    p.vel.x = Math.cos(angle) * opts.speed;
+    p.vel.y = Math.sin(angle) * opts.speed;
+    p.color = color;
+    p.life = opts.life;
+    p.maxLife = opts.life;
+    p.size = opts.size;
+    p.gravity = opts.gravity;
+    p.active = true;
+    return p;
+  }
+
+  private acquireFloatingText(x: number, y: number, text: string | number, color: string, life: number, size: number): FloatingText {
+    const f = this.floatingTextPool.pop() ?? new FloatingText(x, y, text, color, life, size);
+    f.pos.x = x;
+    f.pos.y = y;
+    f.text = String(text);
+    f.color = color;
+    f.life = life;
+    f.maxLife = life;
+    f.size = size;
+    f.vy = -30;
+    f.active = true;
+    return f;
   }
 
   spawnRing(x: number, y: number, radius: number, color: string, life = 0.3): void {
@@ -335,7 +372,11 @@ export class ParticleSystem {
       p.life -= dt;
       if (p.life <= 0) p.active = false;
     }
-    this.particles = this.particles.filter((p) => p.active);
+    this.particles = this.particles.filter((p) => {
+      if (p.active) return true;
+      if (this.particlePool.length < PARTICLE_CAP) this.particlePool.push(p);
+      return false;
+    });
 
     // Floating text
     for (const f of this.floatingText) {
@@ -343,7 +384,11 @@ export class ParticleSystem {
       f.life -= dt;
       if (f.life <= 0) f.active = false;
     }
-    this.floatingText = this.floatingText.filter((f) => f.active);
+    this.floatingText = this.floatingText.filter((f) => {
+      if (f.active) return true;
+      if (this.floatingTextPool.length < FLOATING_TEXT_CAP) this.floatingTextPool.push(f);
+      return false;
+    });
 
     // Zones
     for (const z of this.zones) {

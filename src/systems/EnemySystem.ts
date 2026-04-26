@@ -75,7 +75,14 @@ export class EnemySystem {
       this.game.core.shakeDecay = Math.min(this.game.core.shakeDecay, 10); // sustained boss-arrival rumble
       this.game.core.slowMo = Math.max(this.game.core.slowMo, 0.45);
       this.game.particles.spawnRing(x, y, 90, "#ff1a00");
-      this.game.particles.spawnFloatingText(x, y - 54, "LEVIATHAN DETECTED", "#ff1a00", 3.2, 16);
+      this.game.particles.spawnFloatingText(
+        x,
+        y - 54,
+        type === "harbinger" ? "HARBINGER DETECTED" : "LEVIATHAN DETECTED",
+        "#ff1a00",
+        3.2,
+        16
+      );
     } else {
       this.game.audio.sfxEnemyArrival(type, enemy.pos);
     }
@@ -163,6 +170,7 @@ export class EnemySystem {
       // Boss phase mechanics.
       if (e.isBoss) {
         this.updateBossPhase(e, dt);
+        if (e.ability === "artillery") this.updateHarbingerArtillery(e, dt);
       }
 
       // Movement.
@@ -464,6 +472,29 @@ export class EnemySystem {
         this.corruptionPulse(boss);
       }
     }
+  }
+
+  private updateHarbingerArtillery(boss: Enemy, dt: number): void {
+    boss.artilleryCooldown -= dt;
+    if (boss.artilleryCooldown > 0) return;
+    boss.artilleryCooldown = Math.max(1.4, 4.2 - boss.bossPhase * 0.55);
+
+    const candidates = this.game.towers.list.filter((t) => t.buildProgress >= 1);
+    const target = candidates.length > 0
+      ? candidates[Math.floor(Math.random() * candidates.length)]!
+      : null;
+    const x = target?.pos.x ?? this.game.grid.corePos.x;
+    const y = target?.pos.y ?? this.game.grid.corePos.y;
+
+    this.game.core.meteorStrikes.push({
+      c: Math.max(0, Math.min(24, Math.floor(x / 32))),
+      r: Math.max(0, Math.min(19, Math.floor(y / 32))),
+      timer: 1.7,
+      maxTimer: 1.7,
+    });
+    this.game.particles.spawnBeam(boss.pos.x, boss.pos.y, x, y, "#ff1744", 0.16, { width: 5 });
+    this.game.particles.spawnFloatingText(x, y - 24, "ARTILLERY", "#ff1744", 1.4, 11);
+    this.game.audio.sfxMortar(boss.pos);
   }
 
   private onBossPhaseEnter(boss: Enemy, phase: number): void {

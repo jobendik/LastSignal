@@ -131,6 +131,14 @@ export class TowerSystem {
   }
 
   applySpecialization(t: Tower, specId: string): void {
+    if (specId === "pulse_cryo_proximity" && t.type === "pulse") {
+      t.specId = specId;
+      t.mods.push({ damageMul: 1.1, flags: { cryoField: true } });
+      this.game.bus.emit("tower:specialized", t);
+      this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 28, "CRYO PROXIMITY", "#80d8ff", 1.4, 13);
+      this.game.audio.sfxUpgrade(t.pos);
+      return;
+    }
     t.applySpecialization(specId);
     this.game.bus.emit("tower:specialized", t);
     // Dramatic specialization FX: slow-mo pop + radial burst.
@@ -141,6 +149,21 @@ export class TowerSystem {
     this.game.particles.spawnBurst(t.pos.x, t.pos.y, t.def.color, 20, { speed: 180, life: 0.65, size: 3 });
     this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 28, "SPEC LOCKED", t.def.color, 1.4, 13);
     this.game.audio.sfxUpgrade(t.pos);
+  }
+
+  applyPinnacle(t: Tower): boolean {
+    if (!t.canPinnacle) return false;
+    t.applyPinnacle();
+    this.game.bus.emit("tower:specialized", t);
+    this.game.core.slowMoScale = 0.18;
+    this.game.core.slowMo = 0.65;
+    this.game.particles.spawnRing(t.pos.x, t.pos.y, 58, "#ffffff");
+    this.game.particles.spawnRing(t.pos.x, t.pos.y, 32, t.def.color);
+    this.game.particles.spawnBurst(t.pos.x, t.pos.y, "#ffffff", 12, { speed: 220, life: 0.55, size: 2.5 });
+    this.game.particles.spawnBurst(t.pos.x, t.pos.y, t.def.color, 24, { speed: 180, life: 0.75, size: 3 });
+    this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 34, "PINNACLE ONLINE", "#ffffff", 1.5, 14);
+    this.game.audio.sfxUpgrade(t.pos);
+    return true;
   }
 
   disableTower(t: Tower, duration: number): void {
@@ -182,7 +205,7 @@ export class TowerSystem {
 
   unlockWave(type: TowerType): number {
     if (type === "railgun") return 6;
-    if (type === "tesla" || type === "mortar" || type === "flamer" || type === "barrier" || type === "amplifier") return 3;
+    if (type === "tesla" || type === "mortar" || type === "flamer" || type === "barrier" || type === "amplifier" || type === "reflector" || type === "snare" || type === "overclock") return 3;
     return 1;
   }
 
@@ -298,8 +321,11 @@ export class TowerSystem {
         continue;
       }
 
-      // Amplifier: purely passive — no firing, no update needed.
-      if (t.type === "amplifier") continue;
+      if (t.type === "amplifier" || t.type === "reflector") continue;
+      if (t.type === "overclock") {
+        this.updateOverclockStation(t, dt);
+        continue;
+      }
 
       // Flamer heat management.
       if (t.type === "flamer") {
@@ -595,6 +621,7 @@ export class TowerSystem {
       case "tesla": this.fireTesla(t, target, stats); break;
       case "railgun": this.fireRailgun(t, target, stats); break;
       case "flamer": this.fireFlamer(t, target, stats); break;
+      case "snare": this.fireSnare(t, target, stats); break;
       default: break;
     }
 
@@ -634,6 +661,81 @@ export class TowerSystem {
         if (perp < 10) this.game.enemies.damage(e, dmg * 0.5, { type: "tower", towerType: "railgun", tower: t });
       }
     }
+    this.tryReflectRailgun(t, target, stats);
+  }
+
+  hasAdjacentLevel(t: Tower, type: TowerType, minLevel: number): boolean {
+    for (const other of this.list) {
+      if (other === t || other.type !== type || other.level < minLevel) continue;
+      const dc = Math.abs(other.c - t.c);
+      const dr = Math.abs(other.r - t.r);
+      if (dc <= 1 && dr <= 1) return true;
+    }
+    return false;
+  }
+
+  private tryReflectRailgun(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
+    const reflectors = this.list.filter((x) => x.type === "reflector" && x.buildProgress >= 1);
+    if (reflectors.length === 0) {
+      if (t.flags.railRicochet) this.tryTerrainRicochet(t, target, stats);
+      return;
+    }
+
+    const dx = target.pos.x - t.pos.x;
+    const dy = target.pos.y - t.pos.y;
+    const len = Math.hypot(dx, dy) || 1;
+    let best: Tower | null = null;
+    let bestPerp = Infinity;
+    for (const r of reflectors) {
+      const px = r.pos.x - t.pos.x;
+      const py = r.pos.y - t.pos.y;
+      const along = (px * dx + py * dy) / (len * len);
+      if (along < 0.15 || along > 1.35) continue;
+      const perp = Math.abs(px * (-dy / len) + py * (dx / len));
+      if (perp < Math.min(18, this.effectiveStats(r).range * 0.22) && perp < bestPerp) {
+        bestPerp = perp;
+        best = r;
+      }
+    }
+    if (!best) {
+      if (t.flags.railRicochet) this.tryTerrainRicochet(t, target, stats);
+      return;
+    }
+
+    const next = this.findReflectTarget(best, target, stats.range * 0.9);
+    if (!next) return;
+    const boosted = best.mods.some((m) => m.damageMul && m.damageMul > 1);
+    this.game.enemies.damage(next, stats.damage * (boosted ? 0.75 : 0.6), { type: "tower", towerType: "railgun", tower: t });
+    this.game.particles.spawnBeam(t.pos.x, t.pos.y, best.pos.x, best.pos.y, t.def.color, 0.12, { kind: "railgun", width: 8 });
+    this.game.particles.spawnBeam(best.pos.x, best.pos.y, next.pos.x, next.pos.y, best.def.color, 0.16, { kind: "railgun", width: 9 });
+    this.game.particles.spawnRing(best.pos.x, best.pos.y, 28, best.def.color, 0.32);
+  }
+
+  private tryTerrainRicochet(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
+    let bounced = 0;
+    let from = target.pos;
+    for (const e of this.game.enemies.list) {
+      if (!e.active || e === target || bounced >= 2) continue;
+      if (e.pos.dist(from) > 96) continue;
+      bounced++;
+      this.game.enemies.damage(e, stats.damage * 0.35, { type: "tower", towerType: "railgun", tower: t });
+      this.game.particles.spawnBeam(from.x, from.y, e.pos.x, e.pos.y, t.def.color, 0.1, { kind: "railgun", width: 6 });
+      from = e.pos;
+    }
+  }
+
+  private findReflectTarget(reflector: Tower, exclude: Enemy, range: number): Enemy | null {
+    let best: Enemy | null = null;
+    let bestD = range;
+    for (const e of this.game.enemies.list) {
+      if (!e.active || e === exclude || e.isTunneling) continue;
+      const d = e.pos.dist(reflector.pos);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+    return best;
   }
 
   private rayToScreenEdge(x1: number, y1: number, x2: number, y2: number): { x1: number; y1: number; x2: number; y2: number } {
@@ -696,6 +798,41 @@ export class TowerSystem {
     this.game.particles.spawnRing(t.pos.x, t.pos.y, stats.range, t.def.color);
   }
 
+  private updateOverclockStation(t: Tower, dt: number): void {
+    const stats = this.effectiveStats(t);
+    t.timer -= dt;
+    if (t.timer > 0) return;
+
+    const rangeTiles = stats.range / 48;
+    let best: Tower | null = null;
+    let bestDamage = -1;
+    for (const other of this.list) {
+      if (
+        other === t ||
+        other.isEco ||
+        other.type === "amplifier" ||
+        other.type === "reflector" ||
+        other.type === "overclock"
+      ) continue;
+      if (Math.max(Math.abs(other.c - t.c), Math.abs(other.r - t.r)) > rangeTiles) continue;
+      if (other.powerSurgeTimer > 0 || this.disabled.has(other)) continue;
+      const dmg = this.effectiveStats(other).damage;
+      if (dmg > bestDamage) {
+        bestDamage = dmg;
+        best = other;
+      }
+    }
+
+    t.timer = stats.cooldown;
+    if (!best) return;
+    best.powerSurgeTimer = Math.max(best.powerSurgeTimer, 5);
+    if (t.mods.some((m) => m.damageMul && m.damageMul > 1)) best.overcharge = Math.max(best.overcharge, 5);
+    this.game.particles.spawnBeam(t.pos.x, t.pos.y, best.pos.x, best.pos.y, t.def.color, 0.2);
+    this.game.particles.spawnRing(best.pos.x, best.pos.y, 36, t.def.color, 0.35);
+    this.game.particles.spawnFloatingText(best.pos.x, best.pos.y - 26, "OVERCLOCK", t.def.color, 1.0, 11);
+    this.game.audio.sfxPowerSurge(best.pos);
+  }
+
   private powerSurgeMul(t: Tower): number {
     return t.powerSurgeTimer > 0 ? 2 : 1;
   }
@@ -736,6 +873,23 @@ export class TowerSystem {
       armorPierce: Boolean(t.flags.armorPiercer),
       slowOnHit: t.flags.suppressiveFire ? 0.4 : 0,
       slowStrength: 0.75,
+    });
+    this.game.projectiles.spawn(p);
+  }
+
+  private fireSnare(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
+    const p = new Projectile({
+      pos: t.pos,
+      target,
+      damage: stats.damage,
+      color: t.def.color,
+      speed: t.def.projectileSpeed ?? 420,
+      kind: "bullet",
+      owner: { tower: t },
+      ownerType: "snare",
+      slowOnHit: 2.0,
+      slowStrength: 0,
+      stunChance: t.flags.empArc ? 1 : 0,
     });
     this.game.projectiles.spawn(p);
   }

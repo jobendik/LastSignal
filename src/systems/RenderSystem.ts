@@ -25,6 +25,7 @@ export class RenderSystem {
   private stars: { x: number; y: number; r: number; a: number }[] = [];
   // Ambient ghost silhouettes for main menu background animation.
   private menuGhosts: { x: number; y: number; vx: number; vy: number; r: number; color: string; trail: { x: number; y: number }[] }[] = [];
+  private dirtyRects: { x: number; y: number; w: number; h: number }[] = [];
 
   constructor(private readonly game: Game) {
     this.lightCanvas = document.createElement("canvas");
@@ -47,11 +48,26 @@ export class RenderSystem {
     this.terrainCache.height = VIEW_HEIGHT;
     this.generateNoiseTexture();
     this.generateStars();
+    this.game.bus.on("tower:built", (t: unknown) => this.markEntityDirty(t));
+    this.game.bus.on("tower:sold", (t: unknown) => this.markEntityDirty(t));
+    this.game.bus.on("credits:changed", () => this.markDirty(0, 0, VIEW_WIDTH, 80));
   }
 
   /** Call when a new sector loads to force terrain re-bake next frame. */
   invalidateTerrainCache(): void {
     this.terrainCacheDirty = true;
+    this.markDirty(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  }
+
+  private markDirty(x: number, y: number, w: number, h: number): void {
+    if (this.dirtyRects.length > 64) this.dirtyRects.length = 0;
+    this.dirtyRects.push({ x, y, w, h });
+  }
+
+  private markEntityDirty(entity: unknown): void {
+    const maybe = entity as { pos?: { x: number; y: number } } | null;
+    if (!maybe?.pos) return;
+    this.markDirty(maybe.pos.x - 90, maybe.pos.y - 90, 180, 180);
   }
 
   private generateStars(): void {
@@ -87,7 +103,12 @@ export class RenderSystem {
     this.previousFrameCtx.drawImage(ctx.canvas, 0, 0);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    if (quality === "low" && this.dirtyRects.length > 0 && this.game.state === "PLANNING") {
+      for (const r of this.dirtyRects) ctx.clearRect(r.x, r.y, r.w, r.h);
+    } else {
+      ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    }
+    this.dirtyRects.length = 0;
 
     // Screen shake: directional bias toward impact + rotational component.
     const shake = this.game.core.shake;
@@ -147,6 +168,7 @@ export class RenderSystem {
       ctx.drawImage(this.lightCanvas, 0, 0);
       ctx.restore();
     }
+    this.drawDarknessMode(ctx);
 
     // Reset shake before CRT so the overlay sits fixed on screen.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -279,6 +301,32 @@ export class RenderSystem {
 
     if (this.game.core.settings.graphicsQuality === "high") this.drawFilmGrain(ctx);
 
+    ctx.restore();
+  }
+
+  private drawDarknessMode(ctx: CanvasRenderingContext2D): void {
+    if (!this.game.core.sector?.darkness) return;
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
+    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.globalCompositeOperation = "destination-out";
+
+    const reveal = (x: number, y: number, radius: number) => {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      g.addColorStop(0, "rgba(0,0,0,0.95)");
+      g.addColorStop(0.55, "rgba(0,0,0,0.55)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    reveal(this.game.grid.corePos.x, this.game.grid.corePos.y, 120);
+    for (const t of this.game.towers.list) {
+      const stats = this.game.towers.effectiveStats(t);
+      reveal(t.pos.x, t.pos.y, Math.max(46, Math.min(150, stats.range * 0.75)));
+    }
     ctx.restore();
   }
 
@@ -959,6 +1007,53 @@ export class RenderSystem {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(`+${Math.round(ampBoost * 100)}%`, 0, 0);
+    } else if (t.type === "reflector") {
+      ctx.rotate(-aimAngle);
+      ctx.strokeStyle = t.def.color;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = t.def.color;
+      ctx.beginPath();
+      ctx.moveTo(-11, -7);
+      ctx.lineTo(11, 7);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, elapsed * 1.4, elapsed * 1.4 + Math.PI * 1.2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.rotate(aimAngle);
+    } else if (t.type === "snare") {
+      ctx.fillRect(-4 - (t.recoil || 0), -5, 15, 10);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        const x = 3 + i * 4;
+        ctx.beginPath();
+        ctx.moveTo(x, -5);
+        ctx.lineTo(x + 3, 5);
+        ctx.stroke();
+      }
+    } else if (t.type === "overclock") {
+      ctx.rotate(-aimAngle);
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + elapsed * 0.7;
+        const rad = i % 2 === 0 ? 11 : 7;
+        const px = Math.cos(a) * rad;
+        const py = Math.sin(a) * rad;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.globalAlpha = 0.65;
+      ctx.beginPath();
+      ctx.arc(0, 0, 14 + Math.sin(elapsed * 5) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.rotate(aimAngle);
     } else {
       ctx.fillRect(-3 - (t.recoil || 0), -7, 14, 14);
     }
@@ -974,6 +1069,46 @@ export class RenderSystem {
     if (t.specId) {
       ctx.fillStyle = "#ff9800";
       ctx.fillRect(-9, -18, 18, 2);
+    }
+
+    // Specialization silhouettes: each spec adds a small, readable module to the tower body.
+    if (t.specId) {
+      ctx.save();
+      ctx.strokeStyle = "#ff9800";
+      ctx.fillStyle = "#ff9800";
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "#ff9800";
+      ctx.globalAlpha = 0.9;
+      if (t.specId.includes("focus_lens")) {
+        ctx.beginPath();
+        ctx.arc(10, 0, 5, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (t.specId.includes("chain_storm")) {
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + elapsed;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * 12, Math.sin(a) * 12, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (t.specId.includes("ricochet") || t.flags.railRicochet) {
+        ctx.beginPath();
+        ctx.moveTo(-10, 9);
+        ctx.lineTo(0, 14);
+        ctx.lineTo(10, 9);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, 12, elapsed, elapsed + Math.PI * 0.75);
+        ctx.stroke();
+      }
+      if (t.pinnacleId) {
+        ctx.strokeStyle = "#ffffff";
+        ctx.globalAlpha = 0.75;
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, -elapsed * 1.2, -elapsed * 1.2 + Math.PI * 1.4);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     // Level-based structural complexity.
@@ -1196,6 +1331,17 @@ export class RenderSystem {
     ctx.shadowColor = frozen ? "#80d8ff" : e.color;
     ctx.fillStyle = bodyColor;
 
+    const lodSimple =
+      this.game.core.settings.graphicsQuality === "low" ||
+      (!e.isBoss && Math.hypot(e.pos.x - VIEW_WIDTH / 2, e.pos.y - VIEW_HEIGHT / 2) > 360);
+    if (lodSimple) {
+      ctx.beginPath();
+      ctx.arc(0, 0, e.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
     // Shape by type.
     switch (e.type) {
       case "scout": {
@@ -1356,6 +1502,22 @@ export class RenderSystem {
         break;
       }
       case "leviathan": {
+        for (let si = 0; si < e.leviathanSegments.length; si++) {
+          const seg = e.leviathanSegments[si]!;
+          if (!seg.active) continue;
+          const a = seg.angle + Math.sin(e.timer * 1.4 + si) * 0.35;
+          const dist = e.size * (1.25 + si * 0.18);
+          const hpA = Math.max(0.25, seg.hp / seg.maxHp);
+          ctx.save();
+          ctx.globalAlpha = 0.35 + hpA * 0.45;
+          ctx.fillStyle = si % 2 === 0 ? e.color : "#ff8a80";
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = ctx.fillStyle as string;
+          ctx.beginPath();
+          ctx.ellipse(Math.cos(a) * dist, Math.sin(a) * dist, e.size * 0.42, e.size * 0.24, a, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
         // Multi-segment rotating rings.
         const ringData = [
           { r: e.size * 1.85, speed: 0.7, segs: 6, gap: 0.22, color: e.color },
@@ -1393,6 +1555,33 @@ export class RenderSystem {
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 2;
         ctx.stroke();
+        break;
+      }
+      case "harbinger": {
+        ctx.beginPath();
+        for (let i = 0; i < 7; i++) {
+          const a = (i / 7) * Math.PI * 2 + Math.sin(e.timer * 1.2) * 0.08;
+          const r = e.size * (i % 2 === 0 ? 1.15 : 0.72);
+          const x = Math.cos(a) * r;
+          const y = Math.sin(a) * r;
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.rotate(e.timer * 0.8);
+        ctx.strokeStyle = "#ff8a80";
+        ctx.globalAlpha = 0.65;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(e.size * 1.8, 0);
+          ctx.stroke();
+          ctx.rotate((Math.PI * 2) / 3);
+        }
+        ctx.globalAlpha = 1;
         break;
       }
       case "sprinter":

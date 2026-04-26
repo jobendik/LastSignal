@@ -132,6 +132,15 @@ export class TowerPanel {
         b.onclick = () => this.game.towers.applySpecialization(t, opt.id);
         list.append(b);
       }
+      if (t.type === "pulse" && this.game.towers.hasAdjacentLevel(t, "stasis", 3)) {
+        const b = el("button", { class: "ls-tp-spec-option" });
+        b.append(
+          el("div", { class: "ls-tp-spec-name", text: "Cryo Proximity" }),
+          el("div", { class: "ls-tp-spec-desc", text: "Cross-specialization unlocked by adjacent L3 Stasis. Pulse shots inherit a cryo field module." }),
+        );
+        b.onclick = () => this.game.towers.applySpecialization(t, "pulse_cryo_proximity");
+        list.append(b);
+      }
       this.el.append(list);
     } else if (t.specId) {
       this.el.append(el("div", { class: "ls-tp-spec-applied", text: "SPEC: " + t.specId.replace(/_/g, " ").toUpperCase() }));

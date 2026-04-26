@@ -16,9 +16,22 @@ export class GridSystem {
 
   /** Cache "can place tower here?" by cell index. Invalidated on map change. */
   private placementCacheDirty = true;
+  private pathWorker: Worker | null = null;
 
   constructor() {
     this.reset();
+    if (typeof Worker !== "undefined") {
+      try {
+        this.pathWorker = new Worker(new URL("../workers/pathfindingWorker.ts", import.meta.url), { type: "module" });
+        this.pathWorker.onmessage = (event: MessageEvent<{ flow: number[]; dist: number[] }>) => {
+          this.flow.set(event.data.flow);
+          this.dist.set(event.data.dist);
+          this.placementCacheDirty = true;
+        };
+      } catch {
+        this.pathWorker = null;
+      }
+    }
   }
 
   idx(c: number, r: number): number {
@@ -139,6 +152,10 @@ export class GridSystem {
       }
     }
     this.placementCacheDirty = true;
+    this.pathWorker?.postMessage({
+      cells: Array.from(this.cells),
+      coreCells: this.coreCells,
+    });
   }
 
   /** Vector pointing toward the core from a world position. */

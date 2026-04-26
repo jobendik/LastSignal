@@ -156,6 +156,47 @@ export const towerDefinitions: Record<TowerType, TowerDefinition> = {
     damageType: "none",
     hotkey: "0",
   },
+  reflector: {
+    id: "reflector",
+    name: "Reflector",
+    role: "Rail mirror",
+    description:
+      "Projects a mirror plane. Nearby Railgun beams can redirect through it for angled secondary shots.",
+    cost: 95,
+    range: 84,
+    damage: 0,
+    cooldown: 99999,
+    color: "#e0f7fa",
+    damageType: "none",
+  },
+  snare: {
+    id: "snare",
+    name: "Snare Tower",
+    role: "Hard control",
+    description:
+      "Launches a net projectile that stops one enemy for 2 seconds, then shatters.",
+    cost: 65,
+    range: 118,
+    damage: 0,
+    cooldown: 2.4,
+    color: "#cddc39",
+    damageType: "none",
+    effect: "slow",
+    projectileSpeed: 420,
+  },
+  overclock: {
+    id: "overclock",
+    name: "Overclock Station",
+    role: "Tempo support",
+    description:
+      "Charges an adjacent combat tower with +50% fire rate for 5 seconds, then recharges.",
+    cost: 125,
+    range: 48,
+    damage: 0,
+    cooldown: 15,
+    color: "#ff4081",
+    damageType: "none",
+  },
 };
 
 export const towerOrder: TowerType[] = [
@@ -169,6 +210,9 @@ export const towerOrder: TowerType[] = [
   "flamer",
   "barrier",
   "amplifier",
+  "reflector",
+  "snare",
+  "overclock",
 ];
 
 /**
@@ -334,6 +378,12 @@ export const towerSpecializations: Record<TowerType, SpecializationTree> = {
         name: "Piercing Round",
         description: "Rounds pierce through the first target.",
         mod: { flags: { armorPiercer: true } },
+        pinnacle: {
+          id: "railgun_ricochet",
+          name: "Ricochet Geometry",
+          description: "Rail beams bounce off terrain and Reflectors up to 2 times.",
+          mod: { flags: { railRicochet: true, pinnacle: true } },
+        },
       },
     ],
   },
@@ -403,6 +453,75 @@ export const towerSpecializations: Record<TowerType, SpecializationTree> = {
         name: "Overclock",
         description: "Also boosts adjacent tower fire rate by +10%.",
         mod: { flags: { overclockAdjacent: true } },
+      },
+    ],
+  },
+  reflector: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "reflector_long_plane",
+        name: "Long Plane",
+        description: "+40% mirror influence range.",
+        mod: { rangeMul: 1.4 },
+      },
+      {
+        id: "reflector_hardlight",
+        name: "Hardlight Prism",
+        description: "Redirected Railgun beams deal +25% damage.",
+        mod: { damageMul: 1.25 },
+      },
+      {
+        id: "reflector_feedback",
+        name: "Feedback Sink",
+        description: "Nearby towers gain mild protection from reflected shots.",
+        mod: { flags: { deflectorGrid: true } },
+      },
+    ],
+  },
+  snare: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "snare_barbed_net",
+        name: "Barbed Net",
+        description: "Nets deal light kinetic damage when they shatter.",
+        mod: { damageAdd: 4 },
+      },
+      {
+        id: "snare_wide_cast",
+        name: "Wide Cast",
+        description: "+25% range.",
+        mod: { rangeMul: 1.25 },
+      },
+      {
+        id: "snare_emp_mesh",
+        name: "EMP Mesh",
+        description: "Nets stun briefly after the root ends.",
+        mod: { flags: { empArc: true } },
+      },
+    ],
+  },
+  overclock: {
+    unlockLevel: 3,
+    options: [
+      {
+        id: "overclock_fast_cycle",
+        name: "Fast Cycle",
+        description: "Recharge 25% faster.",
+        mod: { cooldownMul: 0.75 },
+      },
+      {
+        id: "overclock_wide_bus",
+        name: "Wide Bus",
+        description: "Can affect towers up to 2 tiles away.",
+        mod: { rangeMul: 2 },
+      },
+      {
+        id: "overclock_safe_current",
+        name: "Safe Current",
+        description: "Affected towers also gain +10% damage while boosted.",
+        mod: { damageMul: 1.1 },
       },
     ],
   },

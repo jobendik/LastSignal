@@ -109,4 +109,10 @@ export const codexEntries: Record<EnemyType, CodexEntry> = {
     counters: ["Splash damage", "Flamer cones", "Spread targeting"],
     tip: "Mirrors absorb three tower hits. Avoid concentrating fire from one expensive tower until its shell breaks.",
   },
+  harbinger: {
+    enemyId: "harbinger",
+    threatHeadline: "Ranged artillery boss - shells tower clusters from the edge.",
+    counters: ["Railgun", "Reflector angles", "Spread-out towers"],
+    tip: "Do not pack your best towers together. The Harbinger punishes dense layouts with artillery warnings.",
+  },
 };

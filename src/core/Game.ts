@@ -85,6 +85,7 @@ export class Game {
 
   private rafId = 0;
   private running = false;
+  private replayEvents: { t: number; event: string; data?: unknown }[] = [];
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     this.canvas = canvas;
@@ -294,6 +295,22 @@ export class Game {
     this.bus.emit("menu:returned");
   }
 
+  recordReplayEvent(event: string, data?: unknown): void {
+    this.replayEvents.push({ t: Number(this.time.elapsed.toFixed(3)), event, data });
+    if (this.replayEvents.length > 1200) this.replayEvents.shift();
+  }
+
+  startDailyChallenge(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const index = Math.abs(today.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0)) % sectorDefinitions.length;
+    this.core.profile.dailyBestDate = today;
+    this.beginSector(sectorDefinitions[index]!, {
+      endless: false,
+      loadoutId: "assault",
+    });
+    this.particles.spawnFloatingText(this.grid.corePos.x, this.grid.corePos.y - 46, "DAILY CHALLENGE", "#ffeb3b", 1.8, 14);
+  }
+
   togglePause(): void {
     if (this.state === "PAUSED") {
       this.setState("WAVE_ACTIVE"); // resume implies a wave was active
@@ -484,6 +501,9 @@ export class Game {
       this.stats.createJournalEntry(result),
       ...(p.runHistory ?? []),
     ].slice(0, 12);
+    const today = new Date().toISOString().slice(0, 10);
+    const dailyScore = this.core.waveIndex * 1000 + this.core.stats.enemiesKilled + corePct * 10;
+    if (p.dailyBestDate === today) p.dailyBestScore = Math.max(p.dailyBestScore, dailyScore);
     this.persistence.saveProfile(p);
   }
 
@@ -553,17 +573,42 @@ export class Game {
       if (this.core.hitStopTimer <= 0 && this.state === "WAVE_ACTIVE" && this.waves.isWaveFinished() && this.enemies.list.length === 0) {
         this.waves.onWaveComplete();
       }
+      this.saveRunSnapshot();
     } else if (this.state === "PLANNING") {
       // Tower visuals still animate a bit, drones idle, particles decay.
       this.drones.update(dt * 0.5);
       this.particles.update(dt);
       this.waves.updatePlanningCountdown(dt);
+      this.saveRunSnapshot();
     } else if (this.state === "PAUSED") {
       // Freeze simulation; particles continue for ambient visual only.
       this.particles.update(dt * 0.2);
     }
 
     this.input.update(dt);
+  }
+
+  private saveRunSnapshot(): void {
+    if (!this.core.sector || (this.state !== "PLANNING" && this.state !== "WAVE_ACTIVE" && this.state !== "WAVE_COMPLETE")) return;
+    this.persistence.saveRunSnapshot({
+      version: 1,
+      state: this.state,
+      sectorId: this.core.sector.id,
+      waveIndex: this.core.waveIndex,
+      credits: this.core.credits,
+      coreIntegrity: this.core.coreIntegrity,
+      towers: this.towers.list.map((t) => ({
+        type: t.type,
+        c: t.c,
+        r: t.r,
+        level: t.level,
+        specId: t.specId,
+        pinnacleId: t.pinnacleId,
+      })),
+      stats: this.core.stats,
+      savedAt: Date.now(),
+    });
+    this.persistence.saveReplay(this.replayEvents);
   }
 
   // ----- Convenience world metrics -----

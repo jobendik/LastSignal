@@ -19,6 +19,7 @@ if (!canvas) {
 }
 canvas!.width = VIEW_WIDTH;
 canvas!.height = VIEW_HEIGHT;
+canvas!.style.aspectRatio = `${VIEW_WIDTH} / ${VIEW_HEIGHT}`;
 
 // Reuse an existing UI root if provided, otherwise create one.
 let uiRoot = document.getElementById("ls-ui") ?? document.getElementById("ui-root");
@@ -45,6 +46,14 @@ function fit(): void {
 }
 fit();
 window.addEventListener("resize", fit);
+try {
+  const hot = (import.meta as unknown as { hot?: { accept: (deps?: string[], cb?: () => void) => void } }).hot;
+  hot?.accept(["./data/towers.ts", "./data/enemies.ts", "./data/waves.ts", "./data/sectors.ts"], () => {
+    console.info("[LastSignal] balance data hot-reloaded; restart the current sector to apply structural map/wave changes.");
+  });
+} catch {
+  /* non-Vite env */
+}
 
 // Attempt to unlock audio on first user interaction.
 function unlockAudio(): void {

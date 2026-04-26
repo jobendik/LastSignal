@@ -1,5 +1,6 @@
 import type { Game } from "../core/Game";
 import type { RunJournalEntry } from "../core/Types";
+import { achievementDefinitions } from "../data/achievements";
 import { el, clear } from "./dom";
 
 const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^█▓▒░▄▀■□";
@@ -79,6 +80,7 @@ export class MainMenu {
         `<div>Best wave reached: <strong>${p.bestWaveReached}</strong></div>` +
         `<div>Codex entries: <strong>${p.codexSeen.length}</strong> / 14</div>` +
         `<div>Research points: <strong>${p.researchPoints}</strong></div>` +
+        `<div>Prestige: <strong>${p.prestigeLevel}</strong> (x${p.prestigeMultiplier.toFixed(2)})</div>` +
         `<div>Endless best wave: <strong>${p.endlessBestWave}</strong></div>` +
         `<div>Recorded runs: <strong>${p.runHistory.length}</strong></div>`,
       }),
@@ -101,6 +103,17 @@ export class MainMenu {
       this.el.append(journal);
     }
 
+    const medals = el("div", { class: "ls-achievement-showcase" });
+    for (const a of achievementDefinitions.slice(0, 6)) {
+      const unlocked = p.achievementsUnlocked.includes(a.id);
+      medals.append(el("div", {
+        class: `ls-medal ${unlocked ? "unlocked" : "locked"}`,
+        attrs: { title: `${a.name}: ${a.description}` },
+        text: `${a.icon} ${unlocked ? "100%" : "0%"}`,
+      }));
+    }
+    this.el.append(medals);
+
     const actions = el("div", { class: "ls-actions" });
     const startBtn = el("button", { class: "ls-btn ls-btn-primary", text: "START MISSION" });
     startBtn.onclick = () => this.game.setState("SECTOR_SELECT");
@@ -113,6 +126,10 @@ export class MainMenu {
     const researchBtn = el("button", { class: "ls-btn", text: "RESEARCH" });
     researchBtn.onclick = () => this.game.ui.openMeta();
     actions.append(researchBtn);
+
+    const dailyBtn = el("button", { class: "ls-btn", text: "DAILY" });
+    dailyBtn.onclick = () => this.game.startDailyChallenge();
+    actions.append(dailyBtn);
 
     const settingsBtn = el("button", { class: "ls-btn", text: "SETTINGS" });
     settingsBtn.onclick = () => this.game.ui.openSettings();

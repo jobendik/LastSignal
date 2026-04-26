@@ -101,6 +101,10 @@ export class Enemy {
   mirrorCharges = 3; // remaining reflections before mirror breaks
   mirrorCooldown = 0; // seconds between reflections
 
+  // Harbinger artillery boss state.
+  artilleryCooldown = 2.8;
+  leviathanSegments: { hp: number; maxHp: number; angle: number; active: boolean }[] = [];
+
   // Singularity pull state applied by upgraded Stasis towers.
   singularityTimer = 0;
   singularityMax = 1;
@@ -121,6 +125,14 @@ export class Enemy {
     this.size = def.size;
     this.isBoss = Boolean(def.isBoss);
     this.ability = def.ability;
+    if (type === "leviathan") {
+      this.leviathanSegments = Array.from({ length: 7 }, (_, i) => ({
+        hp: this.maxHp / 7,
+        maxHp: this.maxHp / 7,
+        angle: (i / 7) * Math.PI * 2,
+        active: true,
+      }));
+    }
   }
 
   get currentSpeed(): number {
@@ -139,6 +151,14 @@ export class Enemy {
     }
     const armor = Math.min(0.95, (this.def.armor ?? 0) + this.extraArmor);
     const actual = amount * (1 - armor);
+    if (this.type === "leviathan" && this.leviathanSegments.length > 0) {
+      const live = this.leviathanSegments.filter((s) => s.active);
+      const seg = live[Math.floor(Math.random() * live.length)];
+      if (seg) {
+        seg.hp -= actual;
+        if (seg.hp <= 0) seg.active = false;
+      }
+    }
     this.hp -= actual;
     this.damageTakenThisWave += actual;
     this.lastDamageSource = source ?? this.lastDamageSource;

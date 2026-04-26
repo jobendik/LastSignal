@@ -37,6 +37,7 @@ export class Tower {
   powerSurgeTimer = 0;
   static readonly DISSOLVE_MAX = 0.45;
   specId: string | null = null;
+  pinnacleId: string | null = null;
   flags: Partial<Record<TowerFlag, boolean>> = {};
   mods: TowerMod[] = [];
   targetMode: TargetMode = "closest_to_core";
@@ -103,6 +104,13 @@ export class Tower {
     return this.level >= tree.unlockLevel && this.specId == null;
   }
 
+  get canPinnacle(): boolean {
+    if (this.level < 5 || this.specId == null || this.pinnacleId != null) return false;
+    const tree = towerSpecializations[this.type];
+    const opt = tree.options.find((o) => o.id === this.specId);
+    return Boolean(opt?.pinnacle);
+  }
+
   applySpecialization(specId: string): void {
     const tree = towerSpecializations[this.type];
     const opt = tree.options.find((o) => o.id === specId);
@@ -111,6 +119,21 @@ export class Tower {
     this.mods.push(opt.mod);
     if (opt.mod.flags) {
       for (const [k, v] of Object.entries(opt.mod.flags)) {
+        if (v) this.flags[k as TowerFlag] = true;
+      }
+    }
+  }
+
+  applyPinnacle(): void {
+    if (!this.specId) return;
+    const tree = towerSpecializations[this.type];
+    const opt = tree.options.find((o) => o.id === this.specId);
+    const pinnacle = opt?.pinnacle;
+    if (!pinnacle) return;
+    this.pinnacleId = pinnacle.id;
+    this.mods.push(pinnacle.mod);
+    if (pinnacle.mod.flags) {
+      for (const [k, v] of Object.entries(pinnacle.mod.flags)) {
         if (v) this.flags[k as TowerFlag] = true;
       }
     }

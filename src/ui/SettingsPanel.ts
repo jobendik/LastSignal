@@ -27,6 +27,7 @@ export class SettingsPanel {
       this.checkboxRow("Show Damage Numbers", "showDamageNumbers", s.showDamageNumbers),
       this.checkboxRow("Subtitles", "subtitles", s.subtitles),
       this.checkboxRow("Swap Mouse Buttons", "mouseButtonSwap", s.mouseButtonSwap),
+      this.checkboxRow("Gamepad", "gamepadEnabled", s.gamepadEnabled),
       this.checkboxRow("Colorblind Markers", "colorblind", s.colorblind),
       this.checkboxRow("High Contrast", "highContrast", s.highContrast),
       this.selectRow("Font Scale", "fontScale", String(s.fontScale), [
@@ -41,6 +42,10 @@ export class SettingsPanel {
         ["high", "High"],
       ]),
     );
+    form.append(el("div", { class: "ls-form-section", text: "HOTKEYS" }));
+    for (const [action, code] of Object.entries(s.keyBindings)) {
+      form.append(this.keybindRow(action, code));
+    }
     this.el.append(form);
     const row = el("div", { class: "ls-overlay-actions" });
     const close = el("button", { class: "ls-btn ls-btn-primary", text: "Close" });
@@ -97,5 +102,35 @@ export class SettingsPanel {
     };
     row.append(select);
     return row;
+  }
+
+  private keybindRow(action: string, code: string): HTMLElement {
+    const row = el("div", { class: "ls-form-row" });
+    row.append(el("span", { class: "ls-form-label", text: this.labelForAction(action) }));
+    const btn = el("button", { class: "ls-btn ls-keybind-btn", text: this.prettyCode(code) });
+    btn.onclick = () => {
+      btn.textContent = "PRESS KEY";
+      const handler = (ev: KeyboardEvent) => {
+        ev.preventDefault();
+        const next = { ...this.game.core.settings.keyBindings, [action]: ev.code };
+        this.game.settings.update({ keyBindings: next });
+        window.removeEventListener("keydown", handler, true);
+        this.build();
+      };
+      window.addEventListener("keydown", handler, true);
+    };
+    row.append(btn);
+    return row;
+  }
+
+  private labelForAction(action: string): string {
+    return action
+      .replace(/^build(\d+)$/, "Build $1")
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (m) => m.toUpperCase());
+  }
+
+  private prettyCode(code: string): string {
+    return code.replace("Digit", "").replace("Key", "").replace("Equal", "+").replace("Minus", "-");
   }
 }
