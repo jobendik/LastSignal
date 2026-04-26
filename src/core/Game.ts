@@ -575,7 +575,8 @@ export class Game {
       }
       this.saveRunSnapshot();
     } else if (this.state === "PLANNING") {
-      // Tower visuals still animate a bit, drones idle, particles decay.
+      // Tower visuals og bygging skal oppdateres i PLANNING-fasen.
+      this.towers.update(dt); // <- fikser at byggede tårn blir synlige
       this.drones.update(dt * 0.5);
       this.particles.update(dt);
       this.waves.updatePlanningCountdown(dt);
