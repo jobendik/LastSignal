@@ -41,6 +41,9 @@ export class ProjectileSystem {
       if (p.target && p.target.active) {
         dir = p.target.pos.sub(p.pos).normalize();
         p.targetPos = p.target.pos.clone();
+      } else if (p.reflectedTower) {
+        dir = p.reflectedTower.pos.sub(p.pos).normalize();
+        p.targetPos = p.reflectedTower.pos.clone();
       } else {
         dir = p.lastDir;
       }
@@ -48,7 +51,21 @@ export class ProjectileSystem {
       // Record trail position before moving.
       p.trail.push(p.pos.clone());
       if (p.trail.length > 6) p.trail.shift();
-      p.pos = p.pos.add(dir.mult(p.speed * dt));
+      p.pos = p.pos.add(dir.mult(this.effectiveProjectileSpeed(p) * dt));
+      if (p.reflectedTower) {
+        if (!this.game.towers.list.includes(p.reflectedTower)) {
+          p.active = false;
+          continue;
+        }
+        if (p.pos.dist(p.reflectedTower.pos) < 8) {
+          this.game.towers.disableTower(p.reflectedTower, p.reflectedDisable);
+          this.game.particles.spawnBurst(p.reflectedTower.pos.x, p.reflectedTower.pos.y, p.color, 9, { speed: 90, life: 0.35, size: 2 });
+          this.game.particles.spawnRing(p.reflectedTower.pos.x, p.reflectedTower.pos.y, 24, p.color, 0.28);
+          this.game.particles.spawnFloatingText(p.reflectedTower.pos.x, p.reflectedTower.pos.y - 18, "REFLECT HIT", p.color, 0.8, 10);
+          p.active = false;
+          continue;
+        }
+      }
       if (!p.target && p.kind !== "mortar" && this.hitTerrain(p)) {
         this.game.particles.spawnImpactBurst(p.pos.x, p.pos.y, Math.atan2(-dir.y, -dir.x), p.color, 0.8);
         p.active = false;
@@ -140,6 +157,14 @@ export class ProjectileSystem {
     const { c, r } = this.game.grid.worldToCell(p.pos.x, p.pos.y);
     const cell = this.game.grid.cells[this.game.grid.idx(c, r)];
     return cell === CellKind.Rock;
+  }
+
+  private effectiveProjectileSpeed(p: Projectile): number {
+    const g = this.game.core.gravityAnomaly;
+    if (!g) return p.speed;
+    const dx = p.pos.x - g.x;
+    const dy = p.pos.y - g.y;
+    return dx * dx + dy * dy < g.radius * g.radius ? p.speed * 0.55 : p.speed;
   }
 
   private globalMul(p: Projectile): number {

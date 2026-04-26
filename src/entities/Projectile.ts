@@ -27,6 +27,8 @@ export class Projectile {
   chainRange: number;
   owner: ProjectileOwner;
   ownerType: TowerType | "drone" | "other";
+  reflectedTower: Tower | null;
+  reflectedDisable: number;
   active = true;
   life = 2.5;
   maxLife = 2.5;
@@ -57,6 +59,8 @@ export class Projectile {
     armorPierce?: boolean;
     armorBreak?: boolean;
     burningGround?: boolean;
+    reflectedTower?: Tower | null;
+    reflectedDisable?: number;
   }) {
     this.pos = opts.pos.clone();
     this.target = opts.target;
@@ -67,6 +71,8 @@ export class Projectile {
     this.kind = opts.kind;
     this.owner = opts.owner;
     this.ownerType = opts.ownerType;
+    this.reflectedTower = opts.reflectedTower ?? null;
+    this.reflectedDisable = opts.reflectedDisable ?? 0;
     this.splashRadius = opts.splashRadius ?? 0;
     this.slowOnHit = opts.slowOnHit ?? 0;
     this.slowStrength = opts.slowStrength ?? 0.5;

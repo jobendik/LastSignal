@@ -15,11 +15,16 @@ export class RenderSystem {
   private previousFrameCanvas: HTMLCanvasElement;
   private previousFrameCtx: CanvasRenderingContext2D;
   private noiseCanvas: HTMLCanvasElement;
+  // Intermediate canvas for barrel distortion source.
+  private distortionCanvas: HTMLCanvasElement;
+  private distortionCtx: CanvasRenderingContext2D;
   // Pre-baked static terrain (rocks + AO shadows): rebuilt on sector start.
   private terrainCache: HTMLCanvasElement;
   private terrainCacheDirty = true;
   // Pre-built star field (static, generated once).
   private stars: { x: number; y: number; r: number; a: number }[] = [];
+  // Ambient ghost silhouettes for main menu background animation.
+  private menuGhosts: { x: number; y: number; vx: number; vy: number; r: number; color: string; trail: { x: number; y: number }[] }[] = [];
 
   constructor(private readonly game: Game) {
     this.lightCanvas = document.createElement("canvas");
@@ -33,6 +38,10 @@ export class RenderSystem {
     this.noiseCanvas = document.createElement("canvas");
     this.noiseCanvas.width = 256;
     this.noiseCanvas.height = 256;
+    this.distortionCanvas = document.createElement("canvas");
+    this.distortionCanvas.width = VIEW_WIDTH;
+    this.distortionCanvas.height = VIEW_HEIGHT;
+    this.distortionCtx = this.distortionCanvas.getContext("2d")!;
     this.terrainCache = document.createElement("canvas");
     this.terrainCache.width = VIEW_WIDTH;
     this.terrainCache.height = VIEW_HEIGHT;
@@ -96,6 +105,7 @@ export class RenderSystem {
     }
 
     this.drawBackground(ctx);
+    if (this.game.state === "MAIN_MENU") this.drawMainMenuAmbience(ctx);
     if (quality === "high" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
       this.drawPhosphorPersistence(ctx);
     }
@@ -104,11 +114,15 @@ export class RenderSystem {
     this.drawPathPreview(ctx);
     if (this.game.core.showHeatmap) this.drawHeatmap(ctx);
     this.drawKillZone(ctx);
+    this.drawMeteorWarnings(ctx);
+    this.drawGravityAnomaly(ctx);
+    this.drawSignalInterference(ctx);
     this.drawCore(ctx);
     this.drawDamageZones(ctx);
     this.drawScorchDecals(ctx);
     this.drawRings(ctx);
     this.drawTowers(ctx);
+    this.drawSilenceOverlay(ctx);
     this.drawEnemies(ctx);
     this.drawDrones(ctx);
     this.drawProjectiles(ctx);
@@ -117,6 +131,7 @@ export class RenderSystem {
     this.drawMuzzleFlashes(ctx);
     this.drawParticles(ctx);
     this.drawCreditOrbs(ctx);
+    this.drawSalvagePickups(ctx);
     this.drawFloatingText(ctx);
     this.drawBuildSynergyHighlights(ctx);
     this.drawPlacementPreview(ctx);
@@ -140,6 +155,7 @@ export class RenderSystem {
     }
     if (quality === "high" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
       this.drawChromaticAberration(ctx);
+      this.applyBarrelDistortion(ctx);
     }
     this.drawScreenFlashes(ctx);
     this.drawPlanningTimerArc(ctx);
@@ -1140,6 +1156,7 @@ export class RenderSystem {
       ctx.restore();
     }
 
+    const elapsed = this.game.time.elapsed;
     let enemyAlpha = 1;
     if (e.isPhased) enemyAlpha = 0.25 + Math.sin(e.timer * 12) * 0.1;
     if (e.spawnFxTimer > 0) {
@@ -1608,6 +1625,35 @@ export class RenderSystem {
       ctx.arc(0, 0, e.size + 5, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
+    }
+
+    // Shield drones: orbiting cyan spheres, one per active drone.
+    if (e.shieldDroneCount > 0) {
+      const orbitR = e.size + 9;
+      const spin = elapsed * 2.2;
+      for (let d = 0; d < e.shieldDroneCount; d++) {
+        const angle = e.shieldDroneAngles[d]! + spin;
+        const dx = Math.cos(angle) * orbitR;
+        const dy = Math.sin(angle) * orbitR;
+        ctx.save();
+        ctx.translate(dx, dy);
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "#80d8ff";
+        ctx.fillStyle = "#80d8ff";
+        ctx.beginPath();
+        ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+      // Thin orbit ring.
+      ctx.strokeStyle = "rgba(128, 216, 255, 0.35)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.arc(0, 0, orbitR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // Mark indicator (signal marker).
@@ -2252,6 +2298,147 @@ export class RenderSystem {
     ctx.restore();
   }
 
+  private drawGravityAnomaly(ctx: CanvasRenderingContext2D): void {
+    const g = this.game.core.gravityAnomaly;
+    if (!g) return;
+    const t = this.game.time.elapsed;
+    const fade = Math.min(1, g.timer / 1.5) * Math.min(1, (g.maxTimer - g.timer + 0.01) / 1.5);
+    ctx.save();
+    ctx.globalAlpha = fade;
+
+    // Translucent radial fill.
+    const grad = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.radius);
+    grad.addColorStop(0, "rgba(179, 157, 219, 0.25)");
+    grad.addColorStop(0.6, "rgba(103, 58, 183, 0.12)");
+    grad.addColorStop(1, "rgba(103, 58, 183, 0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(g.x, g.y, g.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rotating dashed ring.
+    const pulse = 0.55 + 0.35 * Math.sin(t * 3);
+    ctx.strokeStyle = `rgba(179, 157, 219, ${0.7 * pulse})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.lineDashOffset = -(t * 30) % 10;
+    ctx.beginPath();
+    ctx.arc(g.x, g.y, g.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Inner spiral arms (3 lines rotating outward).
+    for (let arm = 0; arm < 3; arm++) {
+      const angle = t * 1.6 + (arm * Math.PI * 2) / 3;
+      const x2 = g.x + Math.cos(angle) * g.radius * 0.65;
+      const y2 = g.y + Math.sin(angle) * g.radius * 0.65;
+      ctx.strokeStyle = `rgba(179, 157, 219, ${0.4 * pulse})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(g.x, g.y);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  private drawMeteorWarnings(ctx: CanvasRenderingContext2D): void {
+    const strikes = this.game.core.meteorStrikes;
+    if (strikes.length === 0) return;
+    const t = this.game.time.elapsed;
+    ctx.save();
+    for (const m of strikes) {
+      if (m.timer <= 0) continue;
+      const prog = 1 - m.timer / m.maxTimer; // 0 = just appeared, 1 = about to hit
+      const px = m.c * TILE_SIZE + TILE_SIZE / 2;
+      const py = m.r * TILE_SIZE + TILE_SIZE / 2;
+      const pulse = 0.5 + 0.45 * Math.sin(t * (6 + prog * 10));
+
+      // Growing danger fill.
+      ctx.fillStyle = `rgba(255, 112, 67, ${0.06 + prog * 0.12})`;
+      ctx.beginPath();
+      ctx.arc(px, py, TILE_SIZE * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Pulsing warning ring — shrinks as strike approaches.
+      const ringR = TILE_SIZE * (0.55 + (1 - prog) * 0.55);
+      ctx.strokeStyle = `rgba(255, 112, 67, ${0.5 + pulse * 0.45})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner crosshair.
+      const cr = TILE_SIZE * 0.3 * (1 - prog * 0.6);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.35 + pulse * 0.3})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(px - cr, py); ctx.lineTo(px + cr, py);
+      ctx.moveTo(px, py - cr); ctx.lineTo(px, py + cr);
+      ctx.stroke();
+
+      // Countdown text (only when > 1s remaining).
+      if (m.timer > 0.8) {
+        ctx.fillStyle = `rgba(255, 160, 100, ${0.7 + pulse * 0.3})`;
+        ctx.font = "bold 9px Courier New";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(m.timer.toFixed(1) + "s", px, py - TILE_SIZE * 0.55);
+        ctx.textBaseline = "alphabetic";
+      }
+    }
+    ctx.restore();
+  }
+
+  private drawSilenceOverlay(ctx: CanvasRenderingContext2D): void {
+    const sTimer = this.game.waves.silenceTimer;
+    if (sTimer <= 0) return;
+    const t = this.game.time.elapsed;
+    const fade = Math.min(1, sTimer / 0.5); // fade-out in last 0.5s
+    ctx.save();
+
+    // Dark semi-transparent overlay across the tower zone.
+    for (const tower of this.game.towers.list) {
+      const px = tower.pos.x;
+      const py = tower.pos.y;
+      const pulse = 0.55 + 0.35 * Math.sin(t * 5 + px * 0.02);
+
+      // Purple suppression veil per tower.
+      ctx.fillStyle = `rgba(60, 20, 90, ${0.45 * fade * pulse})`;
+      ctx.beginPath();
+      ctx.arc(px, py, TILE_SIZE * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dashed suppression ring.
+      ctx.strokeStyle = `rgba(124, 77, 255, ${0.7 * fade * pulse})`;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.lineDashOffset = (t * 20) % 6;
+      ctx.beginPath();
+      ctx.arc(px, py, TILE_SIZE * 0.48, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Big centered countdown text.
+    const cx = VIEW_WIDTH / 2;
+    const cy = VIEW_HEIGHT / 2 - 30;
+    ctx.globalAlpha = 0.88 * fade;
+    ctx.fillStyle = "#7c4dff";
+    ctx.font = `bold ${14}px Courier New`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "#7c4dff";
+    ctx.shadowBlur = 18;
+    ctx.fillText(`SILENCE: ${sTimer.toFixed(1)}s`, cx, cy);
+    ctx.shadowBlur = 0;
+    ctx.textBaseline = "alphabetic";
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
   private drawKillZone(ctx: CanvasRenderingContext2D): void {
     const kz = this.game.core.killZone;
     const kzMode = this.game.core.killZoneMode;
@@ -2317,6 +2504,225 @@ export class RenderSystem {
     ctx.fillText("+20%", x + TILE_SIZE / 2, y + TILE_SIZE / 2);
     ctx.textBaseline = "alphabetic";
 
+    ctx.restore();
+  }
+
+  private drawMainMenuAmbience(ctx: CanvasRenderingContext2D): void {
+    const GHOST_COLORS = ["#66fcf1", "#ff5252", "#ffeb3b", "#b39ddb", "#80cbc4"];
+    // Lazily populate ghost list.
+    if (this.menuGhosts.length === 0) {
+      for (let i = 0; i < 7; i++) {
+        const angle = Math.PI + (Math.random() - 0.5) * 0.8; // mostly left
+        const speed = 18 + Math.random() * 24;
+        this.menuGhosts.push({
+          x: VIEW_WIDTH + Math.random() * 200,
+          y: 60 + Math.random() * (VIEW_HEIGHT - 120),
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          r: 4 + Math.random() * 6,
+          color: GHOST_COLORS[i % GHOST_COLORS.length]!,
+          trail: [],
+        });
+      }
+    }
+
+    const dt = this.game.time.dt;
+    ctx.save();
+
+    for (const g of this.menuGhosts) {
+      // Advance position.
+      g.x += g.vx * dt;
+      g.y += g.vy * dt;
+
+      // Record trail point (cap at 14 points).
+      g.trail.push({ x: g.x, y: g.y });
+      if (g.trail.length > 14) g.trail.shift();
+
+      // Wrap around when off-screen.
+      if (g.x < -60 || g.y < -60 || g.y > VIEW_HEIGHT + 60) {
+        g.x = VIEW_WIDTH + 40 + Math.random() * 80;
+        g.y = 60 + Math.random() * (VIEW_HEIGHT - 120);
+        g.trail = [];
+      }
+
+      // Draw trail.
+      if (g.trail.length > 1) {
+        for (let i = 1; i < g.trail.length; i++) {
+          const alpha = (i / g.trail.length) * 0.25;
+          ctx.strokeStyle = g.color;
+          ctx.globalAlpha = alpha;
+          ctx.lineWidth = g.r * 0.35 * (i / g.trail.length);
+          ctx.beginPath();
+          ctx.moveTo(g.trail[i - 1]!.x, g.trail[i - 1]!.y);
+          ctx.lineTo(g.trail[i]!.x, g.trail[i]!.y);
+          ctx.stroke();
+        }
+      }
+
+      // Draw ghost body.
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = g.color;
+      ctx.shadowColor = g.color;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // Drift data streams: faint diagonal lines moving from bottom-right to top-left.
+    const t = this.game.time.elapsed;
+    for (let i = 0; i < 4; i++) {
+      const phase = (t * 22 + i * 55) % (VIEW_WIDTH + VIEW_HEIGHT);
+      const x1 = VIEW_WIDTH - phase;
+      const y1 = VIEW_HEIGHT;
+      const x2 = x1 + VIEW_HEIGHT * 0.6;
+      const y2 = 0;
+      ctx.globalAlpha = 0.06 + 0.04 * Math.sin(t * 2 + i);
+      ctx.strokeStyle = "#66fcf1";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  private applyBarrelDistortion(ctx: CanvasRenderingContext2D): void {
+    // Approximate CRT barrel distortion: blit the current canvas to a temp buffer,
+    // then redraw it via stepped horizontal strips with per-strip x-offset = barrel curve.
+    this.distortionCtx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    this.distortionCtx.drawImage(ctx.canvas, 0, 0);
+    ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+    const stripH = 4; // pixels per strip — tradeoff between quality and performance
+    const strength = 1.8; // max horizontal pixel shift at screen edges
+    for (let y = 0; y < VIEW_HEIGHT; y += stripH) {
+      // Normalized vertical position: -1 at top, +1 at bottom.
+      const ny = (y / VIEW_HEIGHT) * 2 - 1;
+      // Horizontal barrel curve: offset is proportional to ny^2 (parabolic).
+      // At center ny=0, no shift; at edges ny=±1, max shift inward.
+      const xShift = strength * ny * ny; // always inward (positive = nudge inward from edges)
+      const drawWidth = VIEW_WIDTH - xShift * 2;
+      ctx.drawImage(
+        this.distortionCanvas,
+        0, y, VIEW_WIDTH, Math.min(stripH, VIEW_HEIGHT - y),
+        xShift, y, drawWidth, Math.min(stripH, VIEW_HEIGHT - y)
+      );
+    }
+  }
+
+  private drawSignalInterference(ctx: CanvasRenderingContext2D): void {
+    const si = this.game.core.signalInterference;
+    if (!si) return;
+    const t = this.game.time.elapsed;
+    const fade = Math.min(1, si.totalTimer / 1.5) * Math.min(1, (si.maxTotalTimer - si.totalTimer + 0.01) / 1.5);
+    ctx.save();
+    ctx.globalAlpha = fade;
+
+    // Translucent amber radial fill.
+    const grad = ctx.createRadialGradient(si.x, si.y, 0, si.x, si.y, si.radius);
+    grad.addColorStop(0, "rgba(239, 108, 0, 0.18)");
+    grad.addColorStop(0.6, "rgba(255, 152, 0, 0.08)");
+    grad.addColorStop(1, "rgba(255, 152, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(si.x, si.y, si.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outer interference ring (dashed, counter-rotating).
+    const pulse = 0.5 + 0.45 * Math.sin(t * 4.5);
+    ctx.strokeStyle = `rgba(239, 108, 0, ${0.65 * pulse})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.lineDashOffset = (t * 35) % 9;
+    ctx.beginPath();
+    ctx.arc(si.x, si.y, si.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Static interference lines (6 jagged radial scratches).
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 + t * 0.8;
+      const jitter = (Math.sin(t * 17 + i * 3.1) * 0.3 + 0.7);
+      const x2 = si.x + Math.cos(angle) * si.radius * jitter;
+      const y2 = si.y + Math.sin(angle) * si.radius * jitter;
+      ctx.strokeStyle = `rgba(255, 152, 0, ${0.22 * pulse})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(si.x, si.y);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    // Center label.
+    ctx.globalAlpha = 0.7 * fade;
+    ctx.fillStyle = "#ef6c00";
+    ctx.font = "bold 9px Courier New";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("SIGNAL INTERFERENCE", si.x, si.y + si.radius + 10);
+    ctx.textBaseline = "alphabetic";
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  private drawSalvagePickups(ctx: CanvasRenderingContext2D): void {
+    const pickups = this.game.core.salvagePickups;
+    if (pickups.length === 0) return;
+    const t = this.game.time.elapsed;
+    ctx.save();
+    for (const s of pickups) {
+      const fade = Math.min(1, s.timer / 1.5); // fade out in last 1.5s
+      const spin = t * 3.2;
+      const pulse = 0.7 + 0.25 * Math.sin(t * 5 + s.x * 0.05);
+      ctx.globalAlpha = fade;
+
+      // Glow halo.
+      const grd = ctx.createRadialGradient(s.x, s.y, 2, s.x, s.y, 14);
+      grd.addColorStop(0, "rgba(255, 213, 79, 0.55)");
+      grd.addColorStop(1, "rgba(255, 213, 79, 0)");
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Spinning diamond shape.
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(spin);
+      const sz = 6 * pulse;
+      ctx.fillStyle = "#ffd54f";
+      ctx.shadowColor = "#ffb300";
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(0, -sz);
+      ctx.lineTo(sz * 0.65, 0);
+      ctx.lineTo(0, sz);
+      ctx.lineTo(-sz * 0.65, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Inner bright core.
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(0, 0, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Value label.
+      ctx.fillStyle = `rgba(255, 213, 79, ${0.85 * fade})`;
+      ctx.font = "bold 8px Courier New";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(`+${s.value}`, s.x, s.y - 10);
+      ctx.textBaseline = "alphabetic";
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 

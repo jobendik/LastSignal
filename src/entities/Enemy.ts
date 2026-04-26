@@ -92,6 +92,15 @@ export class Enemy {
   iceMark = false;     // Stasis
   electricMark = false; // Tesla
 
+  /** Number of active shield drones orbiting this enemy. Each absorbs one hit. */
+  shieldDroneCount = 0;
+  /** Orbit phase angles for each shield drone slot. */
+  readonly shieldDroneAngles = [0, Math.PI * 2 / 3, Math.PI * 4 / 3];
+
+  // Mirror-specific state: reflects projectiles back at source tower.
+  mirrorCharges = 3; // remaining reflections before mirror breaks
+  mirrorCooldown = 0; // seconds between reflections
+
   // Singularity pull state applied by upgraded Stasis towers.
   singularityTimer = 0;
   singularityMax = 1;
@@ -122,6 +131,12 @@ export class Enemy {
   }
 
   damage(amount: number, source: DamageSource | null): number {
+    // Shield drones absorb the next tower or drone hit before it reaches the enemy.
+    if (this.shieldDroneCount > 0 && source != null && source.type !== "other") {
+      this.shieldDroneCount--;
+      // Signal absorption via a marker the caller/renderer can check (no HP lost).
+      return 0;
+    }
     const armor = Math.min(0.95, (this.def.armor ?? 0) + this.extraArmor);
     const actual = amount * (1 - armor);
     this.hp -= actual;

@@ -4,7 +4,7 @@
 
 This document is the master checklist for every improvement needed to make the game feel truly epic. Each section covers a domain; each item is a discrete, implementable task.
 
-Status audited against the current codebase on 2026-04-26; `npm run typecheck` and `npm run build` pass. Checklist progress: 168/226 complete (74.3%), 58 remaining.
+Status audited against the current codebase on 2026-04-26; `npm run typecheck` and `npm run build` pass. Checklist progress: 171/226 complete (75.7%), 55 remaining.
 
 ---
 
@@ -129,7 +129,7 @@ The game uses Canvas 2D with procedural geometry. The CRT aesthetic is a strong 
 
 ### 1.1 Shader-Like Canvas Post-Processing
 - [x] Replace the basic CRT scanline (3px stripes, 10% opacity) with a **true scanline shader simulation**: alternating dark/bright horizontal bands with sub-pixel curvature distortion applied to the canvas via `ctx.transform` *(animated brightness variation per row)*
-- [ ] Add **barrel distortion** by rendering the game to an off-screen canvas and using `ctx.drawImage` with a warped quad (approximate via stepped horizontal strips) to simulate CRT screen curve
+- [x] Add **barrel distortion** by rendering the game to an off-screen canvas and using `ctx.drawImage` with a warped quad (approximate via stepped horizontal strips) to simulate CRT screen curve *(`RenderSystem.applyBarrelDistortion()` blits through a temp canvas and redraws 4px horizontal strips with parabolic inward offset in high-quality CRT mode)*
 - [x] Add a **chromatic aberration pass**: draw subtle screen-blend fringe offsets in high-quality mode using `previousFrameCanvas` *(disabled by reduced flashing / reduced motion; stronger when core integrity is low)*
 - [x] Add a **phosphor persistence / motion blur effect**: draw the previous frame at low opacity before the current frame using a dedicated ghost canvas *(previous-frame canvas composited with screen blend)*
 - [x] Add a **noise/film grain overlay**: every frame sample a pre-generated 256×256 noise texture at a random offset *(256px procedural noise texture sampled at random offsets in CRT pass)*
@@ -291,7 +291,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 - [x] **Card flip animation**: the 3 reward cards flip face-up sequentially with a 0.15s stagger *(CSS rotateX reveal with staggered animation delay)*
 - [x] Cards should have a **visual rarity tier**: Common (grey), Uncommon (blue), Rare (purple), Legendary (gold) with particle effects matching rarity *(rarity colors/shadows on cards)*
 - [x] Show card **synergy hints**: "Pairs well with Tesla" or "Amplifies Harvester income" *(data-driven `synergyHint` on upgrades)*
-- [ ] Hovering a card expands it slightly and shows a full description, not just on-click
+- [x] Hovering a card expands it slightly and shows a full description, not just on-click *(CSS `scale(1.06) translateY(-6px)` + rarity-specific glow shadow + `z-index: 10` so card floats above siblings)*
 - [x] Add a **"Reroll" option** (costs credits or a limited resource) to replace all 3 cards *(35CR reroll avoids previous choices when possible)*
 
 ### 5.4 Game Over & Victory Screens
@@ -341,15 +341,15 @@ Juice is the difference between "functional" and "epic." Every action should hav
 
 ### 7.1 Behavioral AI Improvements
 - [x] **Flanking behavior**: 30% of scouts from wave 5+ are assigned a `flankDir` (±1); their flow-field direction is blended with a perpendicular lateral component (0.55× weight) so they diverge left/right of the main lane *(creates natural two-lane spread from each spawner; flankers still follow BFS so they can't escape past rocks)*
-- [ ] **Formation movement**: Grunts and Brutes travel in loose formations and close ranks when one is killed, providing mutual "cover" (shared threat reduction)
-- [ ] **Adaptive pathing**: enemies with pathfinding intelligence (Weaver, Overlord) slightly deviate from the flow field to avoid tower splash zones when possible
+- [x] **Formation movement**: Grunts and Brutes travel in loose formations and close ranks when one is killed, providing mutual "cover" (shared threat reduction) *(`formationCohesion()` helper in EnemySystem; grunts/brutes attract toward centroid of nearby same-type allies within 60px; weight 12 added to desired velocity)*
+- [x] **Adaptive pathing**: enemies with pathfinding intelligence (Weaver, Overlord) slightly deviate from the flow field to avoid tower splash zones when possible *(`mortarAvoidance()` repels Weaver/Overlord from mortar towers within 110px; weighted repulsion added to desired velocity at strength 55)*
 - [x] **Fear response**: when a Carrier is killed, nearby spawned scouts briefly scatter in random directions before regrouping toward the core *(radial knockback 160 + 1.2s stun to all scouts within 130px)*
 
 ### 7.2 New Enemy Mechanics
-- [ ] **Shield Drone companion**: small drone that orbits a Brute and absorbs the next projectile hit, then is destroyed
+- [x] **Shield Drone companion**: small drone that orbits a Brute and absorbs the next projectile hit, then is destroyed *(22% chance for brutes at wave 5+; `shieldDroneCount` on Enemy; `damage()` returns 0 and decrements count on first non-world hit; orbiting cyan spheres + dashed orbit ring in RenderSystem)*
 - [x] **Tunneler enemy**: enemy that moves underground (invisible on grid) and surfaces at a random tile closer to the core *(dive/surface cycle every 3.5–5.5s; 3× speed + untargetable underground; dirt burst FX; ripple ring while tunneling)*
 - [x] **Saboteur enemy**: enemy that temporarily disables a random tower it walks past (similar to boss phase 3 mechanic) *(38px proximity check; 3s disable, 8s cooldown; orange spark burst + DISABLED text)*
-- [ ] **Mirror enemy**: enemy that copies the last projectile type that hit it and fires it back at the shooting tower
+- [x] **Mirror enemy**: enemy that copies the last projectile type that hit it and fires it back at the shooting tower *(Mirror units absorb three tower hits; bullets/mortar shells travel back as reflected projectiles and beam-like Railgun/Tesla/Flamer attacks snap back with matching FX, disabling the source tower for 2s; codex + campaign/endless spawning wired)*
 
 ### 7.3 Boss Improvements
 - [ ] **Leviathan visual overhaul**: multi-segment serpentine body with each segment taking independent damage and dying separately
@@ -360,7 +360,7 @@ Juice is the difference between "functional" and "epic." Every action should hav
 
 ### 7.4 Enemy Variety & Spawning
 - [x] **Mini-boss waves**: occasional single-enemy "elite" variants of standard enemies at 150% HP and size with a glowing border *(6% chance at wave 5+; 150% HP; golden glow border in RenderSystem)*
-- [ ] **Ambush events**: surprise spawns from non-standard directions (not just the 8 designated spawners) — e.g., a crack appears mid-map
+- [x] **Ambush events**: surprise spawns from non-standard directions (not just the 8 designated spawners) — e.g., a crack appears mid-map *(15% chance at 40% kills from wave 4+; picks random walkable mid-map tile; spawns 3-5 scouts with burst FX + "AMBUSH!" floating text; `ambushTriggered` flag per wave in WaveSystem)*
 - [x] **Swarm intelligence**: Swarm enemies visually flock using boid separation/cohesion — they bunch together and split around obstacles in a fluid way *(cohesion force toward center-of-mass of nearby swarm within 55px)*
 - [x] **Enemy telegraphing**: 1s before a wave sub-group spawns, the spawner portal glows brighter and shows the enemy type icon above it *(WaveSystem `telegraphSigns` getter + RenderSystem red pulse ring 1.5s before spawn)*
 
@@ -447,8 +447,8 @@ Juice is the difference between "functional" and "epic." Every action should hav
 - [ ] **Achievement showcase**: achievements displayed as medals/badges on the main menu with percentage of players who have earned each
 
 ### 11.3 Roguelite Depth
-- [ ] **Build archetype bonuses**: if by wave 8 you have 5+ Harvesters, trigger the "Merchant" bonus archetype (+20% income for the rest of the run)
-- [ ] **Synergy discoveries**: first time you combine specific tower pairs and get above a damage threshold, unlock a named "Discovered Combo" with a bonus
+- [x] **Build archetype bonuses**: if by wave 8 you have 5+ Harvesters, trigger the "Merchant" bonus archetype (+20% income for the rest of the run) *(checked in `WaveSystem.checkMilestones()` at wave 8+; directly multiplies `core.upgrades.harvesterIncomeMul *= 1.2`; "MERCHANT NETWORK" fanfare with green rings + burst)*
+- [x] **Synergy discoveries**: first time you combine specific tower pairs and get above a damage threshold, unlock a named "Discovered Combo" with a bonus *(4 combos: Cryo Cascade, Fire & Brimstone, Signal Storm, Iron Harvest — checked in `checkSynergyDiscoveries()` on wave complete; 500 damage threshold; fanfare announcement with pair name + color-matched rings and burst)*
 - [x] **Run journal**: a persistent log of each run with timestamp, sector, wave reached, build, key events — players can review past runs *(profile stores 12 run entries; main menu shows the latest four with result, sector, wave, core, duration, kills, credits, best tower, and modifiers)*
 
 ---
@@ -463,15 +463,15 @@ Juice is the difference between "functional" and "epic." Every action should hav
 
 ### 12.2 New Wave Events
 - [x] **"Blitz" waves**: all enemies spawn simultaneously (no stagger) — tests AoE capability *(WaveDefinition supports `waveEvent: "blitz"`; Wave 9 is now Blitz Swarm; WaveSystem immediately spawns all pending groups with warning text and red portal rings)*
-- [ ] **"Silence" waves**: no new enemies, but existing surviving enemies get healed to full — tests cleanup efficiency
+- [x] **"Silence" waves**: all towers suppressed for 5s at wave start — enemies advance unchallenged during the silence window; purple veil overlay per tower + "SILENCE: Xs" countdown text; `waveEvent: "silence"` on w07b_Silence_Protocol *(WaveSystem.silenceTimer; TowerSystem skips firing; RenderSystem drawSilenceOverlay)*
 - [x] **"Escalation" sub-events**: mid-wave reinforcement drops once per wave from wave 3 onward near the 65% enemy-killed mark *(spawns 2 + waveIndex/2 reinforcements of the wave's dominant enemy type at a random spawner)*
-- [ ] **"Boss Rush"**: wave 15 sends all unique enemy types in sequence — a gauntlet finale
+- [x] **"Boss Rush"**: wave 15 sends all unique enemy types in sequence — a gauntlet finale *(w15_gauntlet: 11 sequential enemy groups with staggered startDelays; scout → grunt → sprinter → brute → phantom → weaver → shielder → jammer → splitter → carrier → juggernaut)*
 
 ### 12.3 Environmental Hazards
-- [ ] **Meteor showers**: random tiles in the map become danger zones (shown with warning rings) that deal damage to enemies AND towers after 2s
+- [x] **Meteor showers**: random tiles in the map become danger zones (shown with warning rings) that deal damage to enemies AND towers after 2s *(every 28-48s during WAVE_ACTIVE: 2-4 tiles selected; 2.2s warning rings with countdown + crosshair; on impact 22 damage to enemies within 52px + 2s tower disable + orange burst; `MeteorStrike` in GameCoreState; `drawMeteorWarnings` in RenderSystem)*
 - [x] **Power surges**: random towers get a 3s free "overcharge" (double fire rate) from environmental power spikes *(during active waves, eligible combat towers periodically gain `powerSurgeTimer`; TowerSystem doubles fire rate while active; RenderSystem draws cyan dashed electric halo + FX burst)*
-- [ ] **Gravity anomaly**: a moving slow field drifts across the map, slowing enemies AND projectile speeds in its radius
-- [ ] **Signal interference**: towers within a radius of the interference zone have reduced range — the zone moves every 10s
+- [x] **Gravity anomaly**: a moving slow field drifts across the map, slowing enemies AND projectile speeds in its radius *(every 45-70s: spawns a 64-88px radius slow zone moving at 28-50 px/s; bounces off edges; applies `applySlow(0.25, 0.45)` to enemies inside each frame and `ProjectileSystem.effectiveProjectileSpeed()` reduces projectile speed inside the anomaly; purple radial gradient + rotating dashed ring + 3 spiral arms in RenderSystem; `GravityAnomaly` in GameCoreState)*
+- [x] **Signal interference**: towers within a radius of the interference zone have reduced range — the zone moves every 10s *(wave 5+ environmental zone jumps every 10s, reduces affected tower range to 60%, and renders an amber dashed interference field with shift FX)*
 
 ---
 

@@ -103,4 +103,10 @@ export const codexEntries: Record<EnemyType, CodexEntry> = {
     counters: ["Stasis", "Blaster burst", "Any tower"],
     tip: "Worth 50 credits but moves fast. Slow it with Stasis and finish with any tower.",
   },
+  mirror: {
+    enemyId: "mirror",
+    threatHeadline: "Reflector shell - turns tower shots back on their source.",
+    counters: ["Splash damage", "Flamer cones", "Spread targeting"],
+    tip: "Mirrors absorb three tower hits. Avoid concentrating fire from one expensive tower until its shell breaks.",
+  },
 };

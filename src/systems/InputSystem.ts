@@ -75,6 +75,24 @@ export class InputSystem {
     if (!this.isBuildingState()) return;
     const cell = this.cellFromEvent(e);
 
+    // Salvage collection: click within 22px of a pickup to collect it.
+    if (this.game.core.salvagePickups.length > 0) {
+      const mx = this.mouseX, my = this.mouseY;
+      let collected = false;
+      this.game.core.salvagePickups = this.game.core.salvagePickups.filter((s) => {
+        const dx = mx - s.x, dy = my - s.y;
+        if (dx * dx + dy * dy < 22 * 22) {
+          this.game.addCredits(s.value);
+          this.game.particles.spawnFloatingText(s.x, s.y - 16, `+${s.value}CR`, "#ffd54f", 1.2, 11);
+          this.game.particles.spawnBurst(s.x, s.y, "#ffd54f", 6, { speed: 60, life: 0.4, size: 2 });
+          collected = true;
+          return false; // remove
+        }
+        return true;
+      });
+      if (collected) return;
+    }
+
     // Kill zone designation: set the clicked cell as the kill zone.
     if (this.game.core.killZoneMode) {
       this.game.core.killZone = { c: cell.c, r: cell.r };

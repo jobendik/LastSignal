@@ -6,8 +6,10 @@ import {
   createEmptyStats,
   createEmptyUpgradeAggregate,
   type GameCoreState,
+  type GravityAnomaly,
+  type SignalInterference,
 } from "./GameState";
-import { MAX_DT, SPEED_MULTIPLIERS, VIEW_HEIGHT, VIEW_WIDTH } from "./Config";
+import { COLS, MAX_DT, ROWS, SPEED_MULTIPLIERS, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "./Config";
 import type {
   EnemyType,
   GameStateId,
@@ -129,6 +131,14 @@ export class Game {
       achievedMilestones: new Set(),
       tacticalPauseCharges: 0,
       powerSurgeTimer: 8,
+      meteorStrikes: [],
+      meteorShowerCooldown: 35,
+      gravityAnomaly: null,
+      gravityAnomalyCooldown: 50,
+      shakeDecay: 30,
+      signalInterference: null,
+      signalInterferenceCooldown: 55,
+      salvagePickups: [],
     };
 
     // Wire systems that need `this`.
@@ -222,6 +232,14 @@ export class Game {
     this.core.achievedMilestones = new Set();
     this.core.tacticalPauseCharges = 0;
     this.core.powerSurgeTimer = 8;
+    this.core.meteorStrikes = [];
+    this.core.meteorShowerCooldown = 35;
+    this.core.gravityAnomaly = null;
+    this.core.gravityAnomalyCooldown = 50;
+    this.core.shakeDecay = 30;
+    this.core.signalInterference = null;
+    this.core.signalInterferenceCooldown = 55;
+    this.core.salvagePickups = [];
     this.core.speed = 1;
     this.time.timeScale = 1;
 
@@ -335,6 +353,8 @@ export class Game {
     const shakeAmt = Math.min(10, amount / 4);
     this.core.shake = Math.min(18, this.core.shake + shakeAmt);
     this.core.shakeRot = Math.min(0.04, this.core.shakeRot + shakeAmt * 0.003);
+    // Core hits use slow-decay rumble profile.
+    this.core.shakeDecay = Math.min(this.core.shakeDecay, 6);
     if (fromX != null && fromY != null) {
       const cx = this.grid.corePos.x;
       const cy = this.grid.corePos.y;
@@ -478,8 +498,17 @@ export class Game {
     if (this.core.hitStopTimer > 0) {
       this.core.hitStopTimer = Math.max(0, this.core.hitStopTimer - rawDt);
     }
-    if (this.core.shake > 0) this.core.shake = Math.max(0, this.core.shake - dt * 30);
+    if (this.core.shake > 0) {
+      this.core.shake = Math.max(0, this.core.shake - dt * this.core.shakeDecay);
+      if (this.core.shake === 0) this.core.shakeDecay = 30; // reset to default after each shake event
+    }
     if (this.core.shakeRot > 0) this.core.shakeRot = Math.max(0, this.core.shakeRot - dt * 8);
+
+    // Tick salvage pickup timers; remove expired ones.
+    if (this.core.salvagePickups.length > 0) {
+      for (const s of this.core.salvagePickups) s.timer -= rawDt;
+      this.core.salvagePickups = this.core.salvagePickups.filter((s) => s.timer > 0);
+    }
     if (this.core.slowMo > 0) {
       this.core.slowMo -= rawDt;
       this.time.timeScale = this.core.slowMoScale;
@@ -510,6 +539,9 @@ export class Game {
       if (this.core.hitStopTimer <= 0) {
         this.waves.update(dt);
         this.updatePowerSurges(dt);
+        this.updateMeteorShowers(dt);
+        this.updateGravityAnomaly(dt);
+        this.updateSignalInterference(dt);
         this.towers.update(dt);
         this.enemies.update(dt);
         this.projectiles.update(dt);
@@ -579,6 +611,177 @@ export class Game {
     } else if (this.core.emergencyOverheatTimer > 0) {
       this.core.emergencyOverheatTimer = Math.max(0, this.core.emergencyOverheatTimer - dt);
     }
+  }
+
+  private updateMeteorShowers(dt: number): void {
+    if (this.state !== "WAVE_ACTIVE") return;
+    const c = this.core;
+
+    // Tick existing strikes; handle impacts.
+    for (const m of c.meteorStrikes) {
+      m.timer -= dt;
+      if (m.timer <= 0 && m.timer > -0.05) {
+        // Impact: damage enemies within 52px of tile center.
+        const px = m.c * TILE_SIZE + TILE_SIZE / 2;
+        const py = m.r * TILE_SIZE + TILE_SIZE / 2;
+        for (const e of this.enemies.list) {
+          if (!e.active) continue;
+          const dx = e.pos.x - px, dy = e.pos.y - py;
+          if (dx * dx + dy * dy < 52 * 52) {
+            e.damage(22, { type: "other" });
+          }
+        }
+        // Disable any tower on this tile for 2s.
+        const tower = this.towers.findTowerAt(m.c, m.r);
+        if (tower) this.towers.disableTower(tower, 2);
+        // Impact FX.
+        this.particles.spawnBurst(px, py, "#ff7043", 18, { speed: 140, life: 0.6, size: 3 });
+        this.particles.spawnBurst(px, py, "#ffffff", 6, { speed: 60, life: 0.25, size: 2 });
+        this.particles.spawnRing(px, py, 48, "#ff7043", 0.4);
+        this.particles.spawnRing(px, py, 28, "#ffffff", 0.25);
+        this.core.shake = Math.min(18, this.core.shake + 6);
+        this.core.shakeRot = Math.min(0.04, this.core.shakeRot + 0.012);
+        this.bus.emit("meteor:impact", m);
+      }
+    }
+    c.meteorStrikes = c.meteorStrikes.filter((m) => m.timer > -0.1);
+
+    // Spawn new shower.
+    c.meteorShowerCooldown -= dt;
+    if (c.meteorShowerCooldown > 0) return;
+    c.meteorShowerCooldown = 28 + Math.random() * 20;
+
+    // Pick 2-4 non-rock, non-core tiles.
+    const candidates: { c: number; r: number }[] = [];
+    for (let attempt = 0; attempt < 80 && candidates.length < 4; attempt++) {
+      const tc = Math.floor(Math.random() * COLS);
+      const tr = Math.floor(Math.random() * ROWS);
+      const kind = this.grid.cells[this.grid.idx(tc, tr)];
+      if (kind === 0 || kind === 2 /* tower */) candidates.push({ c: tc, r: tr });
+    }
+    const count = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < Math.min(count, candidates.length); i++) {
+      const target = candidates[i]!;
+      c.meteorStrikes.push({ c: target.c, r: target.r, timer: 2.2, maxTimer: 2.2 });
+      const px = target.c * TILE_SIZE + TILE_SIZE / 2;
+      const py = target.r * TILE_SIZE + TILE_SIZE / 2;
+      this.particles.spawnFloatingText(px, py - 22, "IMPACT", "#ff7043", 2.0, 11);
+    }
+    this.bus.emit("meteor:incoming", count);
+  }
+
+  private updateGravityAnomaly(dt: number): void {
+    if (this.state !== "WAVE_ACTIVE") return;
+    const c = this.core;
+
+    // Tick active anomaly.
+    if (c.gravityAnomaly) {
+      const g = c.gravityAnomaly;
+      g.timer -= dt;
+      g.x += g.vx * dt;
+      g.y += g.vy * dt;
+
+      // Bounce off edges.
+      if (g.x < g.radius || g.x > VIEW_WIDTH - g.radius) g.vx *= -1;
+      if (g.y < g.radius || g.y > VIEW_HEIGHT - g.radius) g.vy *= -1;
+
+      // Apply slow to enemies inside the anomaly.
+      for (const e of this.enemies.list) {
+        if (!e.active || e.isBoss) continue;
+        const dx = e.pos.x - g.x, dy = e.pos.y - g.y;
+        if (dx * dx + dy * dy < g.radius * g.radius) {
+          e.applySlow(0.25, 0.45);
+        }
+      }
+
+      if (g.timer <= 0) c.gravityAnomaly = null;
+      return;
+    }
+
+    // Spawn new anomaly.
+    c.gravityAnomalyCooldown -= dt;
+    if (c.gravityAnomalyCooldown > 0) return;
+    c.gravityAnomalyCooldown = 45 + Math.random() * 25;
+
+    const px = VIEW_WIDTH * (0.2 + Math.random() * 0.6);
+    const py = VIEW_HEIGHT * (0.2 + Math.random() * 0.6);
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 28 + Math.random() * 22;
+    c.gravityAnomaly = {
+      x: px, y: py,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      radius: 64 + Math.random() * 24,
+      timer: 12 + Math.random() * 8,
+      maxTimer: 20,
+    };
+    c.gravityAnomaly.maxTimer = c.gravityAnomaly.timer;
+    this.particles.spawnFloatingText(px, py - 36, "GRAVITY ANOMALY", "#b39ddb", 2.2, 12);
+    this.particles.spawnRing(px, py, c.gravityAnomaly.radius, "#b39ddb", 0.45);
+    this.bus.emit("gravity:anomaly", c.gravityAnomaly as GravityAnomaly);
+  }
+
+  private updateSignalInterference(dt: number): void {
+    if (this.state !== "WAVE_ACTIVE" || this.core.waveIndex < 5) return;
+    const c = this.core;
+
+    // Tick active zone.
+    if (c.signalInterference) {
+      const si = c.signalInterference;
+      si.totalTimer -= dt;
+      si.moveTimer -= dt;
+
+      if (si.moveTimer <= 0) {
+        // Jump to a new random open tile center.
+        for (let attempt = 0; attempt < 40; attempt++) {
+          const tc = Math.floor(Math.random() * COLS);
+          const tr = Math.floor(Math.random() * ROWS);
+          const kind = this.grid.cells[this.grid.idx(tc, tr)];
+          if (kind === 0 || kind === 2) {
+            si.x = tc * TILE_SIZE + TILE_SIZE / 2;
+            si.y = tr * TILE_SIZE + TILE_SIZE / 2;
+            break;
+          }
+        }
+        si.moveTimer = 10;
+        this.particles.spawnRing(si.x, si.y, si.radius, "#ef6c00", 0.4);
+        this.particles.spawnFloatingText(si.x, si.y - 30, "SIGNAL SHIFT", "#ef6c00", 1.2, 10);
+      }
+
+      if (si.totalTimer <= 0) {
+        c.signalInterference = null;
+        c.signalInterferenceCooldown = 55 + Math.random() * 25;
+      }
+      return;
+    }
+
+    // Countdown to next zone.
+    c.signalInterferenceCooldown -= dt;
+    if (c.signalInterferenceCooldown > 0) return;
+
+    // Spawn at a random open tile center.
+    let sx = VIEW_WIDTH / 2, sy = VIEW_HEIGHT / 2;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const tc = Math.floor(Math.random() * COLS);
+      const tr = Math.floor(Math.random() * ROWS);
+      const kind = this.grid.cells[this.grid.idx(tc, tr)];
+      if (kind === 0 || kind === 2) {
+        sx = tc * TILE_SIZE + TILE_SIZE / 2;
+        sy = tr * TILE_SIZE + TILE_SIZE / 2;
+        break;
+      }
+    }
+    const life = 28 + Math.random() * 16;
+    c.signalInterference = {
+      x: sx, y: sy,
+      radius: 80 + Math.random() * 24,
+      moveTimer: 10,
+      totalTimer: life,
+      maxTotalTimer: life,
+    };
+    this.particles.spawnFloatingText(sx, sy - 38, "SIGNAL INTERFERENCE", "#ef6c00", 2.4, 12);
+    this.particles.spawnRing(sx, sy, c.signalInterference.radius, "#ef6c00", 0.5);
+    this.bus.emit("interference:start", c.signalInterference as SignalInterference);
   }
 
   private updatePowerSurges(dt: number): void {

@@ -709,14 +709,25 @@
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
   animation: ls-card-flip 0.35s ease backwards;
+  position: relative;
+  z-index: 0;
 }
-.ls-reward-card:hover { transform: translateY(-3px); box-shadow: 0 0 22px rgba(255, 152, 0, 0.5); }
+.ls-reward-card:hover {
+  transform: scale(1.06) translateY(-6px);
+  box-shadow: 0 12px 40px rgba(255, 152, 0, 0.55), 0 0 24px rgba(255, 152, 0, 0.4);
+  background: rgba(15, 20, 28, 0.97);
+  z-index: 10;
+}
 .ls-reward-card.common { border-color: #8a9099; }
+.ls-reward-card.common:hover { box-shadow: 0 12px 36px rgba(138, 144, 153, 0.4), 0 0 20px rgba(138, 144, 153, 0.3); }
 .ls-reward-card.uncommon { border-color: #2196f3; box-shadow: 0 0 14px rgba(33, 150, 243, 0.18); }
+.ls-reward-card.uncommon:hover { box-shadow: 0 12px 40px rgba(33, 150, 243, 0.5), 0 0 22px rgba(33, 150, 243, 0.35); }
 .ls-reward-card.rare { border-color: #9c27b0; box-shadow: 0 0 16px rgba(156, 39, 176, 0.24); }
+.ls-reward-card.rare:hover { box-shadow: 0 12px 40px rgba(156, 39, 176, 0.55), 0 0 26px rgba(156, 39, 176, 0.4); }
 .ls-reward-card.legendary { border-color: #ffeb3b; box-shadow: 0 0 22px rgba(255, 235, 59, 0.3); }
+.ls-reward-card.legendary:hover { box-shadow: 0 12px 44px rgba(255, 235, 59, 0.6), 0 0 30px rgba(255, 235, 59, 0.45); }
 .ls-reward-rarity { font-size: 10px; color: #8a9099; letter-spacing: 2px; }
 .ls-reward-card.uncommon .ls-reward-rarity { color: #64b5f6; }
 .ls-reward-card.rare .ls-reward-rarity { color: #ce93d8; }
@@ -823,14 +834,14 @@
 /* ===== Meta / Research panel ===== */
 .ls-meta-panel {
   position: absolute;
-  inset: 8%;
+  inset: 6%;
   flex-direction: column;
-  background: rgba(4, 7, 12, 0.96);
+  background: rgba(4, 7, 12, 0.97);
   border: 1px solid rgba(102, 252, 241, 0.25);
-  padding: 18px 22px;
+  padding: 14px 18px;
   overflow-y: auto;
   z-index: 110;
-  gap: 12px;
+  gap: 10px;
 }
 .ls-meta-header { text-align: center; }
 .ls-meta-points {
@@ -839,14 +850,104 @@
   font-size: 14px;
   letter-spacing: 2px;
 }
-.ls-meta-tier { display: flex; flex-direction: column; gap: 6px; }
-.ls-meta-tier-label {
-  color: #66fcf1; letter-spacing: 4px; font-size: 11px;
+
+/* --- Tech tree container --- */
+.ls-meta-tree-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 8px 4px;
 }
-.ls-meta-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 8px;
+.ls-meta-tree {
+  position: relative;
 }
+.ls-meta-tree-tier-label {
+  color: #66fcf1;
+  letter-spacing: 4px;
+  font-size: 10px;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* --- Node cards --- */
+.ls-meta-node {
+  position: absolute;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid rgba(102, 252, 241, 0.2);
+  color: #c5c6c7;
+  padding: 8px 10px;
+  cursor: default;
+  text-align: left;
+  font-family: "Courier New", monospace;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.12s;
+  overflow: visible;
+}
+.ls-meta-node.available {
+  border-color: #ffeb3b;
+  box-shadow: 0 0 10px rgba(255, 235, 59, 0.25);
+  cursor: pointer;
+}
+.ls-meta-node.available:hover {
+  border-color: #fff176;
+  box-shadow: 0 0 18px rgba(255, 235, 59, 0.45);
+  transform: translateY(-2px);
+  z-index: 10;
+}
+.ls-meta-node.unlocked {
+  border-color: rgba(76, 175, 80, 0.7);
+  color: #6c7380;
+}
+.ls-meta-node.locked {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.ls-meta-node-icon {
+  font-size: 11px;
+  color: #66fcf1;
+  line-height: 1;
+}
+.ls-meta-node.unlocked .ls-meta-node-icon { color: #4caf50; }
+.ls-meta-node.available .ls-meta-node-icon { color: #ffeb3b; }
+.ls-meta-node-name {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  font-weight: bold;
+  line-height: 1.2;
+}
+.ls-meta-node-cost {
+  font-size: 10px;
+  color: #66fcf1;
+  letter-spacing: 1px;
+}
+.ls-meta-node.unlocked .ls-meta-node-cost { color: #4caf50; }
+.ls-meta-node.available .ls-meta-node-cost { color: #ffeb3b; }
+
+/* Tooltip */
+.ls-meta-node-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(4, 8, 14, 0.96);
+  border: 1px solid rgba(102, 252, 241, 0.4);
+  padding: 8px 10px;
+  min-width: 190px;
+  z-index: 50;
+  pointer-events: none;
+  white-space: normal;
+}
+.ls-meta-node:hover .ls-meta-node-tip { display: block; }
+.ls-meta-node-tip-name { font-size: 11px; color: #66fcf1; letter-spacing: 1px; margin-bottom: 4px; }
+.ls-meta-node-tip-desc { font-size: 10px; color: #a0a8b8; line-height: 1.4; }
+.ls-meta-node-tip-req { font-size: 10px; color: #ef9a9a; margin-top: 4px; letter-spacing: 0.5px; }
+
+/* Fallback: keep old card styles for any remaining uses */
 .ls-meta-card {
   background: rgba(10, 14, 20, 0.7);
   border: 1px solid rgba(102, 252, 241, 0.2);
@@ -1027,7 +1128,7 @@
   background: rgba(20, 8, 8, 0.92);
 }
 .ls-reward-card.cursed:hover {
-  box-shadow: 0 0 32px rgba(255, 82, 82, 0.55);
+  box-shadow: 0 12px 40px rgba(255, 82, 82, 0.55), 0 0 30px rgba(183, 28, 28, 0.5);
 }
 .ls-reward-card.cursed .ls-reward-rarity { color: #ff5252; }
 .ls-reward-card.cursed .ls-reward-name { color: #ff5252; }

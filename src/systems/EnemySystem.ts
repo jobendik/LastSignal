@@ -1,5 +1,6 @@
 import type { Game } from "../core/Game";
 import { Enemy, type DamageSource } from "../entities/Enemy";
+import { Projectile } from "../entities/Projectile";
 import type { EnemyType } from "../core/Types";
 import { Vector2 } from "../core/Vector2";
 import { rnd } from "../core/Random";
@@ -57,6 +58,11 @@ export class EnemySystem {
       enemy.flankDir = Math.random() < 0.5 ? 1 : -1;
     }
 
+    // Shield Drone companion: from wave 5+, 22% of brutes spawn with one orbiting shield drone.
+    if (type === "brute" && this.game.core.waveIndex >= 4 && Math.random() < 0.22) {
+      enemy.shieldDroneCount = 1;
+    }
+
     if (enemy.isBoss) {
       enemy.bossEntranceTimer = enemy.bossEntranceMax;
       this.game.audio.sfxBossAlert(enemy.pos);
@@ -66,6 +72,7 @@ export class EnemySystem {
       this.game.particles.spawnScreenFlash("#ff1a00", 0.5, 0.7);
       this.game.core.shake = Math.max(this.game.core.shake, 22);
       this.game.core.shakeRot = Math.max(this.game.core.shakeRot, 0.06);
+      this.game.core.shakeDecay = Math.min(this.game.core.shakeDecay, 10); // sustained boss-arrival rumble
       this.game.core.slowMo = Math.max(this.game.core.slowMo, 0.45);
       this.game.particles.spawnRing(x, y, 90, "#ff1a00");
       this.game.particles.spawnFloatingText(x, y - 54, "LEVIATHAN DETECTED", "#ff1a00", 3.2, 16);
@@ -104,6 +111,11 @@ export class EnemySystem {
       // Saboteur cooldown decay.
       if (e.type === "saboteur" && e.saboteurCooldown > 0) {
         e.saboteurCooldown = Math.max(0, e.saboteurCooldown - dt);
+      }
+
+      // Mirror cooldown decay.
+      if (e.ability === "mirror" && e.mirrorCooldown > 0) {
+        e.mirrorCooldown = Math.max(0, e.mirrorCooldown - dt);
       }
 
       // Tunneler: dive/surface cycle.
@@ -176,6 +188,14 @@ export class EnemySystem {
         if (e.type === "swarm") {
           desired = desired.add(this.swarmCohesion(e).mult(18));
         }
+        // Formation movement: grunts and brutes drift toward nearby allies (loose formation).
+        if (e.type === "grunt" || e.type === "brute") {
+          desired = desired.add(this.formationCohesion(e).mult(12));
+        }
+        // Adaptive pathing: Weaver and Overlord sense mortar splash zones and nudge laterally.
+        if (e.type === "weaver" || e.type === "overlord") {
+          desired = desired.add(this.mortarAvoidance(e).mult(55));
+        }
         e.vel = Vector2.lerp(e.vel, desired, Math.min(1, dt * 5.5));
       } else {
         e.vel = e.vel.mult(Math.max(0, 1 - dt * 7));
@@ -211,6 +231,12 @@ export class EnemySystem {
             this.game.particles.spawnRing(cx, cy, 70, e.color, 0.6);
           }
           this.game.particles.spawnFloatingText(cx, cy - 28, `-${e.breach} BREACH`, "#ef9a9a", 1.0, 13);
+          // Salvage drop: enemy slipped through — 40% chance to leave a collectible.
+          if (!e.isBoss && Math.random() < 0.4) {
+            const sv = 8 + Math.floor(Math.random() * 14);
+            this.game.core.salvagePickups.push({ x: e.pos.x, y: e.pos.y, value: sv, timer: 9 });
+            this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 18, `+${sv}CR SALVAGE`, "#ffd54f", 1.5, 10);
+          }
         }
         continue;
       }
@@ -231,6 +257,21 @@ export class EnemySystem {
         this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - e.size - 4, "PHASED", "#9c27b0", 0.7, 10);
       }
       return;
+    }
+
+    // Mirror: absorb + reflect projectile hits back at source tower.
+    if (e.ability === "mirror" && e.mirrorCharges > 0 && e.mirrorCooldown <= 0 && src?.type === "tower" && src.tower) {
+      e.mirrorCharges--;
+      e.mirrorCooldown = 0.8;
+      this.spawnMirrorReflection(e, src);
+      // Reflection FX: radial flash + ring + floating text.
+      this.game.particles.spawnBurst(e.pos.x, e.pos.y, "#e0f7fa", 12, { speed: 110, life: 0.45, size: 2.5 });
+      this.game.particles.spawnRing(e.pos.x, e.pos.y, e.size * 2.8, "#e0f7fa", 0.35);
+      this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - e.size - 8, "REFLECTED!", "#e0f7fa", 1.0, 11);
+      if (e.mirrorCharges === 0) {
+        this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - e.size - 20, "MIRROR BROKEN", "#ff5252", 1.2, 10);
+      }
+      return; // absorb — no damage dealt
     }
     // Vulnerability multiplier: from stasis "vulnerabilityPulse" global.
     const slowedMul = e.slowTimer > 0 ? this.game.core.upgrades.slowedEnemyDamageMul : 1;
@@ -284,6 +325,53 @@ export class EnemySystem {
       this.game.stats.recordDamage(src.towerType, dealt);
       if (src.tower) src.tower.totalDamage += dealt;
     }
+  }
+
+  private spawnMirrorReflection(e: Enemy, src: Extract<DamageSource, { type: "tower" }>): void {
+    if (!src.tower) return;
+    const tower = src.tower;
+    const color = "#e0f7fa";
+    const dx = tower.pos.x - e.pos.x;
+    const dy = tower.pos.y - e.pos.y;
+    const angle = Math.atan2(dy, dx);
+    const dist = Math.hypot(dx, dy);
+
+    if (src.towerType === "railgun") {
+      this.game.particles.spawnBeam(e.pos.x, e.pos.y, tower.pos.x, tower.pos.y, color, 0.16, { kind: "railgun", width: 9 });
+      this.game.towers.disableTower(tower, 2);
+      return;
+    }
+    if (src.towerType === "tesla") {
+      this.game.particles.spawnLightning([
+        { x: e.pos.x, y: e.pos.y },
+        { x: tower.pos.x, y: tower.pos.y },
+      ], color);
+      this.game.towers.disableTower(tower, 2);
+      return;
+    }
+    if (src.towerType === "flamer") {
+      this.game.particles.spawnFlameJet(e.pos.x, e.pos.y, angle, Math.max(36, dist), 0.32);
+      this.game.towers.disableTower(tower, 2);
+      return;
+    }
+
+    const kind = src.towerType === "mortar" ? "mortar" : "bullet";
+    const speed = src.towerType === "mortar" ? 260 : 520;
+    const reflected = new Projectile({
+      pos: e.pos,
+      target: null,
+      targetPos: tower.pos,
+      damage: 0,
+      color,
+      speed,
+      kind,
+      owner: { tower },
+      ownerType: src.towerType,
+      reflectedTower: tower,
+      reflectedDisable: 2,
+    });
+    reflected.lastDir = new Vector2(Math.cos(angle), Math.sin(angle));
+    this.game.projectiles.spawn(reflected);
   }
 
   private updateTunneler(e: Enemy, dt: number): void {
@@ -399,10 +487,11 @@ export class EnemySystem {
     this.game.core.slowMoScale = Math.min(this.game.core.slowMoScale, 0.18);
     this.game.core.slowMo = Math.max(this.game.core.slowMo, 0.65);
 
-    // Shake.
+    // Shake (sustained medium-frequency for boss phases).
     if (this.game.core.settings.screenShake) {
       this.game.core.shake = Math.max(this.game.core.shake, 16);
       this.game.core.shakeRot = Math.max(this.game.core.shakeRot, 0.055);
+      this.game.core.shakeDecay = Math.min(this.game.core.shakeDecay, 12);
     }
 
     // Telegraph rings: 3 expanding rings in phase color, staggered.
@@ -449,6 +538,40 @@ export class EnemySystem {
     if (count === 0) return new Vector2();
     cx /= count; cy /= count;
     return new Vector2(cx - e.pos.x, cy - e.pos.y).normalize();
+  }
+
+  private formationCohesion(e: Enemy): Vector2 {
+    const RADIUS = 60;
+    let cx = 0, cy = 0, count = 0;
+    for (const other of this.list) {
+      if (other === e || !other.active || other.type !== e.type) continue;
+      const d = e.pos.dist(other.pos);
+      if (d > 8 && d < RADIUS) { cx += other.pos.x; cy += other.pos.y; count++; }
+    }
+    if (count === 0) return new Vector2();
+    cx /= count; cy /= count;
+    const dx = cx - e.pos.x, dy = cy - e.pos.y;
+    const dist = Math.hypot(dx, dy);
+    return dist > 0 ? new Vector2(dx / dist, dy / dist) : new Vector2();
+  }
+
+  private mortarAvoidance(e: Enemy): Vector2 {
+    // Repel from active mortar towers within sensing range.
+    const SENSE = 110;
+    let rx = 0, ry = 0, count = 0;
+    for (const t of this.game.towers.list) {
+      if (t.type !== "mortar") continue;
+      const dx = e.pos.x - t.pos.x, dy = e.pos.y - t.pos.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 0 && d < SENSE) {
+        const w = 1 - d / SENSE;
+        rx += (dx / d) * w;
+        ry += (dy / d) * w;
+        count++;
+      }
+    }
+    if (count === 0) return new Vector2();
+    return new Vector2(rx / count, ry / count).normalize();
   }
 
   private summonFromSides(boss: Enemy, type: EnemyType, count: number): void {
@@ -514,6 +637,13 @@ export class EnemySystem {
       this.game.particles.spawnRing(e.pos.x, e.pos.y, isBoss ? 80 : e.size * 2.2, e.color, isBoss ? 0.45 : 0.3);
       if (e.isElite) {
         this.game.particles.spawnRing(e.pos.x, e.pos.y, e.size * 3.5, "#ffd600", 0.35);
+      }
+
+      // Salvage drop: tough enemies occasionally leave collectible salvage on death.
+      const salvageTypes: string[] = ["brute", "weaver", "overlord", "phantom", "carrier", "tunneler", "saboteur", "juggernaut"];
+      if (!e.isBoss && salvageTypes.includes(e.type) && Math.random() < 0.22) {
+        const sv = 10 + Math.floor(Math.random() * 16);
+        this.game.core.salvagePickups.push({ x: e.pos.x, y: e.pos.y, value: sv, timer: 9 });
       }
 
       // Carrier death: spawn scouts + fear response (nearby scouts scatter briefly).

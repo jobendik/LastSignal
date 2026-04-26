@@ -283,6 +283,9 @@ export class TowerSystem {
         continue;
       }
 
+      // Silence wave: all tower fire suppressed while silenceTimer > 0.
+      if (this.game.waves.silenceTimer > 0) continue;
+
       // Stasis towers.
       if (t.type === "stasis") {
         this.updateStasis(t, dt);
@@ -517,6 +520,13 @@ export class TowerSystem {
     let range = base.range * up.towerRangeMul + up.towerRangeAdd;
     const specRangeMul = up.specificTowerRangeMul[t.type];
     if (specRangeMul) range *= specRangeMul;
+
+    // Signal interference: reduce range by 40% for towers inside the zone.
+    const si = this.game.core.signalInterference;
+    if (si) {
+      const dx = t.pos.x - si.x, dy = t.pos.y - si.y;
+      if (dx * dx + dy * dy < si.radius * si.radius) range *= 0.6;
+    }
 
     let splashRadius = base.splashRadius * up.mortarSplashMul;
     let chainMax = base.chainMax + (t.type === "tesla" ? up.teslaChainAdd : 0);

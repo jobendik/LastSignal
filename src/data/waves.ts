@@ -149,6 +149,27 @@ export const defaultWaves: WaveDefinition[] = [
     ],
   }),
   summarize({
+    id: "w07b_silence_protocol",
+    name: "Silence Protocol",
+    description: "All tower systems go offline for 5 seconds as a signal jammer blasts through. Enemies advance unchallenged during the silence window.",
+    warning: "SILENCE WAVE: towers suppressed for 5s at start. Pre-position carefully — your layout is your only defense.",
+    recommendedCounters: ["Core positioning", "Kill zone", "Drones"],
+    rewardCredits: 90,
+    rewardChoice: true,
+    waveEvent: "silence",
+    lanes: [
+      {
+        spawnerId: "west",
+        enemies: [{ type: "brute", count: 6, interval: 0.9 }],
+      },
+      {
+        spawnerId: "east",
+        enemies: [{ type: "grunt", count: 14, interval: 0.4 }],
+        startDelay: 1.0,
+      },
+    ],
+  }),
+  summarize({
     id: "w08_nest_splitters",
     name: "Nest Splitters",
     description: "Multiple carriers flood the grid if not controlled.",
@@ -245,6 +266,29 @@ export const defaultWaves: WaveDefinition[] = [
     ],
   }),
   summarize({
+    id: "w12b_mirror_vanguard",
+    name: "Mirror Vanguard",
+    description: "Mirror units lead the charge, reflecting your shots back.",
+    warning: "Don't focus-fire Mirrors — they'll disable your towers. Spread your attacks.",
+    recommendedCounters: ["Mortar splash", "Flamer", "Stasis"],
+    rewardCredits: 135,
+    rewardChoice: false,
+    lanes: [
+      {
+        spawnerId: "west",
+        enemies: [
+          { type: "mirror", count: 4, interval: 1.8 },
+          { type: "grunt", count: 14, interval: 0.35 },
+        ],
+      },
+      {
+        spawnerId: "east",
+        enemies: [{ type: "mirror", count: 3, interval: 2.2 }],
+        startDelay: 2,
+      },
+    ],
+  }),
+  summarize({
     id: "w13_crushing_mass",
     name: "Crushing Mass",
     description: "Heavy armor and carriers.",
@@ -285,7 +329,29 @@ export const defaultWaves: WaveDefinition[] = [
     ],
   }),
   summarize({
-    id: "w15_leviathan",
+    id: "w15_gauntlet",
+    name: "The Gauntlet",
+    description: "One of every enemy type in sequence. The ultimate test of all your defenses.",
+    warning: "BOSS RUSH: every enemy type appears in sequence. Adapt your targeting and never stop firing.",
+    recommendedCounters: ["Everything"],
+    rewardCredits: 200,
+    rewardChoice: true,
+    lanes: [
+      { spawnerId: "north", enemies: [{ type: "scout",     count: 6,  interval: 0.45 }], startDelay: 0   },
+      { spawnerId: "south", enemies: [{ type: "grunt",     count: 6,  interval: 0.65 }], startDelay: 5   },
+      { spawnerId: "east",  enemies: [{ type: "sprinter",  count: 5,  interval: 0.4  }], startDelay: 11  },
+      { spawnerId: "west",  enemies: [{ type: "brute",     count: 4,  interval: 1.1  }], startDelay: 16  },
+      { spawnerId: "north", enemies: [{ type: "phantom",   count: 4,  interval: 0.85 }], startDelay: 22  },
+      { spawnerId: "south", enemies: [{ type: "weaver",    count: 3,  interval: 1.4  }], startDelay: 27  },
+      { spawnerId: "east",  enemies: [{ type: "shielder",  count: 4,  interval: 1.0  }], startDelay: 33  },
+      { spawnerId: "west",  enemies: [{ type: "jammer",    count: 3,  interval: 1.2  }], startDelay: 39  },
+      { spawnerId: "north", enemies: [{ type: "splitter",  count: 3,  interval: 1.5  }], startDelay: 45  },
+      { spawnerId: "south", enemies: [{ type: "carrier",   count: 3,  interval: 1.8  }], startDelay: 52  },
+      { spawnerId: "east",  enemies: [{ type: "juggernaut",count: 2,  interval: 3.0  }], startDelay: 60  },
+    ],
+  }),
+  summarize({
+    id: "w16_leviathan",
     name: "The Leviathan",
     description: "Final boss anomaly inbound with heavy escort.",
     warning: "Boss fight: multi-phase. Summons escorts, disables towers.",

@@ -247,6 +247,20 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     size: 7,
     ability: "none",
   },
+  mirror: {
+    id: "mirror",
+    name: "Mirror",
+    role: "Projectile reflector",
+    description:
+      "Absorbs the first three projectile hits, disabling the attacking tower for 2s each time. Once its mirror charges are depleted it becomes vulnerable.",
+    hp: 45,
+    speed: 38,
+    reward: 18,
+    breach: 11,
+    color: "#e0f7fa",
+    size: 9,
+    ability: "mirror",
+  },
 };
 
 export const enemyOrder: EnemyType[] = [
@@ -267,4 +281,5 @@ export const enemyOrder: EnemyType[] = [
   "tunneler",
   "saboteur",
   "cache",
+  "mirror",
 ];

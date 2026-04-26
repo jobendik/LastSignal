@@ -106,6 +106,68 @@ export interface GameCoreState {
   tacticalPauseCharges: number;
   /** Seconds until the next environmental power surge can strike a combat tower. */
   powerSurgeTimer: number;
+  /** Active meteor strike warnings. Each counts down to impact. */
+  meteorStrikes: MeteorStrike[];
+  /** Seconds until the next meteor shower event. */
+  meteorShowerCooldown: number;
+  /** Moving gravity anomaly zone. Null when inactive. */
+  gravityAnomaly: GravityAnomaly | null;
+  /** Seconds until the next gravity anomaly spawns. */
+  gravityAnomalyCooldown: number;
+  /** Decay rate for screen shake (higher = faster fade = snappier). Default 30. */
+  shakeDecay: number;
+  /** Active signal interference zone that reduces tower range. Null when inactive. */
+  signalInterference: SignalInterference | null;
+  /** Seconds until the next signal interference zone can appear. */
+  signalInterferenceCooldown: number;
+  /** Salvage pickups on the map that the player can click to collect. */
+  salvagePickups: SalvagePickup[];
+}
+
+export interface GravityAnomaly {
+  /** World-space center X. */
+  x: number;
+  /** World-space center Y. */
+  y: number;
+  /** Movement velocity X (px/s). */
+  vx: number;
+  vy: number;
+  /** Radius of effect in pixels. */
+  radius: number;
+  /** Seconds of life remaining. */
+  timer: number;
+  maxTimer: number;
+}
+
+export interface MeteorStrike {
+  c: number;
+  r: number;
+  /** Countdown to impact (seconds). */
+  timer: number;
+  maxTimer: number;
+}
+
+export interface SignalInterference {
+  /** World-space center X. */
+  x: number;
+  /** World-space center Y. */
+  y: number;
+  /** Effect radius in pixels. */
+  radius: number;
+  /** Seconds until next position jump. */
+  moveTimer: number;
+  /** Total seconds of life remaining. */
+  totalTimer: number;
+  maxTotalTimer: number;
+}
+
+export interface SalvagePickup {
+  x: number;
+  y: number;
+  /** Credit value when collected. */
+  value: number;
+  /** Seconds until this pickup expires. */
+  timer: number;
 }
 
 export function createEmptyStats(): RunStats {

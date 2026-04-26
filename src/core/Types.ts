@@ -134,9 +134,10 @@ export type EnemyType =
   | "overlord"
   | "tunneler"
   | "saboteur"
-  | "cache";
+  | "cache"
+  | "mirror";
 
-export type EnemyAbility = "none" | "heal" | "phase" | "spawn" | "boss" | "tunnel";
+export type EnemyAbility = "none" | "heal" | "phase" | "spawn" | "boss" | "tunnel" | "mirror";
 
 export interface EnemyDefinition {
   id: EnemyType;
@@ -178,7 +179,7 @@ export interface WaveDefinition {
   rewardCredits: number;
   rewardChoice: boolean;
   /** Optional special event that changes how the wave plays. */
-  waveEvent?: "blitz";
+  waveEvent?: "blitz" | "silence";
   lanes: WaveLane[];
   /** Convenience flat list for UI + codex generation. */
   enemySummary?: { type: EnemyType; count: number }[];
