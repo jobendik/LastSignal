@@ -138,7 +138,7 @@ export class MainMenu {
     this.el.append(actions);
 
     this.el.append(el("div", { class: "ls-hint", html:
-      "Hotkeys: <span>1-6</span> build, <span>U</span> upgrade, <span>S</span> sell, <span>D</span> drone, <span>K</span> kill zone, <span>T</span> tactical pause, <span>Space</span> start wave / confirm, <span>Tab</span> wave preview, <span>P</span> pause, <span>+/-</span> speed, <span>F1</span> debug." }));
+      "Hotkeys: <span>1-6</span> build, <span>U</span> upgrade, <span>S</span> sell, <span>D</span> drone, <span>R</span> relay deploy, <span>Y</span> command tier, <span>K</span> kill zone, <span>T</span> tactical pause, <span>Space</span> start wave / confirm, <span>Tab</span> wave preview, <span>P</span> pause, <span>+/-</span> speed, <span>F1</span> debug." }));
 
     // Play glitch animation on title (skip if reduce motion is on).
     if (!this.game.core.settings.reducedMotion) {

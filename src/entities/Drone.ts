@@ -21,6 +21,8 @@ export class Drone {
   wanderAngle = rnd(0, Math.PI * 2);
   bobPhase = rnd(0, Math.PI * 2);
   active = true;
+  /** Optional lifetime in seconds for temporary militia units. */
+  ttl: number | null = null;
 
   // Guardian: orbit angle around core.
   orbit = rnd(0, Math.PI * 2);

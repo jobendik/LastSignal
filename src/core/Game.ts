@@ -140,6 +140,10 @@ export class Game {
       signalInterference: null,
       signalInterferenceCooldown: 55,
       salvagePickups: [],
+      coreDeployMode: false,
+      coreNodesBuilt: 0,
+      commandTier: 1,
+      militiaPulseTimer: 12,
     };
 
     // Wire systems that need `this`.
@@ -241,6 +245,10 @@ export class Game {
     this.core.signalInterference = null;
     this.core.signalInterferenceCooldown = 55;
     this.core.salvagePickups = [];
+    this.core.coreDeployMode = false;
+    this.core.coreNodesBuilt = 0;
+    this.core.commandTier = 1;
+    this.core.militiaPulseTimer = 12;
     this.core.speed = 1;
     this.time.timeScale = 1;
 
@@ -417,6 +425,62 @@ export class Game {
     this.particles.spawnRing(this.grid.corePos.x, this.grid.corePos.y, 54, "#4caf50");
     this.audio.sfxReward();
     this.bus.emit("core:repaired", { amount: repaired });
+    return true;
+  }
+
+  maxRelayCoresForRun(): number {
+    // Unlock one extra relay every 4 cleared waves, up to 3.
+    return Math.min(3, 1 + Math.floor(this.core.waveIndex / 4));
+  }
+
+  canDeployRelayCore(): boolean {
+    if (this.state !== "PLANNING" && this.state !== "WAVE_COMPLETE") return false;
+    if (this.core.waveIndex < 2) return false;
+    if (this.core.coreNodesBuilt >= this.maxRelayCoresForRun()) return false;
+    return this.core.credits >= 180;
+  }
+
+  deployRelayCore(c: number, r: number): boolean {
+    if (!this.canDeployRelayCore()) return false;
+    if (!this.grid.canPlaceCoreCluster(c, r)) return false;
+    if (!this.spendCredits(180)) return false;
+    this.grid.placeCoreCluster(c, r);
+    this.core.coreNodesBuilt++;
+    this.core.coreMax += 40;
+    this.core.coreIntegrity = Math.min(this.core.coreMax, this.core.coreIntegrity + 40);
+    const x = (c + 1) * TILE_SIZE;
+    const y = (r + 1) * TILE_SIZE;
+    this.particles.spawnRing(x, y, 46, "#66fcf1");
+    this.particles.spawnBurst(x, y, "#66fcf1", 18, { speed: 160, life: 0.55, size: 2.5 });
+    this.particles.spawnFloatingText(x, y - 24, "RELAY CORE ONLINE", "#66fcf1", 1.2, 11);
+    this.audio.sfxReward();
+    this.core.coreDeployMode = false;
+    this.bus.emit("core:relayBuilt", { c, r, built: this.core.coreNodesBuilt, max: this.maxRelayCoresForRun() });
+    return true;
+  }
+
+  nextCommandTierCost(): number {
+    if (this.core.commandTier === 1) return 220;
+    if (this.core.commandTier === 2) return 380;
+    return 0;
+  }
+
+  canUpgradeCommandTier(): boolean {
+    if (this.state !== "PLANNING" && this.state !== "WAVE_COMPLETE") return false;
+    if (this.core.commandTier >= 3) return false;
+    return this.core.credits >= this.nextCommandTierCost();
+  }
+
+  upgradeCommandTier(): boolean {
+    if (!this.canUpgradeCommandTier()) return false;
+    const cost = this.nextCommandTierCost();
+    if (!this.spendCredits(cost)) return false;
+    this.core.commandTier = Math.min(3, this.core.commandTier + 1) as 1 | 2 | 3;
+    this.core.militiaPulseTimer = 6;
+    this.particles.spawnFloatingText(this.grid.corePos.x, this.grid.corePos.y - 42, `COMMAND TIER ${this.core.commandTier}`, "#ffeb3b", 1.4, 12);
+    this.particles.spawnRing(this.grid.corePos.x, this.grid.corePos.y, 72, "#ffeb3b");
+    this.audio.sfxReward();
+    this.bus.emit("command:tierUp", { tier: this.core.commandTier });
     return true;
   }
 

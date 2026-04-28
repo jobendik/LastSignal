@@ -1,4 +1,5 @@
 import type { Game } from "../core/Game";
+import type { Tower } from "../entities/Tower";
 import { enemyDefinitions } from "../data/enemies";
 import { el, clear } from "./dom";
 
@@ -14,6 +15,8 @@ export class HUD {
   private speedEl = el("span", { text: "1x" });
   private startWaveBtn = el("button", { class: "ls-btn ls-start-wave", text: "START WAVE" });
   private repairBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "REPAIR 30" });
+  private commandTierBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "COMMAND T1" });
+  private relayCoreBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "RELAY 0/1 (R)" });
   private empBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "EMP" });
   private pauseBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "PAUSE (P)" });
   private settingsBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "⚙" });
@@ -28,11 +31,14 @@ export class HUD {
   private countdownFill = el("div", { class: "ls-wave-countdown-fill" });
   private waveIntel = el("div", { class: "ls-wave-intel" });
   private waveTimeline = el("div", { class: "ls-wave-timeline" });
+  private commandPanel = el("div", { class: "ls-command-panel" });
   private criticalOverlay = el("div", { class: "ls-critical-overlay" });
   private rafId = 0;
   private displayedCredits = 0;
   private targetCredits = 0;
   private creditsPrimed = false;
+  private waveCoreIntegrityStart = 0;
+  private tookCoreDamageThisWave = false;
 
   constructor(private readonly game: Game) {
     this.el = el("div", { class: "ls-panel ls-hud" });
@@ -49,11 +55,22 @@ export class HUD {
       void this.speedEl.offsetWidth; // reflow
       this.speedEl.classList.add("ls-speed-flash");
     });
-    bus.on("wave:started", () => this.refresh());
+    bus.on("wave:started", () => {
+      this.waveCoreIntegrityStart = this.game.core.coreIntegrity;
+      this.tookCoreDamageThisWave = false;
+      this.refresh();
+    });
     bus.on("wave:complete", () => this.refresh());
+    bus.on("core:damaged", () => {
+      if (this.game.state === "WAVE_ACTIVE" && this.game.core.coreIntegrity < this.waveCoreIntegrityStart) {
+        this.tookCoreDamageThisWave = true;
+      }
+    });
     bus.on("boss:spawned", () => this.refresh());
     bus.on("boss:killed", () => this.refresh());
     bus.on("core:repaired", () => this.refresh());
+    bus.on("core:relayBuilt", () => this.refresh());
+    bus.on("command:tierUp", () => this.refresh());
     bus.on("core:ability", () => this.refresh());
     bus.on("core:emergency", () => this.refresh());
     bus.on("sector:started", () => this.refresh());
@@ -85,6 +102,8 @@ export class HUD {
     right.append(
       this.startWaveBtn,
       this.repairBtn,
+      this.commandTierBtn,
+      this.relayCoreBtn,
       this.empBtn,
       speedDown, this.speedEl, speedUp,
       this.pauseBtn,
@@ -99,6 +118,11 @@ export class HUD {
     };
     this.pauseBtn.onclick = () => this.game.togglePause();
     this.repairBtn.onclick = () => this.game.repairCore();
+    this.commandTierBtn.onclick = () => this.game.upgradeCommandTier();
+    this.relayCoreBtn.onclick = () => {
+      if (!this.game.canDeployRelayCore()) return;
+      this.game.core.coreDeployMode = !this.game.core.coreDeployMode;
+    };
     this.empBtn.onclick = () => this.game.activateCoreAbility();
     this.settingsBtn.onclick = () => this.game.ui.openSettings();
     this.codexBtn.onclick = () => this.game.ui.openCodex();
@@ -112,6 +136,7 @@ export class HUD {
       this.countdownEl,
       this.waveIntel,
       this.waveTimeline,
+      this.commandPanel,
       this.codexAlert,
       this.modifierStrip,
       this.bossBar,
@@ -127,6 +152,7 @@ export class HUD {
       this.updateCountdown();
       this.updateWaveIntel();
       this.updateCoreActions();
+      this.updateCommandPanel();
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
@@ -183,6 +209,7 @@ export class HUD {
     this.startWaveBtn.style.display = this.game.state === "PLANNING" && this.game.waves.hasMoreWaves ? "" : "none";
     this.updateWaveIntel();
     this.updateCoreActions();
+    this.updateCommandPanel();
     this.criticalOverlay.classList.toggle("visible", pct < 0.15);
 
     // Modifier strip.
@@ -321,10 +348,61 @@ export class HUD {
     this.repairBtn.style.display =
       this.game.state === "PLANNING" || this.game.state === "WAVE_COMPLETE" ? "" : "none";
     this.repairBtn.classList.toggle("disabled", !canRepair);
+    const relayBuilds = `${this.game.core.coreNodesBuilt}/${this.game.maxRelayCoresForRun()}`;
+    const canRelay = this.game.canDeployRelayCore();
+    const canTierUp = this.game.canUpgradeCommandTier();
+    const nextTierCost = this.game.nextCommandTierCost();
+    this.commandTierBtn.textContent =
+      this.game.core.commandTier >= 3
+        ? "COMMAND T3 MAX"
+        : `COMMAND T${this.game.core.commandTier} → T${this.game.core.commandTier + 1} (${nextTierCost})`;
+    this.commandTierBtn.style.display = this.repairBtn.style.display;
+    this.commandTierBtn.classList.toggle("disabled", !canTierUp);
+    this.relayCoreBtn.textContent = `RELAY ${relayBuilds} (R)`;
+    this.relayCoreBtn.style.display = this.repairBtn.style.display;
+    this.relayCoreBtn.classList.toggle("disabled", !canRelay);
+    this.relayCoreBtn.classList.toggle("active", this.game.core.coreDeployMode);
 
     const cd = c.coreAbilityCooldown;
     this.empBtn.textContent = cd > 0 ? `EMP ${Math.ceil(cd)}s` : "EMP READY";
     this.empBtn.style.display = this.game.state === "WAVE_ACTIVE" ? "" : "none";
     this.empBtn.classList.toggle("disabled", cd > 0 || this.game.enemies.list.length === 0);
+  }
+
+  private updateCommandPanel(): void {
+    const show = this.game.state === "PLANNING" || this.game.state === "WAVE_ACTIVE";
+    if (!show) {
+      this.commandPanel.classList.remove("visible");
+      return;
+    }
+    this.commandPanel.classList.add("visible");
+    clear(this.commandPanel);
+
+    const next = this.game.waves.nextWaveDef;
+    const counters = (next?.recommendedCounters ?? []).slice(0, 2);
+    const hasCounterTower = this.hasRecommendedTower(counters);
+    const perfectWaveOk = !this.tookCoreDamageThisWave;
+    const reserveOk = this.game.core.credits >= 30;
+
+    this.commandPanel.append(
+      el("div", { class: "ls-command-title", text: "COMMAND DIRECTIVES" }),
+      this.directiveRow(
+        hasCounterTower,
+        hasCounterTower ? "Counter setup online." : `Build counters: ${counters.join(" + ") || "mixed defense"}.`
+      ),
+      this.directiveRow(perfectWaveOk, perfectWaveOk ? "Perfect wave possible (no core breaches)." : "Core breached this wave."),
+      this.directiveRow(reserveOk, reserveOk ? "Emergency reserve secured (30+ credits)." : "Hold 30 credits for repair/EMP safety.")
+    );
+  }
+
+  private directiveRow(ok: boolean, text: string): HTMLElement {
+    return el("div", { class: `ls-command-row ${ok ? "ok" : "warn"}`, text: `${ok ? "✓" : "•"} ${text}` });
+  }
+
+  private hasRecommendedTower(counters: string[]): boolean {
+    const names = counters.map((c) => c.toLowerCase());
+    const towers = this.game.towers.list as Tower[];
+    if (names.length === 0) return towers.length >= 2;
+    return towers.some((t) => names.some((n) => t.name.toLowerCase().includes(n)));
   }
 }

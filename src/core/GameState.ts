@@ -122,6 +122,14 @@ export interface GameCoreState {
   signalInterferenceCooldown: number;
   /** Salvage pickups on the map that the player can click to collect. */
   salvagePickups: SalvagePickup[];
+  /** True while the player is selecting where to deploy a new relay core node. */
+  coreDeployMode: boolean;
+  /** Number of relay core nodes deployed this run. */
+  coreNodesBuilt: number;
+  /** Command tier acts like a base-tech level (Warcraft-style tech progression). */
+  commandTier: 1 | 2 | 3;
+  /** Timer for periodic militia squad spawns unlocked by command tiers. */
+  militiaPulseTimer: number;
 }
 
 export interface GravityAnomaly {

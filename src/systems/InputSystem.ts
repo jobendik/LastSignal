@@ -1,7 +1,7 @@
 import type { Game } from "../core/Game";
 import { CellKind, type TowerType } from "../core/Types";
 import { towerOrder } from "../data/towers";
-import { TILE_SIZE } from "../core/Config";
+import { COLS, ROWS, TILE_SIZE } from "../core/Config";
 
 export class InputSystem {
   mouseX = 0;
@@ -98,6 +98,10 @@ export class InputSystem {
       this.game.particles.spawnFloatingText(px, py - 20, "KILL ZONE SET", "#ff9800", 1.2, 12);
       this.game.particles.spawnRing(px, py, 28, "#ff9800");
       this.game.bus.emit("killzone:set", this.game.core.killZone);
+    } else if (this.game.core.coreDeployMode) {
+      if (this.game.deployRelayCore(this.overCell.c, this.overCell.r)) {
+        this.game.core.coreDeployMode = false;
+      }
     } else if (this.selectedTowerType) {
       this.tryBuild(this.overCell, false);
     } else {
@@ -160,6 +164,10 @@ export class InputSystem {
       this.game.particles.spawnFloatingText(px, py - 20, "KILL ZONE SET", "#ff9800", 1.2, 12);
       this.game.particles.spawnRing(px, py, 28, "#ff9800");
       this.game.bus.emit("killzone:set", this.game.core.killZone);
+      return;
+    }
+    if (this.game.core.coreDeployMode) {
+      this.game.deployRelayCore(cell.c, cell.r);
       return;
     }
 
@@ -318,6 +326,8 @@ export class InputSystem {
     switch (code) {
       case "Escape":
         this.clearSelection();
+        this.game.core.coreDeployMode = false;
+        this.game.core.killZoneMode = false;
         this.game.bus.emit("ui:esc");
         break;
       case bindings.wavePreview:
@@ -364,6 +374,19 @@ export class InputSystem {
           e.preventDefault();
         }
         break;
+      case "KeyR":
+        if (this.game.canDeployRelayCore()) {
+          this.game.core.coreDeployMode = !this.game.core.coreDeployMode;
+          this.selectedTowerType = null;
+          e.preventDefault();
+        }
+        break;
+      case "KeyY":
+        if (this.game.canUpgradeCommandTier()) {
+          this.game.upgradeCommandTier();
+          e.preventDefault();
+        }
+        break;
     }
   }
 
@@ -386,8 +409,8 @@ export class InputSystem {
 
     const axisX = pad.axes[0] ?? 0;
     const axisY = pad.axes[1] ?? 0;
-    if (Math.abs(axisX) > 0.6) this.gamepadCursor.c = Math.max(0, Math.min(24, this.gamepadCursor.c + Math.sign(axisX)));
-    if (Math.abs(axisY) > 0.6) this.gamepadCursor.r = Math.max(0, Math.min(19, this.gamepadCursor.r + Math.sign(axisY)));
+    if (Math.abs(axisX) > 0.6) this.gamepadCursor.c = Math.max(0, Math.min(COLS - 1, this.gamepadCursor.c + Math.sign(axisX)));
+    if (Math.abs(axisY) > 0.6) this.gamepadCursor.r = Math.max(0, Math.min(ROWS - 1, this.gamepadCursor.r + Math.sign(axisY)));
     this.overCell = { ...this.gamepadCursor };
     this.mouseX = (this.gamepadCursor.c + 0.5) * TILE_SIZE;
     this.mouseY = (this.gamepadCursor.r + 0.5) * TILE_SIZE;
