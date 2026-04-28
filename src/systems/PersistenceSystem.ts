@@ -61,6 +61,7 @@ export const defaultProfile: PersistedProfile = {
   prestigeMultiplier: 1,
   dailyBestScore: 0,
   dailyBestDate: "",
+  commanderBriefingSeen: false,
 };
 
 export class PersistenceSystem {
@@ -103,6 +104,7 @@ export class PersistenceSystem {
         prestigeMultiplier: parsed.prestigeMultiplier ?? 1,
         dailyBestScore: parsed.dailyBestScore ?? 0,
         dailyBestDate: parsed.dailyBestDate ?? "",
+        commanderBriefingSeen: parsed.commanderBriefingSeen ?? false,
       };
     } catch {
       return this.emptyProfile();
@@ -153,6 +155,7 @@ export class PersistenceSystem {
       prestigeMultiplier: 1,
       dailyBestScore: 0,
       dailyBestDate: "",
+      commanderBriefingSeen: false,
     };
   }
 }

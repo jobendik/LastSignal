@@ -100,12 +100,7 @@ export class GridSystem {
         this.coreCells.push(i);
       }
     }
-    // Core center in world coords.
-    const cs = this.coreCells.map((i) => this.coords(i));
-    const avgC = cs.reduce((s, { c }) => s + c, 0) / cs.length + 0.5;
-    const avgR = cs.reduce((s, { r }) => s + r, 0) / cs.length + 0.5;
-    this.corePos = new Vector2(avgC * TILE_SIZE, avgR * TILE_SIZE);
-
+    this.recalcCorePos();
     this.rebuildFlow();
   }
 
@@ -223,5 +218,43 @@ export class GridSystem {
   }
   clearPlacementCacheDirty(): void {
     this.placementCacheDirty = false;
+  }
+
+  canPlaceCoreCluster(c: number, r: number): boolean {
+    // 2x2 relay core footprint.
+    if (!this.isInside(c, r) || !this.isInside(c + 1, r + 1)) return false;
+    const cells = [
+      this.idx(c, r),
+      this.idx(c + 1, r),
+      this.idx(c, r + 1),
+      this.idx(c + 1, r + 1),
+    ];
+    if (cells.some((i) => this.cells[i] !== CellKind.Empty)) return false;
+    // Keep spawners and existing core perimeter clear for readability.
+    const nearSpawner = this.spawners.some((s) => Math.abs(s.c - c) <= 1 && Math.abs(s.r - r) <= 1);
+    if (nearSpawner) return false;
+    return true;
+  }
+
+  placeCoreCluster(c: number, r: number): void {
+    const cells = [
+      this.idx(c, r),
+      this.idx(c + 1, r),
+      this.idx(c, r + 1),
+      this.idx(c + 1, r + 1),
+    ];
+    for (const i of cells) {
+      this.cells[i] = CellKind.Core;
+      if (!this.coreCells.includes(i)) this.coreCells.push(i);
+    }
+    this.recalcCorePos();
+    this.rebuildFlow();
+  }
+
+  private recalcCorePos(): void {
+    const cs = this.coreCells.map((i) => this.coords(i));
+    const avgC = cs.reduce((s, { c }) => s + c, 0) / Math.max(1, cs.length) + 0.5;
+    const avgR = cs.reduce((s, { r }) => s + r, 0) / Math.max(1, cs.length) + 0.5;
+    this.corePos = new Vector2(avgC * TILE_SIZE, avgR * TILE_SIZE);
   }
 }

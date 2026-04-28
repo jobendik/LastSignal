@@ -1,8 +1,9 @@
 import type { SectorDefinition, WaveDefinition, EnemyType } from "../core/Types";
 import { defaultWaves } from "./waves";
+import { COLS, ROWS } from "../core/Config";
 
 /**
- * Layouts are 20 rows of 25 chars.
+ * Base layouts are authored in a compact format, then auto-expanded to the runtime map size.
  *   . empty    # rock     C crystal    X core
  *   N/E/S/W   spawner marker (matching spawner id)
  */
@@ -122,6 +123,30 @@ const defaultSpawners = [
   { id: "west", label: "West Gate", c: 0, r: 9 },
 ];
 
+function expandLayout(layout: string[]): string[] {
+  const srcH = layout.length;
+  const srcW = Math.max(...layout.map((r) => r.length));
+  const offC = Math.max(0, Math.floor((COLS - srcW) / 2));
+  const offR = Math.max(0, Math.floor((ROWS - srcH) / 2));
+  const out = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => "."));
+  for (let r = 0; r < srcH; r++) {
+    for (let c = 0; c < srcW; c++) {
+      const ch = layout[r]?.charAt(c) || ".";
+      if (offR + r >= ROWS || offC + c >= COLS) continue;
+      out[offR + r]![offC + c] = ch;
+    }
+  }
+  return out.map((row) => row.join(""));
+}
+
+function expandSpawners(spawners: SectorDefinition["spawners"], layout: string[]): SectorDefinition["spawners"] {
+  const srcH = layout.length;
+  const srcW = Math.max(...layout.map((r) => r.length));
+  const offC = Math.max(0, Math.floor((COLS - srcW) / 2));
+  const offR = Math.max(0, Math.floor((ROWS - srcH) / 2));
+  return spawners.map((s) => ({ ...s, c: s.c + offC, r: s.r + offR }));
+}
+
 function cloneWaves(waves: WaveDefinition[]): WaveDefinition[] {
   // Structural clone so sector tweaks don't leak across sectors.
   return waves.map((w) => ({
@@ -211,7 +236,7 @@ function hostileCoreWaves(): WaveDefinition[] {
   return out.slice(0, 20);
 }
 
-export const sectorDefinitions: SectorDefinition[] = [
+const baseSectorDefinitions: SectorDefinition[] = [
   {
     id: "sector_01_broken_relay",
     name: "Sector 1 — Broken Relay",
@@ -280,3 +305,9 @@ export const sectorDefinitions: SectorDefinition[] = [
     darkness: true,
   },
 ];
+
+export const sectorDefinitions: SectorDefinition[] = baseSectorDefinitions.map((s) => ({
+  ...s,
+  layout: expandLayout(s.layout),
+  spawners: expandSpawners(s.spawners, s.layout),
+}));
