@@ -218,3 +218,14 @@ Use this screen to decide what to change on the next run (composition, spend pat
 ## One-Sentence Summary
 
 **LAST SIGNAL is won by balancing economy, lane control, and counter-building across escalating waves while preserving enough core integrity and resources to survive late-game pressure.**
+
+---
+
+## RTS-Style Expansion Layer (Warcraft-Inspired)
+
+The game now includes stronger RTS-style base progression inspired by classic macro RTS loops:
+
+- **Command Tiers (T1 → T3):** upgrade your command level in-run to unlock stronger military tempo.
+- **Population Growth:** higher command tiers increase drone population cap.
+- **Militia Waves:** at higher command tiers, your base periodically trains and launches temporary militia drone squads automatically during active combat.
+- **Forward Base Play:** additional relay cores let you establish multi-core defensive territory and shape path pressure, similar to expanding to new bases.

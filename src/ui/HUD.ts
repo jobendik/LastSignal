@@ -15,6 +15,7 @@ export class HUD {
   private speedEl = el("span", { text: "1x" });
   private startWaveBtn = el("button", { class: "ls-btn ls-start-wave", text: "START WAVE" });
   private repairBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "REPAIR 30" });
+  private commandTierBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "COMMAND T1" });
   private relayCoreBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "RELAY 0/1 (R)" });
   private empBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "EMP" });
   private pauseBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "PAUSE (P)" });
@@ -69,6 +70,7 @@ export class HUD {
     bus.on("boss:killed", () => this.refresh());
     bus.on("core:repaired", () => this.refresh());
     bus.on("core:relayBuilt", () => this.refresh());
+    bus.on("command:tierUp", () => this.refresh());
     bus.on("core:ability", () => this.refresh());
     bus.on("core:emergency", () => this.refresh());
     bus.on("sector:started", () => this.refresh());
@@ -100,6 +102,7 @@ export class HUD {
     right.append(
       this.startWaveBtn,
       this.repairBtn,
+      this.commandTierBtn,
       this.relayCoreBtn,
       this.empBtn,
       speedDown, this.speedEl, speedUp,
@@ -115,6 +118,7 @@ export class HUD {
     };
     this.pauseBtn.onclick = () => this.game.togglePause();
     this.repairBtn.onclick = () => this.game.repairCore();
+    this.commandTierBtn.onclick = () => this.game.upgradeCommandTier();
     this.relayCoreBtn.onclick = () => {
       if (!this.game.canDeployRelayCore()) return;
       this.game.core.coreDeployMode = !this.game.core.coreDeployMode;
@@ -346,6 +350,14 @@ export class HUD {
     this.repairBtn.classList.toggle("disabled", !canRepair);
     const relayBuilds = `${this.game.core.coreNodesBuilt}/${this.game.maxRelayCoresForRun()}`;
     const canRelay = this.game.canDeployRelayCore();
+    const canTierUp = this.game.canUpgradeCommandTier();
+    const nextTierCost = this.game.nextCommandTierCost();
+    this.commandTierBtn.textContent =
+      this.game.core.commandTier >= 3
+        ? "COMMAND T3 MAX"
+        : `COMMAND T${this.game.core.commandTier} → T${this.game.core.commandTier + 1} (${nextTierCost})`;
+    this.commandTierBtn.style.display = this.repairBtn.style.display;
+    this.commandTierBtn.classList.toggle("disabled", !canTierUp);
     this.relayCoreBtn.textContent = `RELAY ${relayBuilds} (R)`;
     this.relayCoreBtn.style.display = this.repairBtn.style.display;
     this.relayCoreBtn.classList.toggle("disabled", !canRelay);

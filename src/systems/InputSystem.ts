@@ -381,6 +381,12 @@ export class InputSystem {
           e.preventDefault();
         }
         break;
+      case "KeyY":
+        if (this.game.canUpgradeCommandTier()) {
+          this.game.upgradeCommandTier();
+          e.preventDefault();
+        }
+        break;
     }
   }
 

@@ -19,6 +19,11 @@ export class DroneSystem {
     this.list.length = 0;
   }
 
+  maxDrones(): number {
+    // Command tiers increase population cap (RTS-style supply progression).
+    return MAX_DRONES + (this.game.core.commandTier - 1) * 2;
+  }
+
   nextCost(type: DroneType): number {
     const def = droneDefinitions[type];
     const sameCount = this.list.filter((d) => d.type === type).length;
@@ -27,7 +32,7 @@ export class DroneSystem {
   }
 
   canBuy(type: DroneType): boolean {
-    if (this.list.length >= MAX_DRONES) return false;
+    if (this.list.length >= this.maxDrones()) return false;
     return this.game.core.credits >= this.nextCost(type);
   }
 
@@ -43,7 +48,22 @@ export class DroneSystem {
   }
 
   update(dt: number): void {
+    if (this.game.state === "WAVE_ACTIVE" && this.game.core.commandTier >= 2) {
+      this.game.core.militiaPulseTimer -= dt;
+      if (this.game.core.militiaPulseTimer <= 0) {
+        this.spawnMilitiaPulse();
+        this.game.core.militiaPulseTimer = this.game.core.commandTier === 3 ? 14 : 18;
+      }
+    }
+
     for (const d of this.list) {
+      if (d.ttl != null) {
+        d.ttl -= dt;
+        if (d.ttl <= 0) {
+          d.active = false;
+          continue;
+        }
+      }
       d.timer -= dt;
       if (d.type === "hunter") this.updateHunter(d, dt);
       else if (d.type === "scanner") this.updateScanner(d, dt);
@@ -60,6 +80,22 @@ export class DroneSystem {
         d.angle += diff * 10 * dt;
       }
     }
+    this.list = this.list.filter((d) => d.active);
+  }
+
+  private spawnMilitiaPulse(): void {
+    const count = Math.min(6, this.game.core.commandTier + this.game.core.coreNodesBuilt);
+    const core = this.game.grid.corePos;
+    for (let i = 0; i < count; i++) {
+      const d = new Drone("hunter", core.x + rnd(-36, 36), core.y + rnd(-36, 36));
+      d.damage *= 0.75;
+      d.maxSpeed *= 1.12;
+      d.color = "#90caf9";
+      d.ttl = this.game.core.commandTier === 3 ? 24 : 18;
+      this.list.push(d);
+    }
+    this.game.particles.spawnRing(core.x, core.y, 38, "#90caf9");
+    this.game.bus.emit("militia:pulse", { count });
   }
 
   private updateHunter(d: Drone, dt: number): void {

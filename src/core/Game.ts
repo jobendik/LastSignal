@@ -142,6 +142,8 @@ export class Game {
       salvagePickups: [],
       coreDeployMode: false,
       coreNodesBuilt: 0,
+      commandTier: 1,
+      militiaPulseTimer: 12,
     };
 
     // Wire systems that need `this`.
@@ -245,6 +247,8 @@ export class Game {
     this.core.salvagePickups = [];
     this.core.coreDeployMode = false;
     this.core.coreNodesBuilt = 0;
+    this.core.commandTier = 1;
+    this.core.militiaPulseTimer = 12;
     this.core.speed = 1;
     this.time.timeScale = 1;
 
@@ -452,6 +456,31 @@ export class Game {
     this.audio.sfxReward();
     this.core.coreDeployMode = false;
     this.bus.emit("core:relayBuilt", { c, r, built: this.core.coreNodesBuilt, max: this.maxRelayCoresForRun() });
+    return true;
+  }
+
+  nextCommandTierCost(): number {
+    if (this.core.commandTier === 1) return 220;
+    if (this.core.commandTier === 2) return 380;
+    return 0;
+  }
+
+  canUpgradeCommandTier(): boolean {
+    if (this.state !== "PLANNING" && this.state !== "WAVE_COMPLETE") return false;
+    if (this.core.commandTier >= 3) return false;
+    return this.core.credits >= this.nextCommandTierCost();
+  }
+
+  upgradeCommandTier(): boolean {
+    if (!this.canUpgradeCommandTier()) return false;
+    const cost = this.nextCommandTierCost();
+    if (!this.spendCredits(cost)) return false;
+    this.core.commandTier = Math.min(3, this.core.commandTier + 1) as 1 | 2 | 3;
+    this.core.militiaPulseTimer = 6;
+    this.particles.spawnFloatingText(this.grid.corePos.x, this.grid.corePos.y - 42, `COMMAND TIER ${this.core.commandTier}`, "#ffeb3b", 1.4, 12);
+    this.particles.spawnRing(this.grid.corePos.x, this.grid.corePos.y, 72, "#ffeb3b");
+    this.audio.sfxReward();
+    this.bus.emit("command:tierUp", { tier: this.core.commandTier });
     return true;
   }
 
