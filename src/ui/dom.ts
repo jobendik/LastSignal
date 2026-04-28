@@ -1,18 +1,32 @@
-/** Shared helpers for UI components. */
+/**
+ * Small helpers for building DOM nodes fluently and safely.
+ */
+
 export function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  opts: Partial<{ class: string; text: string; html: string; attrs: Record<string, string> }> = {},
-  children?: (HTMLElement | string)[]
+  tag: K, attrs?: Partial<Record<string, string>> & { class?: string }, children?: (Node | string | null | undefined)[]
 ): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
-  if (opts.class) e.className = opts.class;
-  if (opts.text != null) e.textContent = opts.text;
-  if (opts.html != null) e.innerHTML = opts.html;
-  if (opts.attrs) for (const [k, v] of Object.entries(opts.attrs)) e.setAttribute(k, v);
-  if (children) for (const c of children) e.append(c as Node | string);
+  if (attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null) continue;
+      if (k === 'class')     e.className = v;
+      else if (k === 'html') e.innerHTML = v;
+      else if (k.startsWith('on')) {
+        (e as unknown as Record<string, unknown>)[k] = v;
+      } else {
+        e.setAttribute(k, v);
+      }
+    }
+  }
+  if (children) {
+    for (const c of children) {
+      if (c == null) continue;
+      e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    }
+  }
   return e;
 }
 
-export function clear(e: HTMLElement): void {
-  while (e.firstChild) e.removeChild(e.firstChild);
+export function clearChildren(node: HTMLElement): void {
+  while (node.firstChild) node.removeChild(node.firstChild);
 }

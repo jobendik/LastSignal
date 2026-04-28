@@ -1,0 +1,293 @@
+/* =========================================================
+   Menu screens (main menu, pause, settings, help, ending)
+   ========================================================= */
+
+.menu {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 40% 30%, rgba(242,162,74,0.08) 0%, rgba(0,0,0,0) 60%),
+    linear-gradient(180deg, rgba(5,8,10,0.96) 0%, rgba(5,8,10,0.98) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+.menu-title {
+  font-family: var(--font-display);
+  font-size: 72px;
+  letter-spacing: 0.22em;
+  color: var(--ink-strong);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  text-shadow: 0 0 24px rgba(59,224,138,0.15);
+  position: relative;
+}
+.menu-title::after {
+  content: '';
+  display: block;
+  width: 80px;
+  height: 1px;
+  margin: 14px auto 0;
+  background: var(--scope-green);
+  opacity: 0.6;
+}
+.menu-subtitle {
+  font-size: 11px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 48px;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 260px;
+}
+
+.menu-btn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid rgba(228,220,193,0.2);
+  color: var(--ink-paper);
+  padding: 12px 20px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 160ms var(--ease-smooth);
+  text-align: left;
+  position: relative;
+}
+.menu-btn::before {
+  content: '▸';
+  margin-right: 10px;
+  color: var(--scope-green);
+  opacity: 0;
+  transition: opacity 160ms;
+}
+.menu-btn:hover:not(:disabled),
+.menu-btn:focus-visible {
+  border-color: var(--scope-green);
+  color: var(--ink-strong);
+  background: rgba(59,224,138,0.04);
+  outline: none;
+}
+.menu-btn:hover::before,
+.menu-btn:focus-visible::before {
+  opacity: 1;
+}
+.menu-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.menu-btn.small {
+  padding: 8px 14px;
+  font-size: 11px;
+}
+
+.menu-footer {
+  position: absolute;
+  bottom: 18px;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+}
+.menu-footer span {
+  color: var(--scope-green);
+}
+
+/* Settings panel */
+.settings-panel {
+  width: min(520px, 92vw);
+  background: var(--bg-panel);
+  border: 1px solid rgba(228,220,193,0.12);
+  padding: 28px 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.settings-panel h2 {
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-strong);
+  margin-bottom: 6px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-top: 1px dashed rgba(228,220,193,0.08);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+.settings-row:first-of-type { border-top: 0; }
+.settings-row label {
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  flex: 0 0 auto;
+}
+.settings-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--scope-green);
+}
+.settings-row .val {
+  width: 44px;
+  text-align: right;
+  color: var(--ink-paper);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Loading screen */
+.loading {
+  position: absolute;
+  inset: 0;
+  background: #05080a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  pointer-events: auto;
+  color: var(--ink-dim);
+  font-size: 11px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+}
+.loading .bar {
+  margin-top: 18px;
+  width: 240px;
+  height: 2px;
+  background: rgba(228,220,193,0.12);
+  overflow: hidden;
+}
+.loading .bar > span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--scope-green);
+  transition: width 260ms var(--ease-smooth);
+  box-shadow: 0 0 8px rgba(59,224,138,0.6);
+}
+.loading .tagline {
+  margin-top: 18px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+}
+
+/* Tutorial / help overlay */
+.help-panel {
+  width: min(560px, 92vw);
+  background: var(--bg-panel);
+  border: 1px solid rgba(228,220,193,0.12);
+  padding: 26px;
+  color: var(--ink-paper);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  line-height: 1.65;
+}
+.help-panel h2 {
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--ink-strong);
+  margin-bottom: 14px;
+}
+.help-panel h3 {
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--scope-green);
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+.help-panel ul {
+  list-style: none;
+}
+.help-panel li {
+  display: flex;
+  gap: 10px;
+  padding: 3px 0;
+  color: var(--ink-dim);
+}
+.help-panel li kbd {
+  display: inline-block;
+  min-width: 34px;
+  text-align: center;
+  padding: 2px 6px;
+  border: 1px solid rgba(228,220,193,0.25);
+  border-radius: 2px;
+  background: rgba(255,255,255,0.03);
+  color: var(--ink-strong);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+.help-panel li span { flex: 1; }
+.help-panel .close-note {
+  margin-top: 20px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  text-align: right;
+}
+
+/* Ending screen */
+.ending-screen {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-paper);
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  padding: 40px;
+  text-align: center;
+  z-index: 40;
+  pointer-events: auto;
+  opacity: 0;
+  animation: fade-in 2.4s var(--ease-smooth) 0.4s forwards;
+}
+.ending-screen .glyph {
+  font-family: var(--font-display);
+  font-size: 60px;
+  letter-spacing: 0.35em;
+  color: var(--scope-green);
+  margin-bottom: 18px;
+  text-shadow: 0 0 20px rgba(59,224,138,0.4);
+}
+.ending-screen .body {
+  max-width: 520px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+  line-height: 1.8;
+  margin-bottom: 28px;
+}
+.ending-screen .meta {
+  font-size: 10px;
+  letter-spacing: 0.4em;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  margin-bottom: 30px;
+}
