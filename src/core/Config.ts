@@ -2,10 +2,10 @@
  * Global tuning constants. Gameplay-specific numbers live in /data/* whenever possible.
  */
 export const TILE_SIZE = 32;
-export const COLS = 25;
-export const ROWS = 20;
-export const VIEW_WIDTH = TILE_SIZE * COLS;   // 800
-export const VIEW_HEIGHT = TILE_SIZE * ROWS;  // 640
+export const COLS = 32;
+export const ROWS = 22;
+export const VIEW_WIDTH = TILE_SIZE * COLS;   // 1024
+export const VIEW_HEIGHT = TILE_SIZE * ROWS;  // 704
 
 export const MAX_DT = 1 / 30; // cap delta-time to avoid spiral-of-death
 export const SPEED_MULTIPLIERS = [1, 2, 3] as const;

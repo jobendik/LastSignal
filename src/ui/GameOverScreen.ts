@@ -1,6 +1,22 @@
 import type { Game } from "../core/Game";
 import { el, clear } from "./dom";
 
+function runGrade(g: Game): string {
+  const s = g.core.stats;
+  const corePct = g.core.coreIntegrity / Math.max(1, g.core.coreMax);
+  const killScore = Math.min(40, s.enemiesKilled * 0.18);
+  const efficiency = s.creditsEarned > 0
+    ? Math.max(0, Math.min(25, 25 - ((s.creditsSpent / s.creditsEarned) - 0.8) * 25))
+    : 10;
+  const survival = Math.max(0, Math.min(35, corePct * 35));
+  const total = killScore + efficiency + survival;
+  if (total >= 90) return "S";
+  if (total >= 78) return "A";
+  if (total >= 64) return "B";
+  if (total >= 50) return "C";
+  return "D";
+}
+
 function statsSummary(g: Game): string {
   const s = g.core.stats;
   const p = g.core.profile;
@@ -36,6 +52,7 @@ function statsSummary(g: Game): string {
     .map(([k, v]) => `${k}: ${v}`)
     .join(" · ");
   if (topKills) rows.push(`Top targets: ${topKills}`);
+  rows.push(`Run grade: <b>${runGrade(g)}</b>`);
 
   const towerKillEntries = Object.entries(s.killsByTowerType)
     .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
@@ -126,6 +143,7 @@ export class GameOverScreen {
       this.el.append(
         el("div", { class: "ls-overlay-title ls-gameover-title", text: "CORE OFFLINE" }),
         el("div", { class: "ls-overlay-subtitle", text: "The signal has been lost." }),
+        el("div", { class: "ls-run-grade", text: `GRADE ${runGrade(this.game)}` }),
         el("div", { class: "ls-stats", html: statsSummary(this.game) }),
       );
       const row = el("div", { class: "ls-overlay-actions" });
@@ -178,6 +196,7 @@ export class VictoryScreen {
     content.append(
       el("div", { class: "ls-overlay-title", text: "SIGNAL HELD" }),
       el("div", { class: "ls-overlay-subtitle", text: "The Leviathan is destroyed. The relay endures." }),
+      el("div", { class: "ls-run-grade", text: `GRADE ${runGrade(this.game)}` }),
       el("div", { class: "ls-stats", html: statsSummary(this.game) }),
     );
     const row = el("div", { class: "ls-overlay-actions" });

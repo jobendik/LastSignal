@@ -232,6 +232,7 @@
 .ls-btn-primary:hover { background: rgba(102, 252, 241, 0.25); }
 .ls-btn-ghost { border-color: #3a4049; color: #8a9099; }
 .ls-btn-ghost:hover { border-color: #66fcf1; color: #66fcf1; }
+.ls-btn.active { border-color: #66fcf1; color: #66fcf1; box-shadow: 0 0 10px rgba(102,252,241,0.3); }
 .ls-btn.disabled { opacity: 0.4; cursor: not-allowed; }
 .ls-btn-recall { border-color: #00e5ff; color: #00e5ff; }
 .ls-btn-recall:hover { background: rgba(0, 229, 255, 0.12); box-shadow: 0 0 14px rgba(0, 229, 255, 0.35); }
@@ -553,6 +554,28 @@
   letter-spacing: 1px;
   margin-left: 4px;
 }
+
+.ls-command-panel {
+  display: none;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(102, 252, 241, 0.2);
+  background: rgba(5, 8, 14, 0.62);
+  gap: 2px;
+  flex-direction: column;
+}
+.ls-command-panel.visible { display: flex; }
+.ls-command-title {
+  color: #66fcf1;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.ls-command-row {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+.ls-command-row.ok { color: #9be7a7; }
+.ls-command-row.warn { color: #ffd180; }
 
 /* ===== Build menu ===== */
 .ls-build-menu {
@@ -1273,6 +1296,31 @@
   align-items: center;
   gap: 18px;
   text-align: center;
+}
+
+.ls-run-grade {
+  font-size: 28px;
+  letter-spacing: 6px;
+  color: #ffeb3b;
+  text-shadow: 0 0 14px rgba(255, 235, 59, 0.45);
+}
+
+.ls-briefing .ls-overlay-subtitle {
+  max-width: 720px;
+  text-align: center;
+}
+.ls-briefing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(102, 252, 241, 0.22);
+  background: rgba(8, 14, 22, 0.8);
+  max-width: 720px;
+}
+.ls-briefing-counters {
+  margin-top: 3px;
+  color: #ffe082;
 }
 
 @media (max-width: 760px), (orientation: portrait) {

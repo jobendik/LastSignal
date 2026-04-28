@@ -361,6 +361,8 @@ export interface PersistedProfile {
   prestigeMultiplier: number;
   dailyBestScore: number;
   dailyBestDate: string;
+  /** True after the player has dismissed the in-game commander briefing. */
+  commanderBriefingSeen: boolean;
 }
 
 // ---------- Difficulty ----------
