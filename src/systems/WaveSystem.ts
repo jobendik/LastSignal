@@ -169,6 +169,29 @@ export class WaveSystem {
     if (!wave) return;
 
     this.game.addCredits(wave.rewardCredits);
+    // Reserve Interest: % of unspent credits, capped per wave.
+    const up = this.game.core.upgrades;
+    if (up.unspentInterestPct > 0) {
+      const interest = Math.min(
+        up.unspentInterestCap || Infinity,
+        Math.floor(this.game.core.credits * up.unspentInterestPct)
+      );
+      if (interest > 0) {
+        this.game.addCredits(interest);
+        this.game.particles.spawnFloatingText(
+          this.game.grid.corePos.x,
+          this.game.grid.corePos.y - 30,
+          `+${interest} INTEREST`,
+          "#ffd54f",
+          1.5,
+          12
+        );
+      }
+    }
+    // Supply Drop: flat credit bonus per wave.
+    if (up.waveCompleteCredits > 0) {
+      this.game.addCredits(up.waveCompleteCredits);
+    }
     this.game.economy.onWaveComplete();
     this.checkMilestones();
     this.game.setState("WAVE_COMPLETE");

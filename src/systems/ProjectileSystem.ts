@@ -109,6 +109,7 @@ export class ProjectileSystem {
       this.game.audio.sfxExplosion(0.35, { x: impactX });
       // Pre-compute the canonical tower multiplier once so it's identical for every splash victim.
       const towerMul = towerOwner ? ts.getTowerDamageMultiplier(towerOwner) : 1;
+      const up = this.game.core.upgrades;
       for (const e of this.game.enemies.list) {
         if (!e.active) continue;
         if (e.isPhased && !p.owner.tower?.flags.phaseDisruptor) continue;
@@ -117,6 +118,10 @@ export class ProjectileSystem {
           const falloff = 1 - d / p.splashRadius * 0.5;
           let dmg = p.damage * falloff * towerMul;
           if (p.armorBreak && e.def.armor) dmg *= 1.6;
+          // Cluster Munitions: mortar splash deals bonus damage to swarm/scout.
+          if (p.ownerType === "mortar" && up.mortarSwarmBonus > 0 && (e.type === "swarm" || e.type === "scout")) {
+            dmg *= 1 + up.mortarSwarmBonus;
+          }
           // Kill zone bonus applies to splash targets too.
           const kzS = this.game.core.killZone;
           if (kzS) {

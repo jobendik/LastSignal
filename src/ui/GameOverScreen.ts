@@ -1,5 +1,6 @@
 import type { Game } from "../core/Game";
 import { el, clear } from "./dom";
+import { sectorObjectives } from "../data/objectives";
 
 function runGrade(g: Game): string {
   const s = g.core.stats;
@@ -15,6 +16,38 @@ function runGrade(g: Game): string {
   if (total >= 64) return "B";
   if (total >= 50) return "C";
   return "D";
+}
+
+function objectivesSummary(g: Game, runWon: boolean): HTMLElement | null {
+  const sectorId = g.core.sector?.id;
+  if (!sectorId) return null;
+  const obj = sectorObjectives[sectorId];
+  if (!obj) return null;
+  const primary = g.objectives.evaluate(obj.primary, g.objectives.snapshot(), runWon);
+  const secs = g.objectives.evaluateSecondaries(runWon);
+  const wrap = el("div", { class: "ls-stats" });
+  wrap.append(el("div", { class: "ls-obj-title", text: "OBJECTIVES" }));
+  const prim = el("div", { class: `ls-obj-row primary ${primary.completed ? "ok" : "fail"}` });
+  prim.append(
+    el("span", { class: "ls-obj-marker", text: primary.completed ? "✓" : "✗" }),
+    el("span", { class: "ls-obj-text", text: obj.primary.label })
+  );
+  if (primary.progressText) prim.append(el("span", { class: "ls-obj-progress", text: primary.progressText }));
+  wrap.append(prim);
+
+  for (const s of secs) {
+    const row = el("div", { class: `ls-obj-row secondary ${s.completed ? "ok" : "fail"}` });
+    row.append(
+      el("span", { class: "ls-obj-marker", text: s.completed ? "✓" : "○" }),
+      el("span", { class: "ls-obj-text", text: s.def.label })
+    );
+    if (s.progressText) row.append(el("span", { class: "ls-obj-progress", text: s.progressText }));
+    if (s.completed && s.def.rewardResearch) {
+      row.append(el("span", { class: "ls-obj-reward", text: `+${s.def.rewardResearch}RP` }));
+    }
+    wrap.append(row);
+  }
+  return wrap;
 }
 
 function statsSummary(g: Game): string {
@@ -146,6 +179,8 @@ export class GameOverScreen {
         el("div", { class: "ls-run-grade", text: `GRADE ${runGrade(this.game)}` }),
         el("div", { class: "ls-stats", html: statsSummary(this.game) }),
       );
+      const objs = objectivesSummary(this.game, false);
+      if (objs) this.el.append(objs);
       const row = el("div", { class: "ls-overlay-actions" });
       const retry = el("button", { class: "ls-btn ls-btn-primary", text: "Retry Sector" });
       retry.onclick = () => {
@@ -199,6 +234,25 @@ export class VictoryScreen {
       el("div", { class: "ls-run-grade", text: `GRADE ${runGrade(this.game)}` }),
       el("div", { class: "ls-stats", html: statsSummary(this.game) }),
     );
+    const objs = objectivesSummary(this.game, true);
+    if (objs) content.append(objs);
+    // Sector unlock callout — show next sector if newly unlocked.
+    const justUnlocked = this.game.core.profile.bestSectorCleared;
+    if (justUnlocked >= 1 && justUnlocked < 4) {
+      content.append(
+        el("div", {
+          class: "ls-victory-unlock",
+          text: `Sector ${justUnlocked + 1} unlocked.`,
+        })
+      );
+    } else if (justUnlocked >= 4) {
+      content.append(
+        el("div", {
+          class: "ls-victory-unlock",
+          text: "Campaign complete. Endless / Void available via Research.",
+        })
+      );
+    }
     const row = el("div", { class: "ls-overlay-actions" });
     const again = el("button", { class: "ls-btn ls-btn-primary", text: "New Run" });
     again.onclick = () => this.game.setState("SECTOR_SELECT");

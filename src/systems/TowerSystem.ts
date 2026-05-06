@@ -167,8 +167,25 @@ export class TowerSystem {
   }
 
   disableTower(t: Tower, duration: number): void {
+    let actual = duration;
+    const up = this.game.core.upgrades;
+    // Field Repair Kits: tower disable durations are 30% shorter.
+    if (up.droneRepairFaster) actual *= 0.7;
+    // Conduit Aura: harvester adjacency halves disable durations on neighbors.
+    if (up.harvesterShieldAdjacent) {
+      for (const other of this.list) {
+        if (!other.isEco) continue;
+        const dc = Math.abs(other.c - t.c);
+        const dr = Math.abs(other.r - t.r);
+        if (dc <= 1 && dr <= 1) {
+          actual *= 0.5;
+          this.game.particles.spawnRing(other.pos.x, other.pos.y, 18, "#00e676", 0.18);
+          break;
+        }
+      }
+    }
     const existing = this.disabled.get(t) ?? 0;
-    this.disabled.set(t, Math.max(existing, duration));
+    this.disabled.set(t, Math.max(existing, actual));
   }
 
   findTowerAt(c: number, r: number): Tower | null {
@@ -396,7 +413,20 @@ export class TowerSystem {
       }
       if (modIncomeMul <= 0) return;
 
-      const income = Math.round(stats.income * this.game.core.upgrades.harvesterIncomeMul * modIncomeMul);
+      // Resonant Mining: count adjacent non-harvester towers for an income bonus.
+      let adjBonus = 0;
+      const up = this.game.core.upgrades;
+      if (up.harvesterAdjacencyBonus > 0) {
+        let neighbors = 0;
+        for (const other of this.list) {
+          if (other === t || other.isEco) continue;
+          const dc = Math.abs(other.c - t.c);
+          const dr = Math.abs(other.r - t.r);
+          if (dc <= 1 && dr <= 1) neighbors++;
+        }
+        adjBonus = up.harvesterAdjacencyBonus * neighbors;
+      }
+      const income = Math.round(stats.income * up.harvesterIncomeMul * modIncomeMul * (1 + adjBonus));
       this.game.addCredits(income);
       this.game.audio.sfxCredit(t.pos);
       this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 18, `+${income}`, "#00e676", 0.8, 12);
@@ -429,7 +459,10 @@ export class TowerSystem {
   private applyStasisPulse(t: Tower, target: Enemy, _stats: ReturnType<TowerSystem["effectiveStats"]>): void {
     this.game.audio.sfxTowerFire(t.type, t.pos);
     t.recoil = 4;
-    const strength = t.flags.deepFreeze ? 0.3 : 0.55;
+    const up = this.game.core.upgrades;
+    let strength = t.flags.deepFreeze ? 0.3 : 0.55;
+    // Cryo Saturation: deeper slow.
+    if (up.stasisDeeperSlow > 0) strength = Math.max(0.15, strength - up.stasisDeeperSlow);
     const duration = t.flags.deepFreeze ? 3.4 : 2.6;
     target.applySlow(duration, strength);
     target.freezeFxTimer = duration;
@@ -635,8 +668,16 @@ export class TowerSystem {
   }
 
   private fireRailgun(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
-    // Instant hit ray + big beam.
-    const dmg = stats.damage;
+    const up = this.game.core.upgrades;
+    // Instant hit ray + big beam. Apply boss focus + reflector synergy on the primary hit.
+    let dmg = stats.damage;
+    if (up.railgunBossFocus > 0 && target.isBoss) dmg *= 1 + up.railgunBossFocus;
+    if (up.reflectorRailgunMul > 1) {
+      const adjReflectors = this.list.filter((r) => r.type === "reflector"
+        && Math.max(Math.abs(r.c - t.c), Math.abs(r.r - t.r)) <= 1
+        && r.buildProgress >= 1).length;
+      if (adjReflectors > 0) dmg *= 1 + 0.25 * adjReflectors;
+    }
     this.applyTowerDamage(target, dmg, { type: "tower", towerType: "railgun", tower: t }, t);
     const beam = this.rayToScreenEdge(t.pos.x, t.pos.y, target.pos.x, target.pos.y);
     this.game.particles.spawnBeam(
@@ -648,10 +689,12 @@ export class TowerSystem {
       0.15,
       { kind: "railgun", width: 12 }
     );
-    if (t.flags.armorPiercer) {
+    // Linear Resolve / Piercing Round: pierce other enemies along the line.
+    const pierceAll = up.railgunPierceAll || t.flags.armorPiercer;
+    if (pierceAll) {
+      const pierceMul = up.railgunPierceAll ? 0.5 : 0.5;
       for (const e of this.game.enemies.list) {
         if (e === target || !e.active) continue;
-        // Pierce any enemy roughly along the line between t and target (simple distance check).
         const dx = target.pos.x - t.pos.x;
         const dy = target.pos.y - t.pos.y;
         const len = Math.hypot(dx, dy) || 1;
@@ -662,7 +705,7 @@ export class TowerSystem {
         const along = (px * dx + py * dy) / (len * len);
         if (along < 0 || along > 1.05) continue;
         const perp = Math.abs(px * nx + py * ny);
-        if (perp < 10) this.applyTowerDamage(e, dmg * 0.5, { type: "tower", towerType: "railgun", tower: t }, t);
+        if (perp < 12) this.applyTowerDamage(e, dmg * pierceMul, { type: "tower", towerType: "railgun", tower: t }, t);
       }
     }
     this.tryReflectRailgun(t, target, stats);
@@ -767,6 +810,7 @@ export class TowerSystem {
   }
 
   private fireFlamer(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
+    const up = this.game.core.upgrades;
     const ang = Math.atan2(target.pos.y - t.pos.y, target.pos.x - t.pos.x);
     for (const e of this.game.enemies.list) {
       if (!e.active) continue;
@@ -775,8 +819,16 @@ export class TowerSystem {
       const ea = Math.atan2(e.pos.y - t.pos.y, e.pos.x - t.pos.x);
       let delta = Math.abs(((ea - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
       if (delta > 0.6) continue;
-      this.applyTowerDamage(e, stats.damage, { type: "tower", towerType: "flamer", tower: t }, t);
+      let dmg = stats.damage;
+      // Swarm Igniter: +80% to swarms, -25% to bosses.
+      if (up.flamerSwarmFocus) {
+        if (e.type === "swarm" || e.type === "scout") dmg *= 1.8;
+        else if (e.isBoss) dmg *= 0.75;
+      }
+      this.applyTowerDamage(e, dmg, { type: "tower", towerType: "flamer", tower: t }, t);
       if (t.flags.burningGround) e.applySlow(0.4, 0.85);
+      // Flame Panic: any burning enemy is mildly slowed.
+      if (up.flamerPanicSlow) e.applySlow(0.6, 0.8);
       // Overburn: flamer applies vulnerability so all sources do more damage briefly.
       if (t.flags.vulnerabilityPulse) {
         e.vulnerableTimer = Math.max(e.vulnerableTimer, 2.0);
@@ -885,8 +937,22 @@ export class TowerSystem {
   }
 
   private firePulse(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
-    const shots = t.flags.tripleBurst && (t.burstCount % 3 === 2) ? 3 : 1;
+    const up = this.game.core.upgrades;
+    // Splitter Pulse: every third shot fires a 3-way split with 70% damage each.
+    const splitNow = up.pulseSplitShots && (t.burstCount % 3 === 2);
+    const burstNow = t.flags.tripleBurst && (t.burstCount % 3 === 2);
+    let shots = 1;
+    let perShotMul = 1;
+    if (splitNow) { shots = 3; perShotMul = 0.7; }
+    else if (burstNow) { shots = 3; perShotMul = 1; }
     t.burstCount++;
+    // Last-Stand Pulse: damage scales up to +50% as enemies approach core.
+    let baseDmg = stats.damage;
+    if (up.pulseCoreBoost) {
+      const distCells = this.game.grid.getDistAtWorld(target.pos.x, target.pos.y);
+      const close = Math.max(0, Math.min(1, 1 - distCells / 8));
+      baseDmg *= 1 + 0.5 * close;
+    }
     for (let i = 0; i < shots; i++) {
       const spread = shots === 3 ? (i - 1) * 0.15 : 0;
       const ang = Math.atan2(target.pos.y - t.pos.y, target.pos.x - t.pos.x) + spread;
@@ -895,7 +961,7 @@ export class TowerSystem {
         pos: t.pos,
         target,
         targetPos: t.pos.add(dir.mult(400)),
-        damage: stats.damage,
+        damage: baseDmg * perShotMul,
         color: t.def.color,
         speed: t.def.projectileSpeed ?? 460,
         kind: "bullet",
@@ -942,6 +1008,7 @@ export class TowerSystem {
   }
 
   private fireMortar(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
+    const up = this.game.core.upgrades;
     const p = new Projectile({
       pos: t.pos,
       target,
@@ -954,16 +1021,19 @@ export class TowerSystem {
       ownerType: "mortar",
       splashRadius: stats.splashRadius,
       armorBreak: Boolean(t.flags.armorBreaker),
-      burningGround: Boolean(t.flags.burningGround),
+      // Incendiary Loadout: every shell leaves burning ground.
+      burningGround: Boolean(t.flags.burningGround) || up.mortarAlwaysBurn,
     });
     this.game.projectiles.spawn(p);
   }
 
   private fireTesla(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
+    const up = this.game.core.upgrades;
     const chained: Enemy[] = [target];
     const pts: { x: number; y: number }[] = [{ x: t.pos.x, y: t.pos.y }, { x: target.pos.x, y: target.pos.y }];
     let current = target;
-    const chainRange = stats.chainRange || 64;
+    let chainRange = stats.chainRange || 64;
+    if (up.teslaLongChain) chainRange *= 1.7;
     const maxJumps = Math.max(1, stats.chainMax);
 
     for (let i = 1; i < maxJumps; i++) {
@@ -981,11 +1051,20 @@ export class TowerSystem {
       current = next;
     }
 
-    for (const e of chained) {
+    for (let i = 0; i < chained.length; i++) {
+      const e = chained[i]!;
       let dmg = stats.damage;
+      // Storm Reach: each subsequent jump deals less damage.
+      if (up.teslaLongChain && i > 0) dmg *= Math.pow(0.75, i);
+      // Phantom Lash: bonus damage to phased enemies (works only if can hit).
+      if (up.teslaPhantomBonus > 0 && e.isPhased) dmg *= 1 + up.teslaPhantomBonus;
       if (e.isPhased && t.flags.phaseDisruptor) dmg *= 0.4;
       this.applyTowerDamage(e, dmg, { type: "tower", towerType: "tesla", tower: t }, t);
       if (t.flags.empArc && Math.random() < 0.25) e.applyStun(0.5);
+      // Disruptor Coil: every Tesla hit applies vulnerability.
+      if (up.teslaVulnerability) {
+        e.vulnerableTimer = Math.max(e.vulnerableTimer, 1.2);
+      }
     }
 
     this.game.particles.spawnLightning(pts, t.def.color);

@@ -32,6 +32,7 @@ export class HUD {
   private waveIntel = el("div", { class: "ls-wave-intel" });
   private waveTimeline = el("div", { class: "ls-wave-timeline" });
   private commandPanel = el("div", { class: "ls-command-panel" });
+  private objectivesPanel = el("div", { class: "ls-objectives-panel" });
   private criticalOverlay = el("div", { class: "ls-critical-overlay" });
   private rafId = 0;
   private displayedCredits = 0;
@@ -73,7 +74,11 @@ export class HUD {
     bus.on("command:tierUp", () => this.refresh());
     bus.on("core:ability", () => this.refresh());
     bus.on("core:emergency", () => this.refresh());
-    bus.on("sector:started", () => this.refresh());
+    bus.on("sector:started", () => {
+      this.objectivesLastSig = "";
+      this.objectivesLastBuild = 0;
+      this.refresh();
+    });
   }
 
   private build(): void {
@@ -137,6 +142,7 @@ export class HUD {
       this.waveIntel,
       this.waveTimeline,
       this.commandPanel,
+      this.objectivesPanel,
       this.codexAlert,
       this.modifierStrip,
       this.bossBar,
@@ -153,9 +159,64 @@ export class HUD {
       this.updateWaveIntel();
       this.updateCoreActions();
       this.updateCommandPanel();
+      this.updateObjectivesPanel();
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
+  }
+
+  private objectivesLastBuild = 0;
+  private objectivesLastSig = "";
+  private updateObjectivesPanel(): void {
+    const show = this.game.state === "PLANNING" || this.game.state === "WAVE_ACTIVE" || this.game.state === "WAVE_COMPLETE";
+    const obj = this.game.objectives.currentSectorObjectives;
+    if (!show || !obj) {
+      this.objectivesPanel.classList.remove("visible");
+      return;
+    }
+    this.objectivesPanel.classList.add("visible");
+    // Rate-limit panel rebuilds so we don't thrash the DOM every frame.
+    const now = performance.now();
+    if (now - this.objectivesLastBuild < 350) return;
+    this.objectivesLastBuild = now;
+
+    const snap = this.game.objectives.snapshot();
+    const primary = this.game.objectives.evaluate(obj.primary, snap, false);
+    const sigParts: string[] = [];
+    sigParts.push(`p:${primary.completed ? 1 : 0}:${primary.progressText ?? ""}`);
+    const secEvals = obj.secondary.map((sec) => this.game.objectives.evaluate(sec, snap, false));
+    for (let i = 0; i < secEvals.length; i++) {
+      const ev = secEvals[i]!;
+      const okFlag = ev.completed || (ev.progress != null && ev.progress >= 1) ? 1 : 0;
+      sigParts.push(`${i}:${okFlag}:${ev.progressText ?? ""}`);
+    }
+    const sig = sigParts.join("|");
+    if (sig === this.objectivesLastSig) return;
+    this.objectivesLastSig = sig;
+
+    clear(this.objectivesPanel);
+    this.objectivesPanel.append(el("div", { class: "ls-obj-title", text: "OBJECTIVES" }));
+    const primRow = el("div", { class: "ls-obj-row primary" });
+    primRow.append(
+      el("span", { class: "ls-obj-marker", text: "★" }),
+      el("span", { class: "ls-obj-text", text: obj.primary.label })
+    );
+    if (primary.progressText) {
+      primRow.append(el("span", { class: "ls-obj-progress", text: primary.progressText }));
+    }
+    this.objectivesPanel.append(primRow);
+    for (let i = 0; i < obj.secondary.length; i++) {
+      const sec = obj.secondary[i]!;
+      const ev = secEvals[i]!;
+      const ok = ev.completed || (ev.progress != null && ev.progress >= 1);
+      const row = el("div", { class: `ls-obj-row secondary${ok ? " ok" : ""}` });
+      row.append(
+        el("span", { class: "ls-obj-marker", text: ok ? "✓" : "+" }),
+        el("span", { class: "ls-obj-text", text: sec.label })
+      );
+      if (ev.progressText) row.append(el("span", { class: "ls-obj-progress", text: ev.progressText }));
+      this.objectivesPanel.append(row);
+    }
   }
 
   private updateCountdown(): void {

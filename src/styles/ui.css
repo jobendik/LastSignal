@@ -316,6 +316,38 @@
 .ls-sector-card.ls-sector-cleared { box-shadow: 0 0 14px rgba(0, 230, 118, 0.18); }
 .ls-sector-card.ls-sector-cleared .ls-sector-status { color: #69f0ae; }
 
+/* Sector objective block on sector card */
+.ls-sector-objectives {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(102, 252, 241, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+}
+.ls-sector-obj-primary {
+  color: #ffeb3b;
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+.ls-sector-obj-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #9be7a7;
+}
+.ls-sector-obj-row { line-height: 1.35; }
+.ls-sector-obj-counter {
+  margin-top: 4px;
+  color: #66fcf1;
+  letter-spacing: 0.5px;
+}
+.ls-sector-obj-hazard {
+  color: #ffab40;
+  letter-spacing: 0.5px;
+}
+
 /* ===== HUD ===== */
 .ls-hud {
   position: absolute;
@@ -589,6 +621,64 @@
 }
 .ls-command-row.ok { color: #9be7a7; }
 .ls-command-row.warn { color: #ffd180; }
+
+/* ===== Objectives panel (HUD) ===== */
+.ls-objectives-panel {
+  display: none;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 235, 59, 0.25);
+  background: rgba(8, 12, 18, 0.7);
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+}
+.ls-objectives-panel.visible { display: flex; }
+.ls-obj-title {
+  color: #ffeb3b;
+  letter-spacing: 2px;
+  font-size: 10px;
+}
+.ls-obj-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.5px;
+}
+.ls-obj-row.primary {
+  color: #ffeb3b;
+}
+.ls-obj-row.secondary {
+  color: #9aa4af;
+}
+.ls-obj-row.secondary.ok {
+  color: #9be7a7;
+}
+.ls-obj-marker {
+  width: 10px;
+  text-align: center;
+}
+.ls-obj-text { flex: 1; }
+.ls-obj-progress {
+  font-size: 9px;
+  color: #66fcf1;
+  letter-spacing: 0.5px;
+}
+.ls-obj-row.fail { color: #ef9a9a; }
+.ls-obj-reward {
+  margin-left: 6px;
+  color: #ffd54f;
+  font-size: 9px;
+}
+.ls-victory-unlock {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(102, 252, 241, 0.5);
+  background: rgba(102, 252, 241, 0.08);
+  color: #66fcf1;
+  font-size: 13px;
+  letter-spacing: 2px;
+}
 
 /* ===== Build menu ===== */
 .ls-build-menu {
