@@ -293,6 +293,9 @@ export class ParticleSystem {
 
   private effectBudgetFactor(): number {
     if (this.game.core.settings.reducedMotion) return 0.35;
+    // Honour the explicit user-facing density slider first.
+    const density = this.game.core.settings.vfxParticleDensity;
+    if (density != null) return Math.max(0.15, Math.min(1, density));
     switch (this.game.core.settings.graphicsQuality) {
       case "low": return 0.35;
       case "medium": return 0.65;

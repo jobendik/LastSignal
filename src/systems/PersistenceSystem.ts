@@ -21,6 +21,16 @@ export const defaultSettings: GameSettings = {
   highContrast: false,
   fontScale: 1,
   graphicsQuality: "high",
+  // Per-effect VFX toggles. Default to the "high" preset (everything on).
+  vfxScanlines: true,
+  vfxVignette: true,
+  vfxPhosphor: true,
+  vfxFilmGrain: true,
+  vfxChromaticAberration: true,
+  vfxBarrelDistortion: true,
+  vfxBloom: true,
+  vfxFlicker: true,
+  vfxParticleDensity: 1,
   keyBindings: {
     build1: "Digit1",
     build2: "Digit2",
