@@ -33,6 +33,11 @@ export class HUD {
   private waveTimeline = el("div", { class: "ls-wave-timeline" });
   private commandPanel = el("div", { class: "ls-command-panel" });
   private objectivesPanel = el("div", { class: "ls-objectives-panel" });
+  /** Right-side sidebar that holds the OBJECTIVES + COMMAND DIRECTIVES panels.
+   *  Positioned absolutely so it doesn't make the HUD bar tall and doesn't
+   *  overlap the build menu on the left. Auto-hides when the tower panel is
+   *  shown so player info doesn't fight for the same space. */
+  private rightSidebar = el("div", { class: "ls-hud-right-sidebar" });
   private criticalOverlay = el("div", { class: "ls-critical-overlay" });
   private rafId = 0;
   private displayedCredits = 0;
@@ -135,19 +140,26 @@ export class HUD {
     this.countdownBar.append(this.countdownFill);
     this.countdownEl.append(this.countdownLabel, this.countdownValue, this.countdownBar);
 
+    // Right sidebar holds the OBJECTIVES + COMMAND DIRECTIVES panels in a
+    // dedicated vertical column on the right side of the screen.
+    this.rightSidebar.append(this.objectivesPanel, this.commandPanel);
+
     this.el.append(
       left,
       right,
       this.countdownEl,
       this.waveIntel,
       this.waveTimeline,
-      this.commandPanel,
-      this.objectivesPanel,
+      this.rightSidebar,
       this.codexAlert,
       this.modifierStrip,
       this.bossBar,
       this.criticalOverlay
     );
+
+    // The tower panel uses the same right-side area; the sidebar's visibility
+    // is updated each frame in updateRightSidebarVisibility() via the rAF tick
+    // (no explicit deselect event exists — towers.selected is just nulled).
 
     this.game.bus.on("codex:new", (id: unknown) => this.showCodexAlert(String(id)));
     this.game.bus.on("codex:alertDismissed", () => this.hideCodexAlert());
@@ -160,9 +172,16 @@ export class HUD {
       this.updateCoreActions();
       this.updateCommandPanel();
       this.updateObjectivesPanel();
+      this.updateRightSidebarVisibility();
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
+  }
+
+  private updateRightSidebarVisibility(): void {
+    const towerSelected = !!this.game.towers.selected;
+    // Show only when the tower panel isn't taking the right column.
+    this.rightSidebar.classList.toggle("hidden-by-tower-panel", towerSelected);
   }
 
   private objectivesLastBuild = 0;

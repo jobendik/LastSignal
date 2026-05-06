@@ -522,9 +522,9 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  /* Don't render over the build menu (left:8px, width:200px). */
+  /* Sit to the right of the build menu so its top edge isn't covered. */
   margin-left: 212px;
-  width: calc(100% - 212px);
+  width: calc(100% - 212px - 248px); /* leave room for right sidebar (240px + 8px) */
   font-size: 10px;
   padding: 2px 0;
 }
@@ -572,9 +572,10 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  /* Don't render over the build menu (left:8px, width:200px). */
+  /* Sit to the right of the build menu (left:8px, width:200px) and leave
+     space for the right sidebar (240px + 8px). */
   margin-left: 212px;
-  width: calc(100% - 212px);
+  width: calc(100% - 212px - 248px);
   font-size: 10px;
 }
 .ls-wave-intel.visible,
@@ -606,14 +607,13 @@
 
 .ls-command-panel {
   display: none;
-  /* Don't render over the build menu (left:8px, width:200px). */
-  margin-left: 212px;
-  width: calc(100% - 212px);
+  width: 100%;
   padding: 6px 8px;
   border: 1px solid rgba(102, 252, 241, 0.2);
   background: rgba(5, 8, 14, 0.62);
   gap: 2px;
   flex-direction: column;
+  box-sizing: border-box;
 }
 .ls-command-panel.visible { display: flex; }
 .ls-command-title {
@@ -628,18 +628,32 @@
 .ls-command-row.ok { color: #9be7a7; }
 .ls-command-row.warn { color: #ffd180; }
 
+/* ===== Right-side sidebar (HUD) — holds OBJECTIVES + COMMAND DIRECTIVES ===== */
+.ls-hud-right-sidebar {
+  position: absolute;
+  top: 64px;
+  right: 8px;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 49;
+  pointer-events: auto;
+  transition: opacity 0.18s ease;
+}
+.ls-hud-right-sidebar.hidden-by-tower-panel { opacity: 0; pointer-events: none; }
+
 /* ===== Objectives panel (HUD) ===== */
 .ls-objectives-panel {
   display: none;
-  /* Don't render over the build menu (left:8px, width:200px). */
-  margin-left: 212px;
-  width: calc(100% - 212px);
+  width: 100%;
   padding: 6px 8px;
   border: 1px solid rgba(255, 235, 59, 0.25);
-  background: rgba(8, 12, 18, 0.7);
+  background: rgba(8, 12, 18, 0.85);
   flex-direction: column;
   gap: 2px;
   font-size: 10px;
+  box-sizing: border-box;
 }
 .ls-objectives-panel.visible { display: flex; }
 .ls-obj-title {
@@ -1502,7 +1516,7 @@
   .ls-hud-right {
     margin-left: 0;
   }
-  /* On mobile the build menu becomes a bottom bar; reset the desktop margin. */
+  /* On mobile the build menu becomes a bottom bar; reset desktop layout. */
   .ls-modifier-strip,
   .ls-wave-intel,
   .ls-wave-timeline,
@@ -1510,6 +1524,12 @@
   .ls-objectives-panel {
     margin-left: 0;
     width: 100%;
+  }
+  /* The right sidebar shrinks to fit the smaller viewport. */
+  .ls-hud-right-sidebar {
+    top: 112px;
+    right: 4px;
+    width: min(220px, calc(100vw - 16px));
   }
   .ls-build-menu {
     top: auto;
