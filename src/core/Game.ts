@@ -16,7 +16,6 @@ import type {
   GameStateId,
   SectorDefinition,
   SpeedMultiplier,
-  TowerType,
   UpgradeDefinition,
 } from "./Types";
 
@@ -114,7 +113,6 @@ export class Game {
       stats: createEmptyStats(),
       settings: loadedSettings,
       profile: loadedProfile,
-      paused: false,
       debug: { show: false, showFlow: false, showPaths: false },
       shake: 0,
       shakeDir: { x: 0, y: 0 },
@@ -355,10 +353,16 @@ export class Game {
     this.particles.spawnFloatingText(this.grid.corePos.x, this.grid.corePos.y - 46, "DAILY CHALLENGE", "#ffeb3b", 1.8, 14);
   }
 
+  private prePauseState: GameStateId = "WAVE_ACTIVE";
+
   togglePause(): void {
     if (this.state === "PAUSED") {
-      this.setState("WAVE_ACTIVE"); // resume implies a wave was active
+      this.setState(this.prePauseState);
     } else if (this.state === "WAVE_ACTIVE") {
+      this.prePauseState = this.state;
+      this.setState("PAUSED");
+    } else if (this.state === "PLANNING") {
+      this.prePauseState = this.state;
       this.setState("PAUSED");
     }
   }

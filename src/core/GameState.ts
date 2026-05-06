@@ -118,7 +118,7 @@ export interface GameCoreState {
   stats: RunStats;
   settings: GameSettings;
   profile: PersistedProfile;
-  paused: boolean;
+
   debug: {
     show: boolean;
     showFlow: boolean;
@@ -246,10 +246,10 @@ export function applyUpgradeEffect(
   agg: UpgradeAggregate,
   effect: UpgradeEffect
 ): void {
-  if (effect.towerFireRateMul) agg.towerFireRateMul *= effect.towerFireRateMul;
-  if (effect.towerDamageMul) agg.towerDamageMul *= effect.towerDamageMul;
-  if (effect.towerRangeMul) agg.towerRangeMul *= effect.towerRangeMul;
-  if (effect.towerRangeAdd) agg.towerRangeAdd += effect.towerRangeAdd;
+  if (effect.towerFireRateMul != null) agg.towerFireRateMul *= effect.towerFireRateMul;
+  if (effect.towerDamageMul != null) agg.towerDamageMul *= effect.towerDamageMul;
+  if (effect.towerRangeMul != null) agg.towerRangeMul *= effect.towerRangeMul;
+  if (effect.towerRangeAdd != null) agg.towerRangeAdd += effect.towerRangeAdd;
   if (effect.specificTowerDamageMul) {
     const { type, mul } = effect.specificTowerDamageMul;
     agg.specificTowerDamageMul[type] =
@@ -260,15 +260,15 @@ export function applyUpgradeEffect(
     agg.specificTowerRangeMul[type] =
       (agg.specificTowerRangeMul[type] ?? 1) * mul;
   }
-  if (effect.droneDamageAdd) agg.droneDamageAdd += effect.droneDamageAdd;
-  if (effect.droneRangeAdd) agg.droneRangeAdd += effect.droneRangeAdd;
-  if (effect.harvesterIncomeMul) agg.harvesterIncomeMul *= effect.harvesterIncomeMul;
-  if (effect.slowedEnemyDamageMul) agg.slowedEnemyDamageMul *= effect.slowedEnemyDamageMul;
-  if (effect.teslaChainAdd) agg.teslaChainAdd += effect.teslaChainAdd;
-  if (effect.mortarSplashMul) agg.mortarSplashMul *= effect.mortarSplashMul;
-  if (effect.phantomVisibleBonus) agg.phantomVisibleBonus += effect.phantomVisibleBonus;
-  if (effect.towerBuildCostMul) agg.towerBuildCostMul *= effect.towerBuildCostMul;
-  if (effect.sellRefundMul) agg.sellRefundMul = Math.max(agg.sellRefundMul, effect.sellRefundMul);
+  if (effect.droneDamageAdd != null) agg.droneDamageAdd += effect.droneDamageAdd;
+  if (effect.droneRangeAdd != null) agg.droneRangeAdd += effect.droneRangeAdd;
+  if (effect.harvesterIncomeMul != null) agg.harvesterIncomeMul *= effect.harvesterIncomeMul;
+  if (effect.slowedEnemyDamageMul != null) agg.slowedEnemyDamageMul *= effect.slowedEnemyDamageMul;
+  if (effect.teslaChainAdd != null) agg.teslaChainAdd += effect.teslaChainAdd;
+  if (effect.mortarSplashMul != null) agg.mortarSplashMul *= effect.mortarSplashMul;
+  if (effect.phantomVisibleBonus != null) agg.phantomVisibleBonus += effect.phantomVisibleBonus;
+  if (effect.towerBuildCostMul != null) agg.towerBuildCostMul *= effect.towerBuildCostMul;
+  if (effect.sellRefundMul != null) agg.sellRefundMul = Math.max(agg.sellRefundMul, effect.sellRefundMul);
   if (effect.lowCoreFireRateMul) {
     agg.lowCoreFireRateMul = Math.max(agg.lowCoreFireRateMul, effect.lowCoreFireRateMul);
   }

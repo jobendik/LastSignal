@@ -1296,19 +1296,6 @@ export class RenderSystem {
     }
   }
 
-  private findTargetForDraw(t: Tower): Enemy | null {
-    // Display-only — cheap nearest in range.
-    let best: Enemy | null = null;
-    let bd = Infinity;
-    const range = this.game.towers.effectiveStats(t).range;
-    for (const e of this.game.enemies.list) {
-      if (!e.active) continue;
-      const d = e.pos.dist(t.pos);
-      if (d < range && d < bd) { bd = d; best = e; }
-    }
-    return best;
-  }
-
   private drawEnemies(ctx: CanvasRenderingContext2D): void {
     for (const e of this.game.enemies.list) this.drawEnemy(ctx, e);
   }
@@ -2971,30 +2958,31 @@ export class RenderSystem {
 
   private drawHeatmap(ctx: CanvasRenderingContext2D): void {
     const grid = this.game.grid;
+    const cols = grid.cols, rows = grid.rows;
     // Accumulate enemy presence into a per-tile heat map.
-    const heat = new Float32Array(COLS * ROWS);
+    const heat = new Float32Array(cols * rows);
     for (const e of this.game.enemies.list) {
       if (!e.active) continue;
       const c = Math.floor(e.pos.x / TILE_SIZE);
       const r = Math.floor(e.pos.y / TILE_SIZE);
-      if (c < 0 || c >= COLS || r < 0 || r >= ROWS) continue;
-      heat[r * COLS + c] += 1;
+      if (c < 0 || c >= cols || r < 0 || r >= rows) continue;
+      heat[r * cols + c] += 1;
       // Spread to neighbors for a softer look.
       const neighbors = [[-1,0],[1,0],[0,-1],[0,1]];
       for (const [dc, dr] of neighbors) {
         const nc = c + dc!, nr = r + dr!;
-        if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS) heat[nr * COLS + nc] += 0.4;
+        if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) heat[nr * cols + nc] += 0.4;
       }
     }
     // Also add flow-field convergence weight: tiles many paths pass through get a base tint.
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
         const i = grid.idx(c, r);
         const dist = grid.flow[i];
         if (dist != null && dist >= 0) {
           // Closer to core = higher base heat (paths converge).
           const d = this.game.grid.getDistAtWorld(c * TILE_SIZE + 16, r * TILE_SIZE + 16);
-          heat[r * COLS + c] += Math.max(0, (40 - d) / 40) * 0.6;
+          heat[r * cols + c] += Math.max(0, (40 - d) / 40) * 0.6;
         }
       }
     }
@@ -3004,9 +2992,9 @@ export class RenderSystem {
     if (maxH < 0.1) maxH = 1;
 
     ctx.save();
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const h = (heat[r * COLS + c]! / maxH);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const h = (heat[r * cols + c]! / maxH);
         if (h < 0.05) continue;
         const x = c * TILE_SIZE, y = r * TILE_SIZE;
         // Low = blue, mid = yellow, high = red.
@@ -3031,8 +3019,8 @@ export class RenderSystem {
     ctx.save();
     ctx.strokeStyle = "rgba(255, 235, 59, 0.4)";
     ctx.fillStyle = "rgba(255, 235, 59, 0.4)";
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < grid.rows; r++) {
+      for (let c = 0; c < grid.cols; c++) {
         const i = grid.idx(c, r);
         const next = grid.flow[i];
         if (next == null || next < 0) continue;

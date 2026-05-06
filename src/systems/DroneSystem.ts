@@ -5,7 +5,7 @@ import { droneDefinitions } from "../data/drones";
 import { Vector2 } from "../core/Vector2";
 import { Projectile } from "../entities/Projectile";
 import { clamp, rnd } from "../core/Random";
-import { MAX_DRONES, STARTING_DRONE_COST, DRONE_COST_SCALING, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
+import { MAX_DRONES, STARTING_DRONE_COST, DRONE_COST_SCALING } from "../core/Config";
 
 /**
  * Drone behavior. Hunter: seek-and-fire. Scanner: reveals phantoms. Guardian: orbits core.
@@ -69,8 +69,8 @@ export class DroneSystem {
       else if (d.type === "scanner") this.updateScanner(d, dt);
       else if (d.type === "guardian") this.updateGuardian(d, dt);
 
-      d.pos.x = clamp(d.pos.x, 8, VIEW_WIDTH - 8);
-      d.pos.y = clamp(d.pos.y, 8, VIEW_HEIGHT - 8);
+      d.pos.x = clamp(d.pos.x, 8, this.game.grid.worldW - 8);
+      d.pos.y = clamp(d.pos.y, 8, this.game.grid.worldH - 8);
 
       if (d.vel.mag() > 0.1) {
         const targetAng = Math.atan2(d.vel.y, d.vel.x);

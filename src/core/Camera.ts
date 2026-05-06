@@ -81,8 +81,6 @@ export class Camera {
 
   /** Smoothly move toward target position/zoom each frame. */
   update(dt: number): void {
-    if (this.autoFit) return; // no camera movement on auto-fit maps
-
     // Apply panning from keyboard / edge scroll.
     const speed = this.panSpeed / this.zoom; // faster pan when zoomed out
     const pd = speed * dt;
@@ -103,7 +101,7 @@ export class Camera {
 
   /** Zoom toward/away from a world-space point (usually mouse position). */
   zoomAt(delta: number, worldX: number, worldY: number): void {
-    if (this.autoFit) return;
+    if (this.autoFit) this.autoFit = false; // first zoom unlocks the camera
     const oldZoom = this.targetZoom;
     this.targetZoom = clamp(this.targetZoom * (1 + delta * 0.12), this.minZoom, this.maxZoom);
     // Adjust target position to zoom toward the cursor.
@@ -115,7 +113,7 @@ export class Camera {
 
   /** Set zoom directly (e.g., from HUD buttons). */
   setZoom(z: number): void {
-    if (this.autoFit) return;
+    if (this.autoFit) this.autoFit = false;
     this.targetZoom = clamp(z, this.minZoom, this.maxZoom);
   }
 
@@ -201,8 +199,16 @@ export class Camera {
     // Allow the viewport center to range so the full map can be seen.
     const hw = (this.viewW / 2) / this.targetZoom;
     const hh = (this.viewH / 2) / this.targetZoom;
-    this.targetX = clamp(this.targetX, hw, Math.max(hw, this.mapW - hw));
-    this.targetY = clamp(this.targetY, hh, Math.max(hh, this.mapH - hh));
+    if (this.mapW <= hw * 2) {
+      this.targetX = this.mapW / 2;
+    } else {
+      this.targetX = clamp(this.targetX, hw, this.mapW - hw);
+    }
+    if (this.mapH <= hh * 2) {
+      this.targetY = this.mapH / 2;
+    } else {
+      this.targetY = clamp(this.targetY, hh, this.mapH - hh);
+    }
   }
 }
 

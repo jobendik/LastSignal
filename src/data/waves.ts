@@ -1,4 +1,4 @@
-import type { WaveDefinition, EnemyType } from "../core/Types";
+import type { WaveDefinition } from "../core/Types";
 
 /** Build a rough enemy summary for UI purposes. */
 function summarize(w: Omit<WaveDefinition, "enemySummary">): WaveDefinition {

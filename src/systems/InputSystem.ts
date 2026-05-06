@@ -1,7 +1,7 @@
 import type { Game } from "../core/Game";
 import { CellKind, type TowerType } from "../core/Types";
 import { towerOrder } from "../data/towers";
-import { TILE_SIZE, VIEW_WIDTH, VIEW_HEIGHT } from "../core/Config";
+import { TILE_SIZE } from "../core/Config";
 
 export class InputSystem {
   mouseX = 0;
@@ -16,6 +16,7 @@ export class InputSystem {
   private lastInvalidSoundTime = -Infinity;
   private touchLongPress: ReturnType<typeof window.setTimeout> | null = null;
   private gamepadCursor = { c: 12, r: 10 };
+  private gamepadCursorCooldown = 0;
   private gamepadButtons = new Set<number>();
   private placementGuideSeen = new Set<TowerType>();
   /** Middle-mouse drag state for panning. */
@@ -66,6 +67,7 @@ export class InputSystem {
   update(dt: number): void {
     if (this.placementSnapTimer > 0) this.placementSnapTimer = Math.max(0, this.placementSnapTimer - dt);
     if (this.placementInvalidTimer > 0) this.placementInvalidTimer = Math.max(0, this.placementInvalidTimer - dt);
+    if (this.gamepadCursorCooldown > 0) this.gamepadCursorCooldown = Math.max(0, this.gamepadCursorCooldown - dt);
     // Continuous WASD / arrow key panning.
     const cam = this.game.camera;
     cam.panLeft = this.heldKeys.has("KeyA") || this.heldKeys.has("ArrowLeft");
@@ -152,9 +154,10 @@ export class InputSystem {
     if (this.panDrag) {
       const rect = this.game.canvas.getBoundingClientRect();
       const scaleX = this.game.canvas.width / rect.width;
+      const scaleY = this.game.canvas.height / rect.height;
       const dpr = this.game.render.dpr;
       const dx = (e.clientX - this.panDragStartX) * scaleX / dpr;
-      const dy = (e.clientY - this.panDragStartY) * scaleX / dpr;
+      const dy = (e.clientY - this.panDragStartY) * scaleY / dpr;
       const cam = this.game.camera;
       cam.targetX -= dx / cam.zoom;
       cam.targetY -= dy / cam.zoom;
@@ -344,7 +347,6 @@ export class InputSystem {
   }
 
   private onKey(e: KeyboardEvent): void {
-    const key = e.key;
     const code = e.code;
     const bindings = this.game.core.settings.keyBindings;
     const isBound = (action: string) => code === bindings[action];
@@ -466,8 +468,11 @@ export class InputSystem {
 
     const axisX = pad.axes[0] ?? 0;
     const axisY = pad.axes[1] ?? 0;
-    if (Math.abs(axisX) > 0.6) this.gamepadCursor.c = Math.max(0, Math.min(this.game.grid.cols - 1, this.gamepadCursor.c + Math.sign(axisX)));
-    if (Math.abs(axisY) > 0.6) this.gamepadCursor.r = Math.max(0, Math.min(this.game.grid.rows - 1, this.gamepadCursor.r + Math.sign(axisY)));
+    if (this.gamepadCursorCooldown <= 0 && (Math.abs(axisX) > 0.6 || Math.abs(axisY) > 0.6)) {
+      if (Math.abs(axisX) > 0.6) this.gamepadCursor.c = Math.max(0, Math.min(this.game.grid.cols - 1, this.gamepadCursor.c + Math.sign(axisX)));
+      if (Math.abs(axisY) > 0.6) this.gamepadCursor.r = Math.max(0, Math.min(this.game.grid.rows - 1, this.gamepadCursor.r + Math.sign(axisY)));
+      this.gamepadCursorCooldown = 0.12;
+    }
     this.overCell = { ...this.gamepadCursor };
     this.mouseX = (this.gamepadCursor.c + 0.5) * TILE_SIZE;
     this.mouseY = (this.gamepadCursor.r + 0.5) * TILE_SIZE;

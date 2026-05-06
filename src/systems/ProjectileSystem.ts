@@ -162,7 +162,7 @@ export class ProjectileSystem {
   }
 
   private hitTerrain(p: Projectile): boolean {
-    if (p.pos.x < 0 || p.pos.y < 0 || p.pos.x > this.game.width || p.pos.y > this.game.height) return false;
+    if (p.pos.x < 0 || p.pos.y < 0 || p.pos.x > this.game.width || p.pos.y > this.game.height) return true;
     const { c, r } = this.game.grid.worldToCell(p.pos.x, p.pos.y);
     const cell = this.game.grid.cells[this.game.grid.idx(c, r)];
     return cell === CellKind.Rock;

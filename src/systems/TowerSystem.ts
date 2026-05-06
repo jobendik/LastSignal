@@ -5,7 +5,6 @@ import type { TowerType } from "../core/Types";
 import { towerDefinitions } from "../data/towers";
 import { Projectile } from "../entities/Projectile";
 import { Vector2 } from "../core/Vector2";
-import { VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
 
 /** Handles tower behavior: targeting, firing, specialization effects, upgrades, economy ticks. */
 export class TowerSystem {

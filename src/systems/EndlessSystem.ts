@@ -55,7 +55,7 @@ export class EndlessSystem {
 
     const id = `endless_${this.wave}`;
     const isBoss = this.wave % 8 === 0;
-    if (isBoss) {
+    if (isBoss && lanes.length > 0) {
       const type: EnemyType = this.wave >= 16 ? "leviathan" : "overlord";
       lanes[0]!.enemies.push({ type, count: 1, interval: 0.1 });
     }

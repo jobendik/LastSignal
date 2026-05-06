@@ -41,6 +41,7 @@ export class WaveSystem {
     if (this.chokepointHeat) this.chokepointHeat.fill(0);
     this.chokepointTriggered = false;
     this.chokepointSampleTimer = 0;
+    this.ambushTriggered = false;
     this.planningCountdown = 0;
     this.endlessCurrent = null;
   }

@@ -24,6 +24,7 @@ export class GridSystem {
 
   /** Cache "can place tower here?" by cell index. Invalidated on map change. */
   private placementCacheDirty = true;
+  private placementCache = new Map<number, boolean>();
   private pathWorker: Worker | null = null;
 
   constructor() {
@@ -61,12 +62,12 @@ export class GridSystem {
     const len = this.cols * this.rows;
     this.cells.fill(CellKind.Empty, 0, len);
     this.flow.fill(-1, 0, len);
-    this.dist.fill(0, 0, len);
     for (let i = 0; i < len; i++) this.dist[i] = Infinity;
     this.coreCells = [];
     this.crystalCells = [];
     this.spawners = [];
     this.placementCacheDirty = true;
+    this.placementCache.clear();
   }
 
   loadSector(sector: SectorDefinition): void {
@@ -82,6 +83,7 @@ export class GridSystem {
     this.crystalCells = [];
     this.spawners = sector.spawners.slice();
     this.placementCacheDirty = true;
+    this.placementCache.clear();
 
     // Decode layout.
     for (let r = 0; r < this.rows; r++) {
@@ -146,7 +148,11 @@ export class GridSystem {
   }
 
   /** BFS outward from core cells. Cost = 1 per step. */
-  rebuildFlow(): void {
+  rebuildFlow(skipCacheClear = false): void {
+    if (!skipCacheClear) {
+      this.placementCache.clear();
+      this.placementCacheDirty = true;
+    }
     const len = this.cols * this.rows;
     this.flow.fill(-1, 0, len);
     for (let i = 0; i < len; i++) this.dist[i] = Infinity;
@@ -169,7 +175,6 @@ export class GridSystem {
         }
       }
     }
-    this.placementCacheDirty = true;
     this.pathWorker?.postMessage({
       cells: Array.from(this.cells.subarray(0, len)),
       coreCells: this.coreCells,
@@ -211,16 +216,23 @@ export class GridSystem {
       return cur === CellKind.Crystal;
     }
     if (cur !== CellKind.Empty) return false;
+
+    if (this.placementCache.has(i)) {
+      return this.placementCache.get(i)!;
+    }
+
     // Temporarily block & re-BFS; revert.
     this.cells[i] = CellKind.Tower;
-    this.rebuildFlow();
+    this.rebuildFlow(true);
     const ok = this.spawners.every((s) => this.dist[this.idx(s.c, s.r)] !== Infinity);
     this.cells[i] = CellKind.Empty;
-    this.rebuildFlow();
+    this.rebuildFlow(true);
+
+    this.placementCache.set(i, ok);
     return ok;
   }
 
-  placeTower(c: number, r: number, kind: TowerType, isEco: boolean): void {
+  placeTower(c: number, r: number, _kind: TowerType, isEco: boolean): void {
     const i = this.idx(c, r);
     this.cells[i] = isEco ? CellKind.Harvester : CellKind.Tower;
     this.rebuildFlow();
@@ -235,6 +247,7 @@ export class GridSystem {
   /** Expose dirty flag if future systems want to cache off the grid. */
   markCacheDirty(): void {
     this.placementCacheDirty = true;
+    this.placementCache.clear();
   }
   get isPlacementCacheDirty(): boolean {
     return this.placementCacheDirty;

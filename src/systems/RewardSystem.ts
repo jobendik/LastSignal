@@ -1,5 +1,3 @@
-import type { Game } from "../core/Game";
-
 /** Also exports the UpgradeSystem for data-driven upgrade replay. */
 export { UpgradeSystem } from "./UpgradeSystem";
 
@@ -9,5 +7,3 @@ export { UpgradeSystem } from "./UpgradeSystem";
  */
 export { RewardSystem } from "./UpgradeSystem";
 
-// Unused placeholder export to signal that this file is intentionally a facade.
-export const _rewardFacadeMarker = (game?: Game): boolean => Boolean(game);

@@ -79,14 +79,14 @@ export class Tower {
     let income = (this.def.income ?? 0) * levelMul;
 
     for (const m of this.mods) {
-      if (m.rangeMul) range *= m.rangeMul;
-      if (m.rangeAdd) range += m.rangeAdd;
-      if (m.damageMul) damage *= m.damageMul;
-      if (m.damageAdd) damage += m.damageAdd;
-      if (m.cooldownMul) cooldown *= m.cooldownMul;
-      if (m.splashRadiusMul) splashRadius *= m.splashRadiusMul;
-      if (m.chainMaxAdd) chainMax += m.chainMaxAdd;
-      if (m.incomeMul) income *= m.incomeMul;
+      if (m.rangeMul != null) range *= m.rangeMul;
+      if (m.rangeAdd != null) range += m.rangeAdd;
+      if (m.damageMul != null) damage *= m.damageMul;
+      if (m.damageAdd != null) damage += m.damageAdd;
+      if (m.cooldownMul != null) cooldown *= m.cooldownMul;
+      if (m.splashRadiusMul != null) splashRadius *= m.splashRadiusMul;
+      if (m.chainMaxAdd != null) chainMax += m.chainMaxAdd;
+      if (m.incomeMul != null) income *= m.incomeMul;
     }
     return { range, damage, cooldown, splashRadius, chainMax, income };
   }

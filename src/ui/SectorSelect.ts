@@ -9,14 +9,12 @@ import { el, clear } from "./dom";
 export class SectorSelect {
   el: HTMLElement;
   private endlessRequested = false;
-  private pendingSector: SectorDefinition | null = null;
 
   constructor(private readonly game: Game) {
     this.el = el("div", { class: "ls-panel ls-sector-select" });
   }
 
   refresh(): void {
-    this.pendingSector = null;
     clear(this.el);
     this.el.append(
       el("div", { class: "ls-title", text: "Select Sector" }),
@@ -122,7 +120,6 @@ export class SectorSelect {
   }
 
   private showLoadoutPicker(sector: SectorDefinition): void {
-    this.pendingSector = sector;
     clear(this.el);
 
     this.el.append(

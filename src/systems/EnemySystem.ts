@@ -5,7 +5,7 @@ import type { EnemyType } from "../core/Types";
 import { Vector2 } from "../core/Vector2";
 import { rnd } from "../core/Random";
 import { enemyDefinitions } from "../data/enemies";
-import { VIEW_WIDTH, VIEW_HEIGHT, TILE_SIZE } from "../core/Config";
+import { TILE_SIZE } from "../core/Config";
 
 /** Enemy update, damage routing, boss phases, heal/phase/spawn behavior. */
 export class EnemySystem {
@@ -872,8 +872,8 @@ export class EnemySystem {
     if (!shouldAnnounce) return;
     this.lastKillStreakAnnounced = streak;
 
-    const cx = VIEW_WIDTH / 2;
-    const cy = VIEW_HEIGHT / 2;
+    const cx = this.game.grid.corePos.x;
+    const cy = this.game.grid.corePos.y;
     const color = streak >= 8 ? "#ff5252" : "#ffeb3b";
     this.game.particles.spawnFloatingText(
       cx,
