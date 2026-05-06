@@ -302,6 +302,33 @@ export class Game {
   }
 
   returnToMenu(): void {
+    // Tear down the active sector run so the canvas stops rendering the
+    // previous run's terrain/towers/enemies behind the menu.
+    this.core.sector = null;
+    this.core.waveIndex = 0;
+    this.core.killZone = null;
+    this.core.killZoneMode = false;
+    this.core.coreDeployMode = false;
+    this.core.shake = 0;
+    this.core.shakeRot = 0;
+    this.core.slowMo = 0;
+    this.core.hitStopTimer = 0;
+    this.core.meteorStrikes = [];
+    this.core.gravityAnomaly = null;
+    this.core.signalInterference = null;
+    this.core.salvagePickups = [];
+    this.core.activeModifiers = [];
+    if (this.enemies) this.enemies.reset();
+    if (this.towers) this.towers.reset();
+    if (this.projectiles) this.projectiles.reset();
+    if (this.particles) this.particles.reset();
+    if (this.drones) this.drones.reset();
+    if (this.waves) this.waves.reset();
+    // Clear the grid so darkness/tile-state from the old sector doesn't render.
+    if (this.grid) this.grid.reset();
+    if (this.render) this.render.invalidateTerrainCache();
+    this.audio.stopMusic();
+    this.audio.setMusicIntensity(0);
     this.setState("MAIN_MENU");
     this.bus.emit("menu:returned");
   }

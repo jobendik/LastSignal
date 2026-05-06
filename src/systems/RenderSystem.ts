@@ -129,8 +129,17 @@ export class RenderSystem {
     }
 
     this.drawBackground(ctx);
-    if (this.game.state === "MAIN_MENU") this.drawMainMenuAmbience(ctx);
-    if (quality === "high" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
+    // Skip rendering the game world while the player is on the menu /
+    // sector-select screens — otherwise stale terrain/towers/enemies from
+    // the previous run leak through the overlay.
+    if (this.game.state === "MAIN_MENU" || this.game.state === "SECTOR_SELECT" || !this.game.core.sector) {
+      if (this.game.state === "MAIN_MENU") this.drawMainMenuAmbience(ctx);
+      this.drawScreenFlashes(ctx);
+      return;
+    }
+    const settings = this.game.core.settings;
+    const allowVfx = !settings.reducedFlashing && !reducedMotion;
+    if (settings.vfxPhosphor && allowVfx) {
       this.drawPhosphorPersistence(ctx);
     }
     this.drawTerrain(ctx);
@@ -162,12 +171,14 @@ export class RenderSystem {
     this.drawSelectionHighlights(ctx);
     if (this.game.core.debug.show) this.drawDebugOverlay(ctx);
 
-    // Dynamic light layer — additive compositing.
-    if (quality !== "low") {
+    // Dynamic light layer — additive compositing. Now driven by vfxBloom flag.
+    if (settings.vfxBloom) {
       this.buildLightLayer();
       ctx.save();
       ctx.globalCompositeOperation = "screen";
-      ctx.globalAlpha = quality === "medium" ? 0.36 : 0.55;
+      // Tone the bloom intensity to the chosen quality preset.
+      const bloomAlpha = quality === "high" ? 0.55 : quality === "medium" ? 0.36 : 0.45;
+      ctx.globalAlpha = bloomAlpha;
       ctx.drawImage(this.lightCanvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
       ctx.restore();
     }
@@ -175,11 +186,13 @@ export class RenderSystem {
 
     // Reset shake before CRT so the overlay sits fixed on screen.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (quality !== "low" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
+    if (allowVfx && (settings.vfxScanlines || settings.vfxVignette || settings.vfxFlicker || settings.vfxFilmGrain)) {
       this.drawCRTOverlay(ctx);
     }
-    if (quality === "high" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
+    if (allowVfx && settings.vfxChromaticAberration) {
       this.drawChromaticAberration(ctx);
+    }
+    if (allowVfx && settings.vfxBarrelDistortion) {
       this.applyBarrelDistortion(ctx);
     }
     this.drawScreenFlashes(ctx);
@@ -264,45 +277,52 @@ export class RenderSystem {
   private drawCRTOverlay(ctx: CanvasRenderingContext2D): void {
     ctx.save();
     const t = this.game.time.elapsed;
+    const s = this.game.core.settings;
 
     // Scanlines: alternating dark rows with slight brightness variation.
-    ctx.fillStyle = "#000";
-    for (let y = 0; y < VIEW_HEIGHT; y += 3) {
-      ctx.globalAlpha = 0.08 + Math.sin(y * 0.1 + t * 0.3) * 0.015;
-      ctx.fillRect(0, y, VIEW_WIDTH, 1);
+    if (s.vfxScanlines) {
+      ctx.fillStyle = "#000";
+      for (let y = 0; y < VIEW_HEIGHT; y += 3) {
+        ctx.globalAlpha = 0.08 + Math.sin(y * 0.1 + t * 0.3) * 0.015;
+        ctx.fillRect(0, y, VIEW_WIDTH, 1);
+      }
     }
 
     // Vignette: deepens slightly toward screen edges.
-    ctx.globalAlpha = 1;
-    const vigIntensity = 0.5 + (this.game.core.coreIntegrity / this.game.core.coreMax < 0.3 ? Math.sin(t * 3) * 0.08 : 0);
-    const vg = ctx.createRadialGradient(
-      VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH * 0.3,
-      VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH * 0.78
-    );
-    vg.addColorStop(0, "rgba(0,0,0,0)");
-    vg.addColorStop(1, `rgba(0,0,0,${vigIntensity.toFixed(2)})`);
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    if (s.vfxVignette) {
+      ctx.globalAlpha = 1;
+      const vigIntensity = 0.5 + (this.game.core.coreIntegrity / this.game.core.coreMax < 0.3 ? Math.sin(t * 3) * 0.08 : 0);
+      const vg = ctx.createRadialGradient(
+        VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH * 0.3,
+        VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH * 0.78
+      );
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, `rgba(0,0,0,${vigIntensity.toFixed(2)})`);
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    }
 
     // Phosphor persistence band: slow vertical drift with soft glow.
-    const bandY = (Math.sin(t * 0.55) * 0.5 + 0.5) * (VIEW_HEIGHT - 40);
-    const grd = ctx.createLinearGradient(0, bandY - 12, 0, bandY + 40);
-    grd.addColorStop(0,   "rgba(102, 252, 241, 0)");
-    grd.addColorStop(0.3, "rgba(102, 252, 241, 0.05)");
-    grd.addColorStop(0.6, "rgba(102, 252, 241, 0.03)");
-    grd.addColorStop(1,   "rgba(102, 252, 241, 0)");
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, bandY - 12, VIEW_WIDTH, 52);
+    if (s.vfxPhosphor) {
+      const bandY = (Math.sin(t * 0.55) * 0.5 + 0.5) * (VIEW_HEIGHT - 40);
+      const grd = ctx.createLinearGradient(0, bandY - 12, 0, bandY + 40);
+      grd.addColorStop(0,   "rgba(102, 252, 241, 0)");
+      grd.addColorStop(0.3, "rgba(102, 252, 241, 0.05)");
+      grd.addColorStop(0.6, "rgba(102, 252, 241, 0.03)");
+      grd.addColorStop(1,   "rgba(102, 252, 241, 0)");
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, bandY - 12, VIEW_WIDTH, 52);
+    }
 
     // Occasional random flicker.
-    if (Math.random() < 0.015) {
+    if (s.vfxFlicker && Math.random() < 0.015) {
       ctx.globalAlpha = Math.random() * 0.04;
       ctx.fillStyle = "#66fcf1";
       ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
     }
 
-    if (this.game.core.settings.graphicsQuality === "high") this.drawFilmGrain(ctx);
+    if (s.vfxFilmGrain) this.drawFilmGrain(ctx);
 
     ctx.restore();
   }

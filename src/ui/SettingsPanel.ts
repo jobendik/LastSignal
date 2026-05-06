@@ -36,11 +36,26 @@ export class SettingsPanel {
         ["1.2", "120%"],
         ["1.5", "150%"],
       ]),
-      this.selectRow("Graphics", "graphicsQuality", s.graphicsQuality, [
-        ["low", "Low"],
-        ["medium", "Medium"],
-        ["high", "High"],
+      this.selectRow("Graphics Preset", "graphicsQuality", s.graphicsQuality, [
+        ["low", "Clean HD"],
+        ["medium", "Subtle CRT"],
+        ["high", "Full Retro"],
+        ["custom", "Custom"],
       ]),
+    );
+    // Per-effect graphics toggles. Picking a preset above sets all of these,
+    // but the player can also override any individual effect.
+    form.append(el("div", { class: "ls-form-section", text: "VISUAL EFFECTS" }));
+    form.append(
+      this.checkboxRow("Scanlines", "vfxScanlines", s.vfxScanlines),
+      this.checkboxRow("Vignette", "vfxVignette", s.vfxVignette),
+      this.checkboxRow("Phosphor Persistence", "vfxPhosphor", s.vfxPhosphor),
+      this.checkboxRow("Film Grain", "vfxFilmGrain", s.vfxFilmGrain),
+      this.checkboxRow("Chromatic Aberration", "vfxChromaticAberration", s.vfxChromaticAberration),
+      this.checkboxRow("Barrel Distortion", "vfxBarrelDistortion", s.vfxBarrelDistortion),
+      this.checkboxRow("Neon Bloom", "vfxBloom", s.vfxBloom),
+      this.checkboxRow("Random Flicker", "vfxFlicker", s.vfxFlicker),
+      this.particleDensityRow(s.vfxParticleDensity),
     );
     form.append(el("div", { class: "ls-form-section", text: "HOTKEYS" }));
     for (const [action, code] of Object.entries(s.keyBindings)) {
@@ -76,8 +91,25 @@ export class SettingsPanel {
     input.checked = value;
     input.onchange = () => {
       this.game.settings.update({ [key]: input.checked } as Partial<GameSettings>);
+      // Rebuild so the Graphics Preset dropdown can reflect the new "custom".
+      if (String(key).startsWith("vfx")) this.build();
     };
     row.append(input);
+    return row;
+  }
+
+  private particleDensityRow(value: number): HTMLElement {
+    const row = el("label", { class: "ls-form-row" });
+    row.append(el("span", { class: "ls-form-label", text: "Particle Density" }));
+    const input = el("input", { attrs: { type: "range", min: "0.15", max: "1", step: "0.05" } }) as HTMLInputElement;
+    input.value = String(value);
+    const valEl = el("span", { class: "ls-form-value", text: `${Math.round(value * 100)}%` });
+    input.oninput = () => {
+      const v = parseFloat(input.value);
+      valEl.textContent = `${Math.round(v * 100)}%`;
+      this.game.settings.update({ vfxParticleDensity: v });
+    };
+    row.append(input, valEl);
     return row;
   }
 
@@ -99,6 +131,9 @@ export class SettingsPanel {
       const raw = select.value;
       const next = key === "fontScale" ? parseFloat(raw) : raw;
       this.game.settings.update({ [key]: next } as Partial<GameSettings>);
+      // Picking a graphics preset cascades to the per-effect flags; rebuild
+      // so the checkboxes below reflect the new state immediately.
+      if (key === "graphicsQuality") this.build();
     };
     row.append(select);
     return row;

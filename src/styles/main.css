@@ -24,7 +24,9 @@ body {
 }
 #game-container { width: 100%; height: 100%; }
 
-/* CRT scanlines overlay */
+/* CRT scanlines overlay — global, sits above everything. Toggled off when
+   the user disables scanlines or selects a low/clean preset (the "Clean HD"
+   path in Settings). */
 #ls-app::before, #game-root::before {
   content: "";
   position: fixed;
@@ -40,6 +42,8 @@ body {
   mix-blend-mode: overlay;
   z-index: 10000;
 }
+body.ls-no-scanlines #ls-app::before,
+body.ls-no-scanlines #game-root::before { display: none; }
 
 canvas#ls-canvas, canvas#game-canvas {
   display: block;

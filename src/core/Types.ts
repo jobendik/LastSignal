@@ -368,7 +368,20 @@ export interface GameSettings {
   colorblind: boolean;
   highContrast: boolean;
   fontScale: number;
-  graphicsQuality: "low" | "medium" | "high";
+  graphicsQuality: "low" | "medium" | "high" | "custom";
+  /** Individual VFX toggles. Per-effect overrides; default values match the
+   *  graphicsQuality preset selected at first run, but the player can disable
+   *  any effect they don't like and the renderer will respect it. */
+  vfxScanlines: boolean;
+  vfxVignette: boolean;
+  vfxPhosphor: boolean;
+  vfxFilmGrain: boolean;
+  vfxChromaticAberration: boolean;
+  vfxBarrelDistortion: boolean;
+  vfxBloom: boolean;
+  vfxFlicker: boolean;
+  /** Particle density 0..1. Lower = fewer/cheaper particles, cleaner look. */
+  vfxParticleDensity: number;
   /** User-rebindable keyboard controls, stored as KeyboardEvent.code values. */
   keyBindings: Record<string, string>;
   gamepadEnabled: boolean;
