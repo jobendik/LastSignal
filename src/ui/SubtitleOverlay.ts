@@ -15,8 +15,11 @@ export class SubtitleOverlay {
       attrs: { "aria-live": "polite", "aria-atomic": "false" },
     });
     game.bus.on<AudioSubtitleCue>("audio:subtitle", (cue) => this.show(cue));
-    game.bus.on<{ phase: number; text: string }>("boss:phase", () => {
-      this.show({ text: "BOSS PHASE CHANGE", tone: "alert", duration: 2.2, priority: 3 });
+    game.bus.on<{ phase: number; text: string }>("boss:phase", (ev) => {
+      // Surface the curated per-phase text emitted by EnemySystem (e.g.
+      // "PHASE II — ESCORT SUMMONED") so the player learns what's happening.
+      const text = ev?.text ? ev.text : "BOSS PHASE CHANGE";
+      this.show({ text, tone: "alert", duration: 2.4, priority: 3 });
     });
     game.bus.on("settings:changed", () => {
       if (!this.game.core.settings.subtitles) this.hideAll();

@@ -16,6 +16,7 @@ import { AchievementToast } from "./AchievementToast";
 import { KillFeed } from "./KillFeed";
 import { SubtitleOverlay } from "./SubtitleOverlay";
 import { TutorialOverlay } from "./TutorialOverlay";
+import { SectorBriefingOverlay } from "./SectorBriefingOverlay";
 
 /**
  * Orchestrates all UI panels. Each panel is a small DOM component that
@@ -40,6 +41,7 @@ export class UIManager {
   killFeed: KillFeed;
   subtitles: SubtitleOverlay;
   tutorial: TutorialOverlay;
+  sectorBriefing: SectorBriefingOverlay;
 
   constructor(private readonly game: Game) {
     this.root = game.uiRoot;
@@ -61,6 +63,7 @@ export class UIManager {
     this.killFeed = new KillFeed(game);
     this.subtitles = new SubtitleOverlay(game);
     this.tutorial = new TutorialOverlay(game);
+    this.sectorBriefing = new SectorBriefingOverlay(game);
   }
 
   attach(): void {
@@ -81,7 +84,8 @@ export class UIManager {
       this.killFeed.el,
       this.achievementToast.el,
       this.subtitles.el,
-      this.tutorial.el
+      this.tutorial.el,
+      this.sectorBriefing.el
     );
     this.root.addEventListener("pointerover", (e) => {
       const target = e.target as Element | null;
