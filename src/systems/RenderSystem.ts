@@ -26,6 +26,8 @@ export class RenderSystem {
   // Ambient ghost silhouettes for main menu background animation.
   private menuGhosts: { x: number; y: number; vx: number; vy: number; r: number; color: string; trail: { x: number; y: number }[] }[] = [];
   private dirtyRects: { x: number; y: number; w: number; h: number }[] = [];
+  /** Cached device pixel ratio — updated by notifyResize() when the window resizes. */
+  dpr = window.devicePixelRatio || 1;
 
   constructor(private readonly game: Game) {
     this.lightCanvas = document.createElement("canvas");
@@ -98,11 +100,12 @@ export class RenderSystem {
     const ctx = this.game.ctx;
     const quality = this.game.core.settings.graphicsQuality;
     const reducedMotion = this.game.core.settings.reducedMotion;
+    const dpr = this.dpr;
     this.previousFrameCtx.setTransform(1, 0, 0, 1, 0, 0);
     this.previousFrameCtx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-    this.previousFrameCtx.drawImage(ctx.canvas, 0, 0);
+    this.previousFrameCtx.drawImage(ctx.canvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (quality === "low" && this.dirtyRects.length > 0 && this.game.state === "PLANNING") {
       for (const r of this.dirtyRects) ctx.clearRect(r.x, r.y, r.w, r.h);
     } else {
@@ -165,13 +168,13 @@ export class RenderSystem {
       ctx.save();
       ctx.globalCompositeOperation = "screen";
       ctx.globalAlpha = quality === "medium" ? 0.36 : 0.55;
-      ctx.drawImage(this.lightCanvas, 0, 0);
+      ctx.drawImage(this.lightCanvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
       ctx.restore();
     }
     this.drawDarknessMode(ctx);
 
     // Reset shake before CRT so the overlay sits fixed on screen.
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (quality !== "low" && !this.game.core.settings.reducedFlashing && !reducedMotion) {
       this.drawCRTOverlay(ctx);
     }
@@ -334,7 +337,7 @@ export class RenderSystem {
     ctx.save();
     ctx.globalAlpha = 0.11;
     ctx.globalCompositeOperation = "screen";
-    ctx.drawImage(this.previousFrameCanvas, 0, 0);
+    ctx.drawImage(this.previousFrameCanvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
     ctx.restore();
   }
 
@@ -359,12 +362,12 @@ export class RenderSystem {
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.globalAlpha = 0.055;
-    ctx.drawImage(this.previousFrameCanvas, -offset, 0);
+    ctx.drawImage(this.previousFrameCanvas, -offset, 0, VIEW_WIDTH, VIEW_HEIGHT);
     ctx.restore();
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.globalAlpha = 0.045;
-    ctx.drawImage(this.previousFrameCanvas, offset, 0);
+    ctx.drawImage(this.previousFrameCanvas, offset, 0, VIEW_WIDTH, VIEW_HEIGHT);
     ctx.restore();
   }
 
@@ -531,7 +534,7 @@ export class RenderSystem {
   private drawTerrain(ctx: CanvasRenderingContext2D): void {
     // Static rocks + AO — blit from cache (rebuild only when sector changes).
     if (this.terrainCacheDirty) this.buildTerrainCache();
-    ctx.drawImage(this.terrainCache, 0, 0);
+    ctx.drawImage(this.terrainCache, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
     // Crystals: dynamic (rotate each frame).
     const grid = this.game.grid;
@@ -1002,6 +1005,7 @@ export class RenderSystem {
       }
       ctx.globalAlpha = 1;
       // Center label.
+      ctx.shadowBlur = 0;
       ctx.fillStyle = t.def.color;
       ctx.font = "bold 7px Courier New";
       ctx.textAlign = "center";
@@ -1912,6 +1916,7 @@ export class RenderSystem {
     }
 
     if (e.isBoss) {
+      ctx.shadowBlur = 0;
       ctx.fillStyle = "#fff";
       ctx.font = "bold 10px Courier New";
       ctx.textAlign = "center";
@@ -1920,6 +1925,7 @@ export class RenderSystem {
 
     // Colorblind helper: letter marker.
     if (this.game.core.settings.colorblind) {
+      ctx.shadowBlur = 0;
       ctx.fillStyle = "#fff";
       ctx.font = "bold 10px Courier New";
       ctx.textAlign = "center";
@@ -2784,7 +2790,7 @@ export class RenderSystem {
     // Approximate CRT barrel distortion: blit the current canvas to a temp buffer,
     // then redraw it via stepped horizontal strips with per-strip x-offset = barrel curve.
     this.distortionCtx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-    this.distortionCtx.drawImage(ctx.canvas, 0, 0);
+    this.distortionCtx.drawImage(ctx.canvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
     ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
     const stripH = 4; // pixels per strip — tradeoff between quality and performance

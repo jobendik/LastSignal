@@ -43,7 +43,7 @@ body {
 
 canvas#ls-canvas, canvas#game-canvas {
   display: block;
-  image-rendering: pixelated;
+  image-rendering: auto;
   box-shadow: 0 0 40px rgba(102, 252, 241, 0.2);
   background: #04080c;
   max-width: 100%;
