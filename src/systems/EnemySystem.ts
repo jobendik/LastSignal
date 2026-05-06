@@ -5,7 +5,7 @@ import type { EnemyType } from "../core/Types";
 import { Vector2 } from "../core/Vector2";
 import { rnd } from "../core/Random";
 import { enemyDefinitions } from "../data/enemies";
-import { VIEW_WIDTH, VIEW_HEIGHT } from "../core/Config";
+import { VIEW_WIDTH, VIEW_HEIGHT, COLS, ROWS, TILE_SIZE } from "../core/Config";
 
 /** Enemy update, damage routing, boss phases, heal/phase/spawn behavior. */
 export class EnemySystem {
@@ -61,6 +61,11 @@ export class EnemySystem {
     // Shield Drone companion: from wave 5+, 22% of brutes spawn with one orbiting shield drone.
     if (type === "brute" && this.game.core.waveIndex >= 4 && Math.random() < 0.22) {
       enemy.shieldDroneCount = 1;
+    }
+
+    // Shielder personal bubble: 2 absorb charges so the codex "bubble-bearer" claim is real.
+    if (type === "shielder") {
+      enemy.shielderBubble = 2;
     }
 
     if (enemy.isBoss) {
@@ -145,6 +150,7 @@ export class EnemySystem {
         }
       }
       if (e.stunTimer > 0) e.stunTimer -= dt;
+      if (e.vulnerableTimer > 0) e.vulnerableTimer = Math.max(0, e.vulnerableTimer - dt);
       if (e.singularityTimer > 0) {
         const dx = e.singularityX - e.pos.x;
         const dy = e.singularityY - e.pos.y;
@@ -283,8 +289,25 @@ export class EnemySystem {
     }
     // Vulnerability multiplier: from stasis "vulnerabilityPulse" global.
     const slowedMul = e.slowTimer > 0 ? this.game.core.upgrades.slowedEnemyDamageMul : 1;
+    // Vulnerability status (Stasis Vulnerability Pulse, Flamer Overburn): +25% from any source.
+    const vulnMul = e.vulnerableTimer > 0 ? 1.25 : 1;
     const prevHp = e.hp;
-    const dealt = e.damage(amount * slowedMul, src);
+    const dealt = e.damage(amount * slowedMul * vulnMul, src);
+
+    // Overlord "spawns Swarm on hit": every Nth tower/drone hit births a Swarmling escort.
+    if (e.type === "overlord" && dealt > 0 && src && src.type !== "other") {
+      e.overlordHitsSinceSwarm = (e.overlordHitsSinceSwarm ?? 0) + 1;
+      if (e.overlordHitsSinceSwarm >= 5) {
+        e.overlordHitsSinceSwarm = 0;
+        // Limit total swarm spawn rate per second; do not flood while pinned.
+        if (this.game.time.elapsed - (e.lastSwarmSpawn ?? 0) > 1.0) {
+          e.lastSwarmSpawn = this.game.time.elapsed;
+          const ang = Math.random() * Math.PI * 2;
+          const off = e.size + 8;
+          this.spawn("swarm", e.pos.x + Math.cos(ang) * off, e.pos.y + Math.sin(ang) * off, 1);
+        }
+      }
+    }
 
     // Hit-stop: freeze simulation for ~4 frames on kills that deal ≥35% max HP.
     const killed = prevHp > 0 && e.hp <= 0;
@@ -487,8 +510,9 @@ export class EnemySystem {
     const y = target?.pos.y ?? this.game.grid.corePos.y;
 
     this.game.core.meteorStrikes.push({
-      c: Math.max(0, Math.min(24, Math.floor(x / 32))),
-      r: Math.max(0, Math.min(19, Math.floor(y / 32))),
+      // Use real grid bounds (Part 1.5 fix). Old code clamped to 24/19 from a stale grid size.
+      c: Math.max(0, Math.min(COLS - 1, Math.floor(x / TILE_SIZE))),
+      r: Math.max(0, Math.min(ROWS - 1, Math.floor(y / TILE_SIZE))),
       timer: 1.7,
       maxTimer: 1.7,
     });

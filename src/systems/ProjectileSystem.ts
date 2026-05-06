@@ -96,6 +96,8 @@ export class ProjectileSystem {
   private onImpact(p: Projectile, direct: Enemy | null): void {
     const impactX = p.targetPos.x;
     const impactY = p.targetPos.y;
+    const towerOwner = p.owner.tower;
+    const ts = this.game.towers;
 
     // Splash damage or direct hit.
     if (p.splashRadius > 0) {
@@ -105,14 +107,15 @@ export class ProjectileSystem {
         this.game.particles.spawnScreenFlash("#000000", 0.55, 0.04);
       }
       this.game.audio.sfxExplosion(0.35, { x: impactX });
+      // Pre-compute the canonical tower multiplier once so it's identical for every splash victim.
+      const towerMul = towerOwner ? ts.getTowerDamageMultiplier(towerOwner) : 1;
       for (const e of this.game.enemies.list) {
         if (!e.active) continue;
         if (e.isPhased && !p.owner.tower?.flags.phaseDisruptor) continue;
         const d = e.pos.dist(new Vector2(impactX, impactY));
         if (d <= p.splashRadius) {
           const falloff = 1 - d / p.splashRadius * 0.5;
-          let dmg = p.damage * falloff;
-          dmg *= this.globalMul(p);
+          let dmg = p.damage * falloff * towerMul;
           if (p.armorBreak && e.def.armor) dmg *= 1.6;
           // Kill zone bonus applies to splash targets too.
           const kzS = this.game.core.killZone;
@@ -129,7 +132,8 @@ export class ProjectileSystem {
         this.game.particles.spawnDamageZone(impactX, impactY, p.splashRadius * 0.7, p.damage * 0.4, 2.5);
       }
     } else if (direct) {
-      let dmg = p.damage * this.globalMul(p);
+      const towerMul = towerOwner ? ts.getTowerDamageMultiplier(towerOwner) : 1;
+      let dmg = p.damage * towerMul;
       if (p.armorPierce && (direct.type === "brute" || direct.type === "carrier")) dmg *= 1.6;
       // Kill zone bonus: +20% damage to enemies standing on the designated tile.
       const kz = this.game.core.killZone;
@@ -165,34 +169,5 @@ export class ProjectileSystem {
     const dx = p.pos.x - g.x;
     const dy = p.pos.y - g.y;
     return dx * dx + dy * dy < g.radius * g.radius ? p.speed * 0.55 : p.speed;
-  }
-
-  private globalMul(p: Projectile): number {
-    const up = this.game.core.upgrades;
-    let mul = 1;
-    if (p.owner.tower) {
-      mul *= up.towerDamageMul;
-      const spec = up.specificTowerDamageMul[p.owner.tower.type];
-      if (spec) mul *= spec;
-
-      // Amplifier tower adjacency: +15% per adjacent amplifier (or +25% with Resonance Core).
-      const tc = p.owner.tower.c;
-      const tr = p.owner.tower.r;
-      for (const amp of this.game.towers.list) {
-        if (amp.type !== "amplifier") continue;
-        const tileRange = amp.flags.resonanceCore ? 2 : 1;
-        if (Math.max(Math.abs(amp.c - tc), Math.abs(amp.r - tr)) <= tileRange) {
-          mul *= amp.flags.resonanceCore ? 1.25 : 1.15;
-        }
-      }
-    }
-    // Low-core circuit.
-    if (
-      up.lowCoreFireRateMul > 1 &&
-      this.game.core.coreIntegrity / this.game.core.coreMax <= up.lowCoreThreshold
-    ) {
-      mul *= 1.15; // mild bonus damage alongside fire rate
-    }
-    return mul;
   }
 }

@@ -147,7 +147,7 @@ export const towerDefinitions: Record<TowerType, TowerDefinition> = {
     name: "Amplifier",
     role: "Support booster",
     description:
-      "Doesn't fire. Boosts all towers within 1 tile by +15% damage. Stack strategically.",
+      "Doesn't fire. Boosts every adjacent combat tower (Pulse, Blaster, Mortar, Tesla, Railgun, Flamer, Snare) by +15% damage. Stack strategically.",
     cost: 110,
     range: 48,
     damage: 0,
@@ -284,7 +284,7 @@ export const towerSpecializations: Record<TowerType, SpecializationTree> = {
       {
         id: "stasis_vulnerability",
         name: "Vulnerability Pulse",
-        description: "Slowed enemies take +25% damage from all sources.",
+        description: "Stasis pulse marks the target as Vulnerable for the slow's duration. Vulnerable enemies take +25% damage from every source.",
         mod: { flags: { vulnerabilityPulse: true } },
       },
     ],
@@ -405,7 +405,7 @@ export const towerSpecializations: Record<TowerType, SpecializationTree> = {
       {
         id: "flamer_overburn",
         name: "Overburn",
-        description: "+25% damage on slowed targets.",
+        description: "Each flame tick marks burning enemies as Vulnerable for 2s. Vulnerable enemies take +25% damage from every source.",
         mod: { flags: { vulnerabilityPulse: true } },
       },
     ],

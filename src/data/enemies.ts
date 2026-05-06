@@ -137,7 +137,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     name: "Shielder",
     role: "Bubble-bearer",
     description:
-      "Projects a protective bubble. Break it, then nuke it.",
+      "Carries a personal shield bubble that absorbs the first 2 incoming hits before damage is dealt. Burst it with disposable shots, then nuke it.",
     hp: 46,
     speed: 42,
     reward: 9,
@@ -194,7 +194,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     name: "Overlord",
     role: "Mid-run elite boss",
     description:
-      "An elite boss that escorts lesser anomalies. Spawns Swarm on hit.",
+      "An elite boss that escorts lesser anomalies. Births a Swarm escort every 5 hits taken, so sustained chip damage spawns more pressure than a single big shot.",
     hp: 420,
     speed: 22,
     reward: 60,
