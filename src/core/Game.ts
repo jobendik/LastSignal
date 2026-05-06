@@ -43,6 +43,7 @@ import { DifficultySystem } from "../systems/DifficultySystem";
 import { MetaSystem } from "../systems/MetaSystem";
 import { AchievementSystem } from "../systems/AchievementSystem";
 import { EndlessSystem } from "../systems/EndlessSystem";
+import { ObjectivesSystem } from "../systems/ObjectivesSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
@@ -77,6 +78,7 @@ export class Game {
   meta!: MetaSystem;
   achievements!: AchievementSystem;
   endless!: EndlessSystem;
+  objectives!: ObjectivesSystem;
   render!: RenderSystem;
   input!: InputSystem;
   ui!: UIManager;
@@ -162,6 +164,7 @@ export class Game {
     this.meta = new MetaSystem(this);
     this.achievements = new AchievementSystem(this);
     this.endless = new EndlessSystem(this);
+    this.objectives = new ObjectivesSystem(this);
     this.render = new RenderSystem(this);
     this.input = new InputSystem(this);
     this.ui = new UIManager(this);
@@ -526,6 +529,9 @@ export class Game {
 
   onGameOver(): void {
     this.stats.finalize();
+    // Even on defeat, partial-progress objectives that don't require a win are awarded
+    // (most secondaries gate on runWon, so the practical effect is a no-op).
+    this.objectives.awardOnRunEnd(false);
     this.setState("GAME_OVER");
     this.audio.sfxLose();
     this.bus.emit("game:over");
@@ -534,6 +540,8 @@ export class Game {
 
   onVictory(): void {
     this.stats.finalize();
+    // Award secondary-objective research before commitProfile saves the new total.
+    this.objectives.awardOnRunEnd(true);
     this.setState("VICTORY");
     this.audio.sfxVictory();
     this.bus.emit("game:victory");
@@ -725,6 +733,10 @@ export class Game {
 
   private updateMeteorShowers(dt: number): void {
     if (this.state !== "WAVE_ACTIVE") return;
+    // Sector hazard gating (Part 7). Existing strikes still tick so harbinger-spawned
+    // meteors and other systems that PUSH onto meteorStrikes still impact correctly;
+    // we only suppress the ambient "spawn new shower" path.
+    const enabled = this.core.sector?.hazards?.meteors ?? true;
     const c = this.core;
 
     // Tick existing strikes; handle impacts.
@@ -756,7 +768,8 @@ export class Game {
     }
     c.meteorStrikes = c.meteorStrikes.filter((m) => m.timer > -0.1);
 
-    // Spawn new shower.
+    // Spawn new shower (gated by sector hazard config).
+    if (!enabled) return;
     c.meteorShowerCooldown -= dt;
     if (c.meteorShowerCooldown > 0) return;
     c.meteorShowerCooldown = 28 + Math.random() * 20;
@@ -782,6 +795,7 @@ export class Game {
 
   private updateGravityAnomaly(dt: number): void {
     if (this.state !== "WAVE_ACTIVE") return;
+    const enabled = this.core.sector?.hazards?.gravity ?? true;
     const c = this.core;
 
     // Tick active anomaly.
@@ -808,7 +822,8 @@ export class Game {
       return;
     }
 
-    // Spawn new anomaly.
+    // Spawn new anomaly (gated by sector hazard config).
+    if (!enabled) return;
     c.gravityAnomalyCooldown -= dt;
     if (c.gravityAnomalyCooldown > 0) return;
     c.gravityAnomalyCooldown = 45 + Math.random() * 25;
@@ -833,6 +848,7 @@ export class Game {
 
   private updateSignalInterference(dt: number): void {
     if (this.state !== "WAVE_ACTIVE" || this.core.waveIndex < 5) return;
+    const enabled = this.core.sector?.hazards?.signalInterference ?? true;
     const c = this.core;
 
     // Tick active zone.
@@ -865,7 +881,8 @@ export class Game {
       return;
     }
 
-    // Countdown to next zone.
+    // Countdown to next zone (gated by sector hazard config).
+    if (!enabled) return;
     c.signalInterferenceCooldown -= dt;
     if (c.signalInterferenceCooldown > 0) return;
 
@@ -896,6 +913,8 @@ export class Game {
 
   private updatePowerSurges(dt: number): void {
     if (this.state !== "WAVE_ACTIVE") return;
+    const enabled = this.core.sector?.hazards?.powerSurges ?? true;
+    if (!enabled) return;
     this.core.powerSurgeTimer -= dt;
     if (this.core.powerSurgeTimer > 0) return;
 

@@ -1,5 +1,5 @@
 import type { SectorDefinition, WaveDefinition, EnemyType } from "../core/Types";
-import { defaultWaves } from "./waves";
+import { defaultWaves, sector2Waves, sector3Waves, sector4Waves } from "./waves";
 import { COLS, ROWS } from "../core/Config";
 import { mulberry32 } from "../core/Random";
 
@@ -160,37 +160,29 @@ function cloneWaves(waves: WaveDefinition[]): WaveDefinition[] {
   }));
 }
 
-// Sector 2 wave tweaks: slightly harder from wave 4 onwards.
-function harderWaves(): WaveDefinition[] {
-  const out = cloneWaves(defaultWaves);
-  for (const w of out) {
-    for (const lane of w.lanes) {
-      for (const g of lane.enemies) {
-        g.count = Math.ceil(g.count * 1.1);
-      }
-    }
-    w.rewardCredits = Math.round(w.rewardCredits * 1.1);
-  }
-  return out;
+// Sector 2 (Crystal Scar) curated waves — economy / greed teaching.
+function crystalScarWaves(): WaveDefinition[] {
+  return cloneWaves(sector2Waves);
 }
 
-// Sector 3: phantom-heavy rebalance.
-// IMPORTANT: must be deterministic so the previewable wave summary, the codex,
-// and the actual wave content always match across page reloads. Uses a fixed
-// mulberry32 stream rather than Math.random.
-function phantomHeavy(): WaveDefinition[] {
-  const out = cloneWaves(defaultWaves);
-  const phantomTypes: EnemyType[] = ["scout", "grunt"];
+// Sector 3 (Phantom Gate) curated waves — detection / control teaching.
+// We additionally apply a deterministic phantom-mutation pass so a portion
+// of generic scouts/grunts in any sub-wave become phantoms; this preserves
+// the "phantom-heavy" feel while keeping waves stable & previewable.
+function phantomGateWaves(): WaveDefinition[] {
+  const out = cloneWaves(sector3Waves);
+  const phantomTargets: EnemyType[] = ["scout", "grunt"];
   const rand = mulberry32(0xC0FFEE);
   for (const w of out) {
+    // Don't mutate boss waves or final-gauntlet pacing.
+    if (w.isBossWave) continue;
     for (const lane of w.lanes) {
       for (const g of lane.enemies) {
-        if (phantomTypes.includes(g.type) && rand() < 0.5) {
+        if (phantomTargets.includes(g.type) && rand() < 0.35) {
           g.type = "phantom";
         }
       }
     }
-    // Re-summarize so wave preview reflects the actual mutated enemies (Part 1 — codex truthfulness).
     if (w.enemySummary) {
       const map = new Map<EnemyType, number>();
       for (const lane of w.lanes) {
@@ -202,51 +194,24 @@ function phantomHeavy(): WaveDefinition[] {
   return out;
 }
 
-function summarizeLocal(w: Omit<WaveDefinition, "enemySummary">): WaveDefinition {
-  const map = new Map<EnemyType, number>();
-  for (const lane of w.lanes) {
-    for (const g of lane.enemies) map.set(g.type, (map.get(g.type) ?? 0) + g.count);
-  }
-  return {
-    ...w,
-    enemySummary: Array.from(map.entries()).map(([type, count]) => ({ type, count })),
-  };
+// Sector 4 (Hostile Core) curated waves — final-exam difficulty with two bosses.
+function hostileCoreWaves(): WaveDefinition[] {
+  return cloneWaves(sector4Waves);
 }
 
-function hostileCoreWaves(): WaveDefinition[] {
-  const out = cloneWaves(defaultWaves);
-  out.splice(12, 0, summarizeLocal({
-    id: "w13_harbinger_edge",
-    name: "Harbinger at the Edge",
-    description: "A ranged artillery boss anchors at the perimeter and shells tower clusters.",
-    warning: "SECOND BOSS: spread towers and use long-range pressure.",
-    recommendedCounters: ["Railgun", "Reflector", "Stasis"],
-    rewardCredits: 180,
-    rewardChoice: true,
-    isBossWave: true,
-    lanes: [
-      { spawnerId: "east", enemies: [{ type: "harbinger", count: 1, interval: 1 }] },
-      { spawnerId: "west", enemies: [{ type: "jammer", count: 4, interval: 1.5 }], startDelay: 3 },
-    ],
-  }));
-  while (out.length < 20) {
-    const idx = out.length + 1;
-    out.push(summarizeLocal({
-      id: `w${idx}_hostile_escalation`,
-      name: `Hostile Escalation ${idx}`,
-      description: "The hostile core pre-buffs mixed anomalies and compresses the lanes.",
-      warning: "Final-sector pressure: armor, speed and support arrive together.",
-      recommendedCounters: ["Snare", "Overclock", "Mortar", "Tesla"],
-      rewardCredits: 150 + idx * 8,
-      rewardChoice: idx % 2 === 0,
-      lanes: [
-        { spawnerId: "north", enemies: [{ type: "juggernaut", count: 2 + Math.floor(idx / 5), interval: 1.5 }] },
-        { spawnerId: "south", enemies: [{ type: "saboteur", count: 3 + Math.floor(idx / 6), interval: 1.1 }], startDelay: 1.5 },
-        { spawnerId: "east", enemies: [{ type: "tunneler", count: 4 + Math.floor(idx / 4), interval: 0.9 }], startDelay: 3 },
-      ],
-    }));
+// Void waves: take a deterministically scrambled & buffed Sector-4 wave list
+// to give post-game / endless runs combined-arms pressure.
+function voidWaves(): WaveDefinition[] {
+  const out = cloneWaves(sector4Waves);
+  for (const w of out) {
+    for (const lane of w.lanes) {
+      for (const g of lane.enemies) {
+        g.count = Math.ceil(g.count * 1.15);
+      }
+    }
+    w.rewardCredits = Math.round(w.rewardCredits * 1.1);
   }
-  return out.slice(0, 20);
+  return out;
 }
 
 const baseSectorDefinitions: SectorDefinition[] = [
@@ -262,6 +227,8 @@ const baseSectorDefinitions: SectorDefinition[] = [
     startingCredits: 250,
     coreIntegrity: 100,
     lore: "A battered relay still whispers through the static. Hold it long enough to triangulate the source.",
+    // Sector 1 is the teaching sector — keep the field clean of environmental chaos.
+    hazards: { meteors: false, gravity: false, signalInterference: false, powerSurges: false },
   },
   {
     id: "sector_02_orbital_platform",
@@ -271,10 +238,12 @@ const baseSectorDefinitions: SectorDefinition[] = [
     accentColor: "#00e676",
     layout: sector2Layout,
     spawners: defaultSpawners,
-    waves: harderWaves(),
+    waves: crystalScarWaves(),
     startingCredits: 230,
     coreIntegrity: 100,
     lore: "The platform's gravity wells are failing in sequence. Every corridor has become a launch tube.",
+    // Crystal Scar: economy + power surges fit the theme; keep it tactical.
+    hazards: { meteors: false, gravity: false, signalInterference: false, powerSurges: true },
   },
   {
     id: "sector_03_deep_space_wreckage",
@@ -284,11 +253,13 @@ const baseSectorDefinitions: SectorDefinition[] = [
     accentColor: "#9e9e9e",
     layout: sector3Layout,
     spawners: defaultSpawners,
-    waves: phantomHeavy(),
+    waves: phantomGateWaves(),
     startingCredits: 260,
     coreIntegrity: 100,
     lore: "Something inside the wreck is answering your pings. The reply arrives before the signal is sent.",
     darkness: true,
+    // Phantom Gate: signal interference + gravity anomaly fit the disruptor theme.
+    hazards: { meteors: false, gravity: true, signalInterference: true, powerSurges: false },
   },
   {
     id: "sector_04_hostile_core",
@@ -299,9 +270,11 @@ const baseSectorDefinitions: SectorDefinition[] = [
     layout: sector4Layout,
     spawners: defaultSpawners,
     waves: hostileCoreWaves(),
-    startingCredits: 300,
+    startingCredits: 280,
     coreIntegrity: 110,
     lore: "This is not a relay. It is the thing using relays to speak.",
+    // Hostile Core: meteors + power surges, plus boss artillery already provides "shells".
+    hazards: { meteors: true, gravity: false, signalInterference: true, powerSurges: true },
   },
   {
     id: "sector_void",
@@ -311,11 +284,13 @@ const baseSectorDefinitions: SectorDefinition[] = [
     accentColor: "#b39ddb",
     layout: voidLayout(),
     spawners: defaultSpawners,
-    waves: harderWaves(),
+    waves: voidWaves(),
     startingCredits: 240,
     coreIntegrity: 100,
     lore: "The Void is a map that forgot its own shape. The route is stable only until the next run.",
     darkness: true,
+    // Void: every hazard. Combined chaos is the point.
+    hazards: { meteors: true, gravity: true, signalInterference: true, powerSurges: true },
   },
 ];
 

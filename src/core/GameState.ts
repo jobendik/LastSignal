@@ -25,6 +25,30 @@ export interface UpgradeAggregate {
   /** Whether the player has the Tactical Pause upgrade (1 slow-mo per wave). */
   tacticalPause: boolean;
   appliedUpgradeIds: string[];
+  // ---------- BUILD-DEFINING (Part 5) ----------
+  pulseSplitShots: boolean;
+  pulseDeathMark: boolean;
+  pulseCoreBoost: boolean;
+  stasisDeathSlow: boolean;
+  stasisDeeperSlow: number;
+  mortarSwarmBonus: number;
+  mortarAlwaysBurn: boolean;
+  teslaLongChain: boolean;
+  teslaVulnerability: boolean;
+  teslaPhantomBonus: number;
+  flamerPanicSlow: boolean;
+  flamerSwarmFocus: boolean;
+  railgunBossFocus: number;
+  railgunPierceAll: boolean;
+  droneCorePriority: boolean;
+  droneRevealAll: boolean;
+  droneRepairFaster: boolean;
+  harvesterShieldAdjacent: boolean;
+  harvesterAdjacencyBonus: number;
+  unspentInterestPct: number;
+  unspentInterestCap: number;
+  waveCompleteCredits: number;
+  reflectorRailgunMul: number;
 }
 
 export function createEmptyUpgradeAggregate(): UpgradeAggregate {
@@ -48,6 +72,29 @@ export function createEmptyUpgradeAggregate(): UpgradeAggregate {
     lowCoreThreshold: 0,
     tacticalPause: false,
     appliedUpgradeIds: [],
+    pulseSplitShots: false,
+    pulseDeathMark: false,
+    pulseCoreBoost: false,
+    stasisDeathSlow: false,
+    stasisDeeperSlow: 0,
+    mortarSwarmBonus: 0,
+    mortarAlwaysBurn: false,
+    teslaLongChain: false,
+    teslaVulnerability: false,
+    teslaPhantomBonus: 0,
+    flamerPanicSlow: false,
+    flamerSwarmFocus: false,
+    railgunBossFocus: 0,
+    railgunPierceAll: false,
+    droneCorePriority: false,
+    droneRevealAll: false,
+    droneRepairFaster: false,
+    harvesterShieldAdjacent: false,
+    harvesterAdjacencyBonus: 0,
+    unspentInterestPct: 0,
+    unspentInterestCap: 0,
+    waveCompleteCredits: 0,
+    reflectorRailgunMul: 1,
   };
 }
 
@@ -229,4 +276,28 @@ export function applyUpgradeEffect(
     agg.lowCoreThreshold = Math.max(agg.lowCoreThreshold, effect.lowCoreThreshold);
   }
   if (effect.tacticalPause) agg.tacticalPause = true;
+  // Build-defining flags (Part 5).
+  if (effect.pulseSplitShots) agg.pulseSplitShots = true;
+  if (effect.pulseDeathMark) agg.pulseDeathMark = true;
+  if (effect.pulseCoreBoost) agg.pulseCoreBoost = true;
+  if (effect.stasisDeathSlow) agg.stasisDeathSlow = true;
+  if (effect.stasisDeeperSlow != null) agg.stasisDeeperSlow = Math.max(agg.stasisDeeperSlow, effect.stasisDeeperSlow);
+  if (effect.mortarSwarmBonus != null) agg.mortarSwarmBonus = Math.max(agg.mortarSwarmBonus, effect.mortarSwarmBonus);
+  if (effect.mortarAlwaysBurn) agg.mortarAlwaysBurn = true;
+  if (effect.teslaLongChain) agg.teslaLongChain = true;
+  if (effect.teslaVulnerability) agg.teslaVulnerability = true;
+  if (effect.teslaPhantomBonus != null) agg.teslaPhantomBonus = Math.max(agg.teslaPhantomBonus, effect.teslaPhantomBonus);
+  if (effect.flamerPanicSlow) agg.flamerPanicSlow = true;
+  if (effect.flamerSwarmFocus) agg.flamerSwarmFocus = true;
+  if (effect.railgunBossFocus != null) agg.railgunBossFocus = Math.max(agg.railgunBossFocus, effect.railgunBossFocus);
+  if (effect.railgunPierceAll) agg.railgunPierceAll = true;
+  if (effect.droneCorePriority) agg.droneCorePriority = true;
+  if (effect.droneRevealAll) agg.droneRevealAll = true;
+  if (effect.droneRepairFaster) agg.droneRepairFaster = true;
+  if (effect.harvesterShieldAdjacent) agg.harvesterShieldAdjacent = true;
+  if (effect.harvesterAdjacencyBonus != null) agg.harvesterAdjacencyBonus = Math.max(agg.harvesterAdjacencyBonus, effect.harvesterAdjacencyBonus);
+  if (effect.unspentInterestPct != null) agg.unspentInterestPct = Math.max(agg.unspentInterestPct, effect.unspentInterestPct);
+  if (effect.unspentInterestCap != null) agg.unspentInterestCap = Math.max(agg.unspentInterestCap, effect.unspentInterestCap);
+  if (effect.waveCompleteCredits != null) agg.waveCompleteCredits += effect.waveCompleteCredits;
+  if (effect.reflectorRailgunMul != null) agg.reflectorRailgunMul *= effect.reflectorRailgunMul;
 }

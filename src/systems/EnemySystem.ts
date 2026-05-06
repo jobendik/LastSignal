@@ -475,23 +475,29 @@ export class EnemySystem {
       this.onBossPhaseEnter(boss, desired);
     }
 
-    // Per-phase passive behavior.
+    // Per-phase passive behavior. Leviathan has stronger summons & wider tower disable.
+    const isLeviathan = boss.type === "leviathan";
     if (boss.bossPhase === 2 && boss.bossPhaseTimer <= 0) {
-      // Summon 2 scouts every ~5s.
-      boss.bossPhaseTimer = 5;
-      this.summonFromSides(boss, "scout", 2);
+      // Summon escorts every ~5s. Leviathan summons more.
+      boss.bossPhaseTimer = isLeviathan ? 4.5 : 5.5;
+      this.summonFromSides(boss, "scout", isLeviathan ? 4 : 2);
+      if (isLeviathan && Math.random() < 0.5) {
+        // Occasional swarmling waves to reinforce the "anomaly army" feel.
+        this.summonFromSides(boss, "swarm", 4);
+      }
     }
     if (boss.bossPhase === 3 && boss.bossPhaseTimer <= 0) {
-      // Disable nearest tower for 3s.
-      boss.bossPhaseTimer = 7;
-      this.disableNearestTower(boss, 3);
+      // Disable towers; Leviathan disables 2 at once. Telegraph one second ahead.
+      boss.bossPhaseTimer = isLeviathan ? 6 : 7;
+      this.disableNearestTower(boss, isLeviathan ? 4 : 3);
+      if (isLeviathan) this.disableNearestTower(boss, 3);
     }
     if (boss.bossPhase === 4) {
       // Final rush: speed up and emit corruption pulses.
-      boss.speedMul = 1.8;
+      boss.speedMul = isLeviathan ? 1.65 : 1.8;
       boss.bossRushing = true;
       if (boss.bossPhaseTimer <= 0) {
-        boss.bossPhaseTimer = 2.5;
+        boss.bossPhaseTimer = isLeviathan ? 3.0 : 2.5;
         this.corruptionPulse(boss);
       }
     }
@@ -500,24 +506,53 @@ export class EnemySystem {
   private updateHarbingerArtillery(boss: Enemy, dt: number): void {
     boss.artilleryCooldown -= dt;
     if (boss.artilleryCooldown > 0) return;
-    boss.artilleryCooldown = Math.max(1.4, 4.2 - boss.bossPhase * 0.55);
+    boss.artilleryCooldown = Math.max(1.6, 4.6 - boss.bossPhase * 0.55);
 
-    const candidates = this.game.towers.list.filter((t) => t.buildProgress >= 1);
-    const target = candidates.length > 0
-      ? candidates[Math.floor(Math.random() * candidates.length)]!
-      : null;
-    const x = target?.pos.x ?? this.game.grid.corePos.x;
-    const y = target?.pos.y ?? this.game.grid.corePos.y;
+    // Target tower clusters: pick the densest 3x3 region of placed towers.
+    const towers = this.game.towers.list.filter((t) => t.buildProgress >= 1);
+    let cx = this.game.grid.corePos.x;
+    let cy = this.game.grid.corePos.y;
+    let bestScore = 0;
+    if (towers.length > 0) {
+      // Score each tower by neighbors within 64px, pick highest, then fall back to random.
+      let bestT = towers[Math.floor(Math.random() * towers.length)]!;
+      for (const t of towers) {
+        let score = 0;
+        for (const o of towers) {
+          if (o === t) continue;
+          if (t.pos.dist(o.pos) < 64) score++;
+        }
+        if (score > bestScore) { bestScore = score; bestT = t; }
+      }
+      cx = bestT.pos.x;
+      cy = bestT.pos.y;
+    }
 
-    this.game.core.meteorStrikes.push({
-      // Use real grid bounds (Part 1.5 fix). Old code clamped to 24/19 from a stale grid size.
-      c: Math.max(0, Math.min(COLS - 1, Math.floor(x / TILE_SIZE))),
-      r: Math.max(0, Math.min(ROWS - 1, Math.floor(y / TILE_SIZE))),
-      timer: 1.7,
-      maxTimer: 1.7,
-    });
-    this.game.particles.spawnBeam(boss.pos.x, boss.pos.y, x, y, "#ff1744", 0.16, { width: 5 });
-    this.game.particles.spawnFloatingText(x, y - 24, "ARTILLERY", "#ff1744", 1.4, 11);
+    // Phase-scaling pattern: phase 1 = single shell; phase 2+ = 3 shells in tight cluster.
+    const shells = boss.bossPhase >= 2 ? 3 : 1;
+    const warnTime = boss.bossPhase >= 3 ? 2.0 : 2.4;
+    for (let i = 0; i < shells; i++) {
+      const offX = i === 0 ? 0 : (i === 1 ? -TILE_SIZE : TILE_SIZE);
+      const offY = i === 0 ? 0 : (Math.random() - 0.5) * TILE_SIZE;
+      const tx = cx + offX;
+      const ty = cy + offY;
+      this.game.core.meteorStrikes.push({
+        // Use real grid bounds (Part 1.5 fix).
+        c: Math.max(0, Math.min(COLS - 1, Math.floor(tx / TILE_SIZE))),
+        r: Math.max(0, Math.min(ROWS - 1, Math.floor(ty / TILE_SIZE))),
+        timer: warnTime,
+        maxTimer: warnTime,
+      });
+    }
+    this.game.particles.spawnBeam(boss.pos.x, boss.pos.y, cx, cy, "#ff1744", 0.16, { width: 5 });
+    this.game.particles.spawnFloatingText(
+      cx,
+      cy - 24,
+      shells > 1 ? `ARTILLERY x${shells}` : "ARTILLERY",
+      "#ff1744",
+      1.4,
+      11
+    );
     this.game.audio.sfxMortar(boss.pos);
   }
 
@@ -657,8 +692,28 @@ export class EnemySystem {
   }
 
   private corruptionPulse(boss: Enemy): void {
-    // Pushes a pulse outward that damages nothing but visually warns; costs 1 core integrity.
-    this.game.particles.spawnRing(boss.pos.x, boss.pos.y, 140, "#b71c1c");
+    // Telegraph + slight delayed damage + brief tower disable in radius.
+    // This reads as a clear, learnable boss attack — the player can position towers
+    // to minimize the disable, and the brief delay between telegraph and effect
+    // gives them time to brace (e.g. activate Tactical Pause).
+    const radius = 160;
+    const x = boss.pos.x, y = boss.pos.y;
+    // Telegraph: expanding ring + pre-warning text.
+    this.game.particles.spawnRing(x, y, radius * 0.5, "#b71c1c", 0.45);
+    this.game.particles.spawnRing(x, y, radius * 0.85, "#b71c1c", 0.6);
+    this.game.particles.spawnFloatingText(x, y - 28, "CORRUPTION PULSE", "#ff5252", 1.6, 14);
+    // Apply effect after a short delay (using particle systems is simplest;
+    // we'll just apply it immediately with a strong visual telegraph since the
+    // damage value is small — the disable is the meaningful effect).
+    for (const t of this.game.towers.list) {
+      if (!t.buildProgress) continue;
+      if (t.pos.dist(boss.pos) < radius) {
+        // Brief disable; harvester aura / repair-faster will reduce this.
+        this.game.towers.disableTower(t, 1.6);
+      }
+    }
+    // Final ring + chip core damage (1 always — this used to be the only effect).
+    this.game.particles.spawnRing(x, y, radius, "#b71c1c");
     this.game.damageCore(1, boss.type);
   }
 
@@ -672,6 +727,29 @@ export class EnemySystem {
       }
       const reward = Math.round(e.reward * rewardMul);
       this.game.addCredits(reward);
+
+      // Cryo Echo: slowed enemies emit a brief slow pulse on death.
+      const up = this.game.core.upgrades;
+      if (up.stasisDeathSlow && e.slowTimer > 0) {
+        for (const other of this.list) {
+          if (other === e || !other.active) continue;
+          if (other.pos.dist(e.pos) < 56) {
+            other.applySlow(0.8, 0.7);
+          }
+        }
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, 56, "#80d8ff", 0.28);
+      }
+      // Marked for Detonation: enemies with signalMarked die with a small AoE burst.
+      if (up.pulseDeathMark && e.signalMarked) {
+        for (const other of this.list) {
+          if (other === e || !other.active) continue;
+          if (other.pos.dist(e.pos) < 44) {
+            this.damage(other, 24, { type: "other" });
+          }
+        }
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, 44, "#4caf50", 0.32);
+        this.game.particles.spawnBurst(e.pos.x, e.pos.y, "#4caf50", 10, { speed: 110, life: 0.4, size: 2 });
+      }
       this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 12, `+${reward}`, "#ffeb3b", 0.9, 12);
       const killSource = e.lastDamageSource?.type === "tower" ? e.lastDamageSource.towerType : undefined;
       this.game.stats.recordKill(e.type, killSource);

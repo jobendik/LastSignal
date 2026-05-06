@@ -101,11 +101,21 @@ export class DroneSystem {
   private updateHunter(d: Drone, dt: number): void {
     let target = null;
     let min = Infinity;
+    const corePriority = this.game.core.upgrades.droneCorePriority;
+    const corePos = this.game.grid.corePos;
     for (const e of this.game.enemies.list) {
       if (!e.active || e.isPhased) continue;
-      const dist = e.pos.dist(d.pos);
-      if (dist < min) { min = dist; target = e; }
+      let score: number;
+      if (corePriority) {
+        // Sentry Protocol: prefer enemies near the core.
+        const distToCore = e.pos.dist(corePos);
+        score = distToCore;
+      } else {
+        score = e.pos.dist(d.pos);
+      }
+      if (score < min) { min = score; target = e; }
     }
+    if (target) min = target.pos.dist(d.pos);
     let steer = new Vector2();
     if (target && min < 300) {
       steer = this.seek(d, target.pos);

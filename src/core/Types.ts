@@ -216,6 +216,22 @@ export interface SectorDefinition {
   lore?: string;
   /** Darkness sectors dim the playfield; tower lights become strategic visibility pools. */
   darkness?: boolean;
+  /**
+   * Per-sector hazard enable flags. When omitted, every hazard runs (legacy behavior).
+   * Set to false to suppress hazards that don't fit the sector theme.
+   */
+  hazards?: SectorHazardConfig;
+}
+
+export interface SectorHazardConfig {
+  /** Random meteor showers strike the field. */
+  meteors?: boolean;
+  /** Roaming gravity anomaly slows enemies and projectiles. */
+  gravity?: boolean;
+  /** Signal interference zone reduces tower range. */
+  signalInterference?: boolean;
+  /** Periodic environmental power surge buffs random combat tower. */
+  powerSurges?: boolean;
 }
 
 // ---------- Upgrades ----------
@@ -247,6 +263,55 @@ export interface UpgradeEffect {
   lowCoreThreshold?: number;
   /** Grants the Tactical Pause ability (1 slow-mo per wave). */
   tacticalPause?: boolean;
+  // ---------- BUILD-DEFINING (Part 5) ----------
+  /** Pulse: chance every Nth shot splits into multiple weaker shots. */
+  pulseSplitShots?: boolean;
+  /** Pulse: marked enemies explode on death (small AoE). */
+  pulseDeathMark?: boolean;
+  /** Pulse: closer to core = more damage (up to +50%). */
+  pulseCoreBoost?: boolean;
+  /** Stasis: slow effect spreads briefly on enemy death. */
+  stasisDeathSlow?: boolean;
+  /** Stasis: slow strength deepens by an extra amount. */
+  stasisDeeperSlow?: number;
+  /** Mortar: bonus damage vs swarm/scout (anti-density). */
+  mortarSwarmBonus?: number;
+  /** Mortar: burn ground always on. */
+  mortarAlwaysBurn?: boolean;
+  /** Tesla: chain jumps gain extra range but lose more damage per jump. */
+  teslaLongChain?: boolean;
+  /** Tesla: applies vulnerability briefly to anything hit. */
+  teslaVulnerability?: boolean;
+  /** Tesla: bonus damage to phased enemies. */
+  teslaPhantomBonus?: number;
+  /** Flamer: burning enemies are slowed slightly. */
+  flamerPanicSlow?: boolean;
+  /** Flamer: bonus damage vs swarms, reduced vs bosses. */
+  flamerSwarmFocus?: boolean;
+  /** Railgun: bonus damage vs bosses. */
+  railgunBossFocus?: number;
+  /** Railgun: pierces through enemies in line. */
+  railgunPierceAll?: boolean;
+  /** Drone: hunter prioritizes enemies near core. */
+  droneCorePriority?: boolean;
+  /** Drone: scanner reveals all phantoms on map. */
+  droneRevealAll?: boolean;
+  /** Drone: repair drone restores towers faster (shorter disable timers). */
+  droneRepairFaster?: boolean;
+  /** Economy: harvester also shields adjacent towers (reduces incoming disable durations). */
+  harvesterShieldAdjacent?: boolean;
+  /** Economy: bonus credits per non-harvester tower adjacent to harvester. */
+  harvesterAdjacencyBonus?: number;
+  /** Economy: interest on unspent credits at wave end (% of unspent up to a cap). */
+  unspentInterestPct?: number;
+  /** Economy: interest cap (max bonus credits per wave). */
+  unspentInterestCap?: number;
+  /** Generic: every wave-complete grants this many credits. */
+  waveCompleteCredits?: number;
+  /** Reflector synergy: adjacent reflectors give railguns +bonus damage. */
+  reflectorRailgunMul?: number;
+  /** Adds N starting drones to a free tier-1 spawn pool (cosmetic boost). */
+  bonusDrones?: number;
 }
 
 export type UpgradeRarity = "common" | "uncommon" | "rare" | "legendary" | "cursed";

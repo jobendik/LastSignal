@@ -3,6 +3,7 @@ import type { SectorDefinition } from "../core/Types";
 import { sectorDefinitions } from "../data/sectors";
 import { difficultyDefinitions, difficultyOrder } from "../data/difficulty";
 import { loadoutDefinitions, type LoadoutDefinition } from "../data/loadouts";
+import { sectorObjectives } from "../data/objectives";
 import { el, clear } from "./dom";
 
 export class SectorSelect {
@@ -43,10 +44,10 @@ export class SectorSelect {
       const preview = this.buildMapPreview(s);
       const statusText = isLocked
         ? isVoid
-          ? "🔒 Locked — clear Sector 4 and unlock Endless research."
-          : `🔒 Locked — clear Sector ${sectorIndex - 1} first.`
+          ? "Locked — clear Sector 4 and unlock Endless research."
+          : `Locked — clear Sector ${sectorIndex - 1} first.`
         : isCleared
-        ? "✓ Cleared"
+        ? "Cleared"
         : "Available";
       card.append(
         preview,
@@ -59,6 +60,28 @@ export class SectorSelect {
           html: `<span>${s.waves.length} waves</span> · <span>Core ${s.coreIntegrity}</span> · <span>Credits ${s.startingCredits}</span>`,
         })
       );
+      // Objectives + counterplay block (Part 8 — sector card UX).
+      const obj = sectorObjectives[s.id];
+      if (obj) {
+        const block = el("div", { class: "ls-sector-objectives" });
+        block.append(
+          el("div", { class: "ls-sector-obj-primary", text: `PRIMARY · ${obj.primary.label}` })
+        );
+        const secList = el("div", { class: "ls-sector-obj-secondary" });
+        for (const sec of obj.secondary) {
+          secList.append(el("div", { class: "ls-sector-obj-row", text: `+ ${sec.label}` }));
+        }
+        block.append(secList);
+        if (obj.counterplay.length) {
+          block.append(
+            el("div", { class: "ls-sector-obj-counter", text: `Counter: ${obj.counterplay.join(" · ")}` })
+          );
+        }
+        if (obj.hazards) {
+          block.append(el("div", { class: "ls-sector-obj-hazard", text: `Hazard: ${obj.hazards}` }));
+        }
+        card.append(block);
+      }
       if (isLocked) {
         (card as HTMLButtonElement).disabled = true;
       } else {
