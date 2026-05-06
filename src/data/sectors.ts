@@ -1,6 +1,7 @@
 import type { SectorDefinition, WaveDefinition, EnemyType } from "../core/Types";
 import { defaultWaves } from "./waves";
 import { COLS, ROWS } from "../core/Config";
+import { mulberry32 } from "../core/Random";
 
 /**
  * Base layouts are authored in a compact format, then auto-expanded to the runtime map size.
@@ -174,16 +175,28 @@ function harderWaves(): WaveDefinition[] {
 }
 
 // Sector 3: phantom-heavy rebalance.
+// IMPORTANT: must be deterministic so the previewable wave summary, the codex,
+// and the actual wave content always match across page reloads. Uses a fixed
+// mulberry32 stream rather than Math.random.
 function phantomHeavy(): WaveDefinition[] {
   const out = cloneWaves(defaultWaves);
   const phantomTypes: EnemyType[] = ["scout", "grunt"];
+  const rand = mulberry32(0xC0FFEE);
   for (const w of out) {
     for (const lane of w.lanes) {
       for (const g of lane.enemies) {
-        if (phantomTypes.includes(g.type) && Math.random() < 0.5) {
+        if (phantomTypes.includes(g.type) && rand() < 0.5) {
           g.type = "phantom";
         }
       }
+    }
+    // Re-summarize so wave preview reflects the actual mutated enemies (Part 1 — codex truthfulness).
+    if (w.enemySummary) {
+      const map = new Map<EnemyType, number>();
+      for (const lane of w.lanes) {
+        for (const g of lane.enemies) map.set(g.type, (map.get(g.type) ?? 0) + g.count);
+      }
+      w.enemySummary = Array.from(map.entries()).map(([type, count]) => ({ type, count }));
     }
   }
   return out;

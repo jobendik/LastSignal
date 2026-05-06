@@ -25,27 +25,51 @@ export class SectorSelect {
     this.el.append(this.buildDifficultyPicker());
 
     const grid = el("div", { class: "ls-sector-grid ls-sector-starmap" });
-    for (const s of sectorDefinitions) {
+    const bestCleared = this.game.core.profile.bestSectorCleared;
+    const hasEndless = this.game.meta.aggregate().hasEndless;
+    sectorDefinitions.forEach((s, i) => {
+      const sectorIndex = i + 1; // 1-based
+      const isVoid = s.id === "sector_void";
+      // Sector N requires sector N-1 cleared. Void requires the campaign be cleared
+      // (best >= 4) AND the Endless research unlock — campaign-only otherwise.
+      const isLocked = isVoid
+        ? bestCleared < 4 || !hasEndless
+        : sectorIndex > 1 && bestCleared < sectorIndex - 1;
+      const isCleared = sectorIndex <= bestCleared;
       const card = el("button", { class: "ls-sector-card" });
-      card.style.borderColor = s.accentColor;
+      if (isLocked) card.classList.add("ls-sector-locked");
+      if (isCleared) card.classList.add("ls-sector-cleared");
+      card.style.borderColor = isLocked ? "#3a3a3a" : s.accentColor;
       const preview = this.buildMapPreview(s);
+      const statusText = isLocked
+        ? isVoid
+          ? "🔒 Locked — clear Sector 4 and unlock Endless research."
+          : `🔒 Locked — clear Sector ${sectorIndex - 1} first.`
+        : isCleared
+        ? "✓ Cleared"
+        : "Available";
       card.append(
         preview,
         el("div", { class: "ls-sector-name", text: s.name }),
         el("div", { class: "ls-sector-desc", text: s.description }),
         el("div", { class: "ls-sector-lore", text: s.lore ?? "" }),
+        el("div", { class: "ls-sector-status", text: statusText }),
         el("div", {
           class: "ls-sector-meta",
           html: `<span>${s.waves.length} waves</span> · <span>Core ${s.coreIntegrity}</span> · <span>Credits ${s.startingCredits}</span>`,
         })
       );
-      card.onclick = () => this.showLoadoutPicker(s);
+      if (isLocked) {
+        (card as HTMLButtonElement).disabled = true;
+      } else {
+        card.onclick = () => this.showLoadoutPicker(s);
+      }
       grid.append(card);
-    }
+    });
     this.el.append(grid);
 
     // Endless toggle — only if research unlocked.
-    if (this.game.meta.aggregate().hasEndless) {
+    if (hasEndless) {
       const endlessRow = el("div", { class: "ls-endless-row" });
       const toggle = el("button", {
         class: "ls-btn ls-btn-endless",

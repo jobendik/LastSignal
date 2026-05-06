@@ -302,6 +302,19 @@
 .ls-sector-desc { font-size: 12px; color: #c5c6c7; margin-bottom: 8px; }
 .ls-sector-lore { font-size: 10px; color: #8a9099; line-height: 1.4; margin-bottom: 8px; font-style: italic; }
 .ls-sector-meta { font-size: 11px; color: #8a9099; }
+.ls-sector-status { font-size: 11px; color: #c5c6c7; margin-bottom: 6px; letter-spacing: 1px; }
+.ls-sector-card.ls-sector-locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.85);
+}
+.ls-sector-card.ls-sector-locked:hover {
+  transform: none;
+  box-shadow: none;
+}
+.ls-sector-card.ls-sector-locked .ls-sector-status { color: #ef9a9a; }
+.ls-sector-card.ls-sector-cleared { box-shadow: 0 0 14px rgba(0, 230, 118, 0.18); }
+.ls-sector-card.ls-sector-cleared .ls-sector-status { color: #69f0ae; }
 
 /* ===== HUD ===== */
 .ls-hud {

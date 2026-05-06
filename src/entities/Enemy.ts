@@ -111,6 +111,20 @@ export class Enemy {
   singularityX = 0;
   singularityY = 0;
 
+  /**
+   * Vulnerability status: while > 0, this enemy takes +25% damage from all sources.
+   * Applied by Stasis "Vulnerability Pulse" specialization and Flamer "Overburn".
+   * Routed centrally in EnemySystem.damage so every damage path benefits consistently.
+   */
+  vulnerableTimer = 0;
+
+  /** Overlord swarm-on-hit counter (every Nth incoming hit births a Swarm escort). */
+  overlordHitsSinceSwarm = 0;
+  /** Game time of last swarm spawn — prevents flooding while overlord is pinned. */
+  lastSwarmSpawn = 0;
+  /** Shielder bubble: each charge absorbs one incoming hit (Codex says "bubble-bearer"). */
+  shielderBubble = 0;
+
   constructor(type: EnemyType, x: number, y: number, hpOverride?: number) {
     const def = enemyDefinitions[type];
     this.def = def;
@@ -147,6 +161,11 @@ export class Enemy {
     if (this.shieldDroneCount > 0 && source != null && source.type !== "other") {
       this.shieldDroneCount--;
       // Signal absorption via a marker the caller/renderer can check (no HP lost).
+      return 0;
+    }
+    // Shielder personal bubble: absorbs the first hit, then the unit is vulnerable.
+    if (this.shielderBubble > 0 && source != null && source.type !== "other") {
+      this.shielderBubble--;
       return 0;
     }
     const armor = Math.min(0.95, (this.def.armor ?? 0) + this.extraArmor);

@@ -434,6 +434,10 @@ export class TowerSystem {
     target.applySlow(duration, strength);
     target.freezeFxTimer = duration;
     target.freezeFxMax = duration;
+    // Vulnerability Pulse specialization: tag the primary target as vulnerable.
+    if (t.flags.vulnerabilityPulse) {
+      target.vulnerableTimer = Math.max(target.vulnerableTimer, duration);
+    }
     this.game.particles.spawnBeam(t.pos.x, t.pos.y, target.pos.x, target.pos.y, t.def.color, 0.18);
 
     if (t.flags.singularity) {
@@ -633,7 +637,7 @@ export class TowerSystem {
   private fireRailgun(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
     // Instant hit ray + big beam.
     const dmg = stats.damage;
-    this.game.enemies.damage(target, dmg, { type: "tower", towerType: "railgun", tower: t });
+    this.applyTowerDamage(target, dmg, { type: "tower", towerType: "railgun", tower: t }, t);
     const beam = this.rayToScreenEdge(t.pos.x, t.pos.y, target.pos.x, target.pos.y);
     this.game.particles.spawnBeam(
       beam.x1,
@@ -658,7 +662,7 @@ export class TowerSystem {
         const along = (px * dx + py * dy) / (len * len);
         if (along < 0 || along > 1.05) continue;
         const perp = Math.abs(px * nx + py * ny);
-        if (perp < 10) this.game.enemies.damage(e, dmg * 0.5, { type: "tower", towerType: "railgun", tower: t });
+        if (perp < 10) this.applyTowerDamage(e, dmg * 0.5, { type: "tower", towerType: "railgun", tower: t }, t);
       }
     }
     this.tryReflectRailgun(t, target, stats);
@@ -705,7 +709,7 @@ export class TowerSystem {
     const next = this.findReflectTarget(best, target, stats.range * 0.9);
     if (!next) return;
     const boosted = best.mods.some((m) => m.damageMul && m.damageMul > 1);
-    this.game.enemies.damage(next, stats.damage * (boosted ? 0.75 : 0.6), { type: "tower", towerType: "railgun", tower: t });
+    this.applyTowerDamage(next, stats.damage * (boosted ? 0.75 : 0.6), { type: "tower", towerType: "railgun", tower: t }, t);
     this.game.particles.spawnBeam(t.pos.x, t.pos.y, best.pos.x, best.pos.y, t.def.color, 0.12, { kind: "railgun", width: 8 });
     this.game.particles.spawnBeam(best.pos.x, best.pos.y, next.pos.x, next.pos.y, best.def.color, 0.16, { kind: "railgun", width: 9 });
     this.game.particles.spawnRing(best.pos.x, best.pos.y, 28, best.def.color, 0.32);
@@ -718,7 +722,7 @@ export class TowerSystem {
       if (!e.active || e === target || bounced >= 2) continue;
       if (e.pos.dist(from) > 96) continue;
       bounced++;
-      this.game.enemies.damage(e, stats.damage * 0.35, { type: "tower", towerType: "railgun", tower: t });
+      this.applyTowerDamage(e, stats.damage * 0.35, { type: "tower", towerType: "railgun", tower: t }, t);
       this.game.particles.spawnBeam(from.x, from.y, e.pos.x, e.pos.y, t.def.color, 0.1, { kind: "railgun", width: 6 });
       from = e.pos;
     }
@@ -771,8 +775,12 @@ export class TowerSystem {
       const ea = Math.atan2(e.pos.y - t.pos.y, e.pos.x - t.pos.x);
       let delta = Math.abs(((ea - ang + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
       if (delta > 0.6) continue;
-      this.game.enemies.damage(e, stats.damage, { type: "tower", towerType: "flamer", tower: t });
+      this.applyTowerDamage(e, stats.damage, { type: "tower", towerType: "flamer", tower: t }, t);
       if (t.flags.burningGround) e.applySlow(0.4, 0.85);
+      // Overburn: flamer applies vulnerability so all sources do more damage briefly.
+      if (t.flags.vulnerabilityPulse) {
+        e.vulnerableTimer = Math.max(e.vulnerableTimer, 2.0);
+      }
     }
     this.game.particles.spawnFlameJet(t.pos.x, t.pos.y, ang, stats.range, 0.6);
   }
@@ -835,6 +843,45 @@ export class TowerSystem {
 
   private powerSurgeMul(t: Tower): number {
     return t.powerSurgeTimer > 0 ? 2 : 1;
+  }
+
+  /**
+   * Single canonical multiplier for any tower-sourced damage.
+   * Combines: global towerDamageMul, per-type multipliers, low-core bonus,
+   * and Amplifier auras (basic +15% / Resonance Core +25% within tile range).
+   * Used by ProjectileSystem AND by direct-damage paths (Railgun/Tesla/Flamer/splash)
+   * so all towers get consistent global modifiers (Part 1 — mechanical correctness).
+   */
+  getTowerDamageMultiplier(t: Tower | undefined): number {
+    if (!t) return 1;
+    const up = this.game.core.upgrades;
+    let mul = up.towerDamageMul;
+    const spec = up.specificTowerDamageMul[t.type];
+    if (spec) mul *= spec;
+
+    // Amplifier adjacency bonus. Default tile range = 1, Resonance Core = 2.
+    for (const amp of this.list) {
+      if (amp.type !== "amplifier" || amp.buildProgress < 1) continue;
+      const tileRange = amp.flags.resonanceCore ? 2 : 1;
+      if (Math.max(Math.abs(amp.c - t.c), Math.abs(amp.r - t.r)) <= tileRange) {
+        mul *= amp.flags.resonanceCore ? 1.25 : 1.15;
+      }
+    }
+
+    // Low-core bonus damage when "Last Stand Circuit" is active.
+    if (
+      up.lowCoreFireRateMul > 1 &&
+      this.game.core.coreIntegrity / this.game.core.coreMax <= up.lowCoreThreshold
+    ) {
+      mul *= 1.15;
+    }
+    return mul;
+  }
+
+  /** Apply a tower-sourced damage hit to an enemy through the canonical multiplier. */
+  applyTowerDamage(target: Enemy, amount: number, src: import("../entities/Enemy").DamageSource | null, tower: Tower | undefined): void {
+    const mul = this.getTowerDamageMultiplier(tower);
+    this.game.enemies.damage(target, amount * mul, src);
   }
 
   private firePulse(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {
@@ -937,7 +984,7 @@ export class TowerSystem {
     for (const e of chained) {
       let dmg = stats.damage;
       if (e.isPhased && t.flags.phaseDisruptor) dmg *= 0.4;
-      this.game.enemies.damage(e, dmg, { type: "tower", towerType: "tesla", tower: t });
+      this.applyTowerDamage(e, dmg, { type: "tower", towerType: "tesla", tower: t }, t);
       if (t.flags.empArc && Math.random() < 0.25) e.applyStun(0.5);
     }
 
