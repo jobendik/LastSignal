@@ -522,7 +522,9 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  width: 100%;
+  /* Don't render over the build menu (left:8px, width:200px). */
+  margin-left: 212px;
+  width: calc(100% - 212px);
   font-size: 10px;
   padding: 2px 0;
 }
@@ -570,7 +572,9 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  width: 100%;
+  /* Don't render over the build menu (left:8px, width:200px). */
+  margin-left: 212px;
+  width: calc(100% - 212px);
   font-size: 10px;
 }
 .ls-wave-intel.visible,
@@ -602,7 +606,9 @@
 
 .ls-command-panel {
   display: none;
-  width: 100%;
+  /* Don't render over the build menu (left:8px, width:200px). */
+  margin-left: 212px;
+  width: calc(100% - 212px);
   padding: 6px 8px;
   border: 1px solid rgba(102, 252, 241, 0.2);
   background: rgba(5, 8, 14, 0.62);
@@ -625,7 +631,9 @@
 /* ===== Objectives panel (HUD) ===== */
 .ls-objectives-panel {
   display: none;
-  width: 100%;
+  /* Don't render over the build menu (left:8px, width:200px). */
+  margin-left: 212px;
+  width: calc(100% - 212px);
   padding: 6px 8px;
   border: 1px solid rgba(255, 235, 59, 0.25);
   background: rgba(8, 12, 18, 0.7);
@@ -680,6 +688,62 @@
   letter-spacing: 2px;
 }
 
+/* ===== Sector briefing overlay (per-run intro toast) ===== */
+.ls-sector-briefing {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 84px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 240px));
+  background: rgba(4, 7, 12, 0.94);
+  border: 1px solid rgba(255, 235, 59, 0.45);
+  box-shadow: 0 0 24px rgba(255, 235, 59, 0.15);
+  padding: 12px 16px;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 70;
+  cursor: pointer;
+  animation: ls-sb-fade 0.4s ease;
+  font-size: 12px;
+}
+.ls-sector-briefing.visible { display: flex; }
+@keyframes ls-sb-fade {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.ls-sb-eyebrow {
+  font-size: 9px;
+  letter-spacing: 4px;
+  color: #ffeb3b;
+}
+.ls-sb-name {
+  font-size: 18px;
+  letter-spacing: 3px;
+  color: #66fcf1;
+}
+.ls-sb-brief {
+  font-size: 12px;
+  color: #c5c6c7;
+  line-height: 1.45;
+}
+.ls-sb-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 11px;
+  color: #c5c6c7;
+}
+.ls-sb-tag {
+  flex-shrink: 0;
+  min-width: 64px;
+  color: #66fcf1;
+  letter-spacing: 2px;
+  font-size: 9px;
+  padding-top: 1px;
+}
+.ls-sb-tag.warn { color: #ffab40; }
+
 /* ===== Build menu ===== */
 .ls-build-menu {
   position: absolute;
@@ -693,7 +757,9 @@
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
-  z-index: 40;
+  /* Above the HUD (z:50) so the HUD's tall expanded background gradient
+     (caused by stacked sub-panels) doesn't visually cover the build menu. */
+  z-index: 51;
   flex-wrap: nowrap;
 }
 .ls-build-title {
@@ -1435,6 +1501,15 @@
   }
   .ls-hud-right {
     margin-left: 0;
+  }
+  /* On mobile the build menu becomes a bottom bar; reset the desktop margin. */
+  .ls-modifier-strip,
+  .ls-wave-intel,
+  .ls-wave-timeline,
+  .ls-command-panel,
+  .ls-objectives-panel {
+    margin-left: 0;
+    width: 100%;
   }
   .ls-build-menu {
     top: auto;
