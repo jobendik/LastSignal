@@ -1,28 +1,30 @@
-import { COLS, ROWS } from "../core/Config";
 import { CellKind } from "../core/Types";
 
 interface PathRequest {
   cells: number[];
   coreCells: number[];
+  cols: number;
+  rows: number;
 }
 
 self.onmessage = (event: MessageEvent<PathRequest>) => {
-  const { cells, coreCells } = event.data;
-  const flow = new Int32Array(COLS * ROWS);
-  const dist = new Float32Array(COLS * ROWS);
+  const { cells, coreCells, cols, rows } = event.data;
+  const len = cols * rows;
+  const flow = new Int32Array(len);
+  const dist = new Float32Array(len);
   flow.fill(-1);
   dist.fill(Infinity);
   const queue: number[] = [];
   let head = 0;
 
   const neighbors = (i: number): number[] => {
-    const c = i % COLS;
-    const r = Math.floor(i / COLS);
+    const c = i % cols;
+    const r = Math.floor(i / cols);
     const out: number[] = [];
     if (c > 0) out.push(i - 1);
-    if (c < COLS - 1) out.push(i + 1);
-    if (r > 0) out.push(i - COLS);
-    if (r < ROWS - 1) out.push(i + COLS);
+    if (c < cols - 1) out.push(i + 1);
+    if (r > 0) out.push(i - cols);
+    if (r < rows - 1) out.push(i + cols);
     return out;
   };
   const walkable = (i: number) => {

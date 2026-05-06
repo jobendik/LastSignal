@@ -212,6 +212,9 @@ export interface SectorDefinition {
   waves: WaveDefinition[];
   startingCredits: number;
   coreIntegrity: number;
+  /** Grid dimensions. When omitted, defaults to DEFAULT_COLS × DEFAULT_ROWS (32×22). */
+  cols?: number;
+  rows?: number;
   /** Optional flavor text shown on the sector star map. */
   lore?: string;
   /** Darkness sectors dim the playfield; tower lights become strategic visibility pools. */

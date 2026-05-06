@@ -4,7 +4,7 @@ import type { Enemy } from "../entities/Enemy";
 import { Tower } from "../entities/Tower";
 import type { Drone } from "../entities/Drone";
 import type { Projectile } from "../entities/Projectile";
-import { COLS, ROWS, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
+import { TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
 import { towerDefinitions } from "../data/towers";
 import type { TowerType } from "../core/Types";
 
@@ -49,7 +49,7 @@ export class RenderSystem {
     this.terrainCache.width = VIEW_WIDTH;
     this.terrainCache.height = VIEW_HEIGHT;
     this.generateNoiseTexture();
-    this.generateStars();
+    this.generateStars(VIEW_WIDTH, VIEW_HEIGHT);
     this.game.bus.on("tower:built", (t: unknown) => this.markEntityDirty(t));
     this.game.bus.on("tower:sold", (t: unknown) => this.markEntityDirty(t));
     this.game.bus.on("credits:changed", () => this.markDirty(0, 0, VIEW_WIDTH, 80));
@@ -72,11 +72,12 @@ export class RenderSystem {
     this.markDirty(maybe.pos.x - 90, maybe.pos.y - 90, 180, 180);
   }
 
-  private generateStars(): void {
+  private generateStars(w = VIEW_WIDTH, h = VIEW_HEIGHT): void {
+    this.stars = [];
     for (let i = 0; i < 120; i++) {
       this.stars.push({
-        x: Math.random() * VIEW_WIDTH,
-        y: Math.random() * VIEW_HEIGHT,
+        x: Math.random() * w,
+        y: Math.random() * h,
         r: Math.random() * 1.2 + 0.3,
         a: Math.random() * 0.55 + 0.1,
       });
@@ -101,31 +102,25 @@ export class RenderSystem {
     const quality = this.game.core.settings.graphicsQuality;
     const reducedMotion = this.game.core.settings.reducedMotion;
     const dpr = this.dpr;
+    const cam = this.game.camera;
     this.previousFrameCtx.setTransform(1, 0, 0, 1, 0, 0);
     this.previousFrameCtx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
     this.previousFrameCtx.drawImage(ctx.canvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (quality === "low" && this.dirtyRects.length > 0 && this.game.state === "PLANNING") {
-      for (const r of this.dirtyRects) ctx.clearRect(r.x, r.y, r.w, r.h);
-    } else {
-      ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-    }
+    ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
     this.dirtyRects.length = 0;
 
     // Screen shake: directional bias toward impact + rotational component.
     const shake = this.game.core.shake;
     const shakeRot = this.game.core.shakeRot;
+    let shakeOffX = 0, shakeOffY = 0, shakeRotVal = 0;
     if (this.game.core.settings.screenShake && !reducedMotion && (shake > 0.01 || shakeRot > 0.001)) {
       const dir = this.game.core.shakeDir;
       const rand = (Math.random() - 0.5);
-      // 60% directional, 40% random perpendicular
-      const sx = dir.x * shake * 0.6 * rand + (Math.random() - 0.5) * shake * 0.4;
-      const sy = dir.y * shake * 0.6 * rand + (Math.random() - 0.5) * shake * 0.4;
-      const rot = (Math.random() - 0.5) * shakeRot * 2;
-      ctx.translate(VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
-      ctx.rotate(rot);
-      ctx.translate(-VIEW_WIDTH / 2 + sx, -VIEW_HEIGHT / 2 + sy);
+      shakeOffX = dir.x * shake * 0.6 * rand + (Math.random() - 0.5) * shake * 0.4;
+      shakeOffY = dir.y * shake * 0.6 * rand + (Math.random() - 0.5) * shake * 0.4;
+      shakeRotVal = (Math.random() - 0.5) * shakeRot * 2;
     }
 
     this.drawBackground(ctx);
@@ -142,6 +137,15 @@ export class RenderSystem {
     if (settings.vfxPhosphor && allowVfx) {
       this.drawPhosphorPersistence(ctx);
     }
+
+    // ---- BEGIN CAMERA TRANSFORM (world-space) ----
+    ctx.save();
+    // Apply shake in screen-space, then camera.
+    ctx.translate(VIEW_WIDTH / 2 + shakeOffX, VIEW_HEIGHT / 2 + shakeOffY);
+    if (shakeRotVal !== 0) ctx.rotate(shakeRotVal);
+    ctx.scale(cam.zoom, cam.zoom);
+    ctx.translate(-cam.x, -cam.y);
+
     this.drawTerrain(ctx);
     if (this.game.core.debug.showFlow) this.drawFlowDebug(ctx);
     this.drawPathPreview(ctx);
@@ -176,15 +180,21 @@ export class RenderSystem {
       this.buildLightLayer();
       ctx.save();
       ctx.globalCompositeOperation = "screen";
-      // Tone the bloom intensity to the chosen quality preset.
       const bloomAlpha = quality === "high" ? 0.55 : quality === "medium" ? 0.36 : 0.45;
       ctx.globalAlpha = bloomAlpha;
+      // Draw light canvas in world-space — we need to invert the camera to blit screen-sized texture.
+      ctx.translate(cam.x, cam.y);
+      ctx.scale(1 / cam.zoom, 1 / cam.zoom);
+      ctx.translate(-VIEW_WIDTH / 2, -VIEW_HEIGHT / 2);
       ctx.drawImage(this.lightCanvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
       ctx.restore();
     }
     this.drawDarknessMode(ctx);
 
-    // Reset shake before CRT so the overlay sits fixed on screen.
+    // ---- END CAMERA TRANSFORM ----
+    ctx.restore();
+
+    // Reset to screen-space for overlays.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (allowVfx && (settings.vfxScanlines || settings.vfxVignette || settings.vfxFlicker || settings.vfxFilmGrain)) {
       this.drawCRTOverlay(ctx);
@@ -197,6 +207,10 @@ export class RenderSystem {
     }
     this.drawScreenFlashes(ctx);
     this.drawPlanningTimerArc(ctx);
+    // Minimap (screen-space overlay).
+    if (this.game.core.sector && !cam.isAutoFit) {
+      this.drawMinimap(ctx);
+    }
   }
 
   private buildLightLayer(): void {
@@ -329,9 +343,10 @@ export class RenderSystem {
 
   private drawDarknessMode(ctx: CanvasRenderingContext2D): void {
     if (!this.game.core.sector?.darkness) return;
+    const grid = this.game.grid;
     ctx.save();
     ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
-    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.fillRect(0, 0, grid.worldW, grid.worldH);
     ctx.globalCompositeOperation = "destination-out";
 
     const reveal = (x: number, y: number, radius: number) => {
@@ -454,13 +469,15 @@ export class RenderSystem {
     ctx.globalAlpha = 1;
 
     // Animated grid: sector accent color instead of always cyan.
+    const COLS = this.game.grid.cols;
+    const ROWS = this.game.grid.rows;
     ctx.lineWidth = 1;
     for (let c = 0; c <= COLS; c++) {
       const wave = 0.04 + Math.sin(elapsed * 1.6 - c * 0.3) * 0.025;
       ctx.strokeStyle = `rgba(${ar}, ${ag}, ${ab}, ${wave.toFixed(3)})`;
       ctx.beginPath();
       ctx.moveTo(c * TILE_SIZE, 0);
-      ctx.lineTo(c * TILE_SIZE, VIEW_HEIGHT);
+      ctx.lineTo(c * TILE_SIZE, ROWS * TILE_SIZE);
       ctx.stroke();
     }
     for (let r = 0; r <= ROWS; r++) {
@@ -468,7 +485,7 @@ export class RenderSystem {
       ctx.strokeStyle = `rgba(${ar}, ${ag}, ${ab}, ${wave.toFixed(3)})`;
       ctx.beginPath();
       ctx.moveTo(0, r * TILE_SIZE);
-      ctx.lineTo(VIEW_WIDTH, r * TILE_SIZE);
+      ctx.lineTo(COLS * TILE_SIZE, r * TILE_SIZE);
       ctx.stroke();
     }
     ctx.restore();
@@ -476,9 +493,18 @@ export class RenderSystem {
 
   /** Bake static rocks + ambient occlusion into the off-screen cache canvas. */
   private buildTerrainCache(): void {
-    const tc = this.terrainCache.getContext("2d")!;
-    tc.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
     const grid = this.game.grid;
+    const COLS = grid.cols;
+    const ROWS = grid.rows;
+    // Resize cache if needed (large maps).
+    const cacheW = COLS * TILE_SIZE;
+    const cacheH = ROWS * TILE_SIZE;
+    if (this.terrainCache.width !== cacheW || this.terrainCache.height !== cacheH) {
+      this.terrainCache.width = cacheW;
+      this.terrainCache.height = cacheH;
+    }
+    const tc = this.terrainCache.getContext("2d")!;
+    tc.clearRect(0, 0, cacheW, cacheH);
 
     // Rock polygons.
     for (let r = 0; r < ROWS; r++) {
@@ -554,10 +580,12 @@ export class RenderSystem {
   private drawTerrain(ctx: CanvasRenderingContext2D): void {
     // Static rocks + AO — blit from cache (rebuild only when sector changes).
     if (this.terrainCacheDirty) this.buildTerrainCache();
-    ctx.drawImage(this.terrainCache, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.drawImage(this.terrainCache, 0, 0);
 
-    // Crystals: dynamic (rotate each frame).
     const grid = this.game.grid;
+    const COLS = grid.cols;
+    const ROWS = grid.rows;
+    // Crystals: dynamic (rotate each frame).
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const i = grid.idx(c, r);
@@ -3040,6 +3068,92 @@ export class RenderSystem {
       `Cell:         ${g.input.hoverCell ? g.input.hoverCell.c + "," + g.input.hoverCell.r : "-"}`,
     ];
     lines.forEach((l, i) => ctx.fillText(l, 12, 22 + i * 12));
+    ctx.restore();
+  }
+
+  /** Draw a compact minimap in the bottom-right corner of the screen. */
+  private drawMinimap(ctx: CanvasRenderingContext2D): void {
+    const grid = this.game.grid;
+    const cam = this.game.camera;
+    const COLS = grid.cols;
+    const ROWS = grid.rows;
+    const mapW = 180;
+    const mapH = Math.round(mapW * (ROWS / COLS));
+    const mx = VIEW_WIDTH - mapW - 8;
+    const my = VIEW_HEIGHT - mapH - 8;
+    const tileW = mapW / COLS;
+    const tileH = mapH / ROWS;
+
+    ctx.save();
+    // Background.
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = "rgba(8, 12, 18, 0.85)";
+    ctx.fillRect(mx - 2, my - 2, mapW + 4, mapH + 4);
+    ctx.strokeStyle = "rgba(102, 252, 241, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx - 2, my - 2, mapW + 4, mapH + 4);
+    ctx.globalAlpha = 1;
+
+    // Terrain tiles.
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const kind = grid.cells[grid.idx(c, r)];
+        if (kind === 0) continue; // empty — skip
+        const tx = mx + c * tileW;
+        const ty = my + r * tileH;
+        switch (kind) {
+          case 2: ctx.fillStyle = "#232a33"; break; // Rock
+          case 3: ctx.fillStyle = "#00e676"; break; // Crystal
+          case 4: ctx.fillStyle = "#66fcf1"; break; // Core
+          case 5: ctx.fillStyle = "#4caf50"; break; // Tower
+          case 6: ctx.fillStyle = "#00e676"; break; // Harvester
+          default: ctx.fillStyle = "#333"; break;
+        }
+        ctx.fillRect(tx, ty, Math.ceil(tileW), Math.ceil(tileH));
+      }
+    }
+
+    // Spawners — red dots.
+    ctx.fillStyle = "#f44336";
+    for (const s of grid.spawners) {
+      ctx.beginPath();
+      ctx.arc(mx + (s.c + 0.5) * tileW, my + (s.r + 0.5) * tileH, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Tower positions — colored dots.
+    for (const t of this.game.towers.list) {
+      ctx.fillStyle = t.def.color;
+      const tc = Math.floor(t.pos.x / TILE_SIZE);
+      const tr = Math.floor(t.pos.y / TILE_SIZE);
+      ctx.fillRect(mx + tc * tileW, my + tr * tileH, Math.ceil(tileW), Math.ceil(tileH));
+    }
+
+    // Enemy positions — red dots.
+    ctx.fillStyle = "rgba(244, 67, 54, 0.85)";
+    for (const e of this.game.enemies.list) {
+      if (!e.active) continue;
+      const ex = mx + (e.pos.x / TILE_SIZE) * tileW;
+      const ey = my + (e.pos.y / TILE_SIZE) * tileH;
+      ctx.fillRect(ex - 0.5, ey - 0.5, 1.5, 1.5);
+    }
+
+    // Camera viewport rectangle.
+    const vb = cam.getVisibleBounds();
+    const vx = mx + (vb.x / (COLS * TILE_SIZE)) * mapW;
+    const vy = my + (vb.y / (ROWS * TILE_SIZE)) * mapH;
+    const vw = (vb.w / (COLS * TILE_SIZE)) * mapW;
+    const vh = (vb.h / (ROWS * TILE_SIZE)) * mapH;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.9;
+    ctx.strokeRect(
+      Math.max(mx, vx),
+      Math.max(my, vy),
+      Math.min(vw, mapW - (vx - mx)),
+      Math.min(vh, mapH - (vy - my))
+    );
+
     ctx.restore();
   }
 }

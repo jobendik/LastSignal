@@ -792,10 +792,12 @@ export class TowerSystem {
     const nx = dx / len;
     const ny = dy / len;
     const candidates: number[] = [];
+    const mapW = this.game.grid.worldW;
+    const mapH = this.game.grid.worldH;
 
-    if (nx > 0) candidates.push((VIEW_WIDTH - x1) / nx);
+    if (nx > 0) candidates.push((mapW - x1) / nx);
     else if (nx < 0) candidates.push((0 - x1) / nx);
-    if (ny > 0) candidates.push((VIEW_HEIGHT - y1) / ny);
+    if (ny > 0) candidates.push((mapH - y1) / ny);
     else if (ny < 0) candidates.push((0 - y1) / ny);
 
     const forwardCandidates = candidates.filter((v) => v > 0);

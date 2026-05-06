@@ -2,10 +2,22 @@
  * Global tuning constants. Gameplay-specific numbers live in /data/* whenever possible.
  */
 export const TILE_SIZE = 32;
-export const COLS = 32;
-export const ROWS = 22;
-export const VIEW_WIDTH = TILE_SIZE * COLS;   // 1024
-export const VIEW_HEIGHT = TILE_SIZE * ROWS;  // 704
+
+/** Default grid dimensions (used by legacy sectors that don't specify cols/rows). */
+export const DEFAULT_COLS = 32;
+export const DEFAULT_ROWS = 22;
+/** Backward-compat aliases — systems that only reference COLS/ROWS still compile.
+ *  At runtime, always prefer GridSystem.cols / GridSystem.rows for the active sector. */
+export const COLS = DEFAULT_COLS;
+export const ROWS = DEFAULT_ROWS;
+
+/** Maximum grid dimensions — used for pre-allocated buffer sizing. */
+export const MAX_COLS = 80;
+export const MAX_ROWS = 56;
+
+/** Viewport (canvas logical) size — independent of world/map size. */
+export const VIEW_WIDTH  = 1024;
+export const VIEW_HEIGHT = 704;
 
 export const MAX_DT = 1 / 30; // cap delta-time to avoid spiral-of-death
 export const SPEED_MULTIPLIERS = [1, 2, 3] as const;

@@ -214,6 +214,104 @@ function voidWaves(): WaveDefinition[] {
   return out;
 }
 
+
+
+// ──────────────────────────────────────────────────────────
+// SECTOR 6 — FRACTURED EXPANSE (64×44) — first large-format map
+// ──────────────────────────────────────────────────────────
+function buildExpanseLayout(): string[] {
+  const W = 64, H = 44;
+  const rows = Array.from({ length: H }, () => Array.from({ length: W }, () => "."));
+  // Helper to set a cell.
+  const set = (c: number, r: number, ch: string) => { if (r >= 0 && r < H && c >= 0 && c < W) rows[r]![c] = ch; };
+  // Place core cluster (2x2) at center.
+  const coreC = 31, coreR = 21;
+  set(coreC, coreR, "X"); set(coreC+1, coreR, "X"); set(coreC, coreR+1, "X"); set(coreC+1, coreR+1, "X");
+  // Place rock formations to create natural chokepoints.
+  // Central fortress walls.
+  for (let i = -4; i <= 5; i++) { set(coreC + i, coreR - 4, "#"); set(coreC + i, coreR + 5, "#"); }
+  for (let i = -3; i <= 4; i++) { set(coreC - 5, coreR + i, "#"); set(coreC + 6, coreR + i, "#"); }
+  // Open gaps in the fortress walls.
+  set(coreC, coreR - 4, "."); set(coreC+1, coreR - 4, ".");
+  set(coreC, coreR + 5, "."); set(coreC+1, coreR + 5, ".");
+  set(coreC - 5, coreR, "."); set(coreC - 5, coreR+1, ".");
+  set(coreC + 6, coreR, "."); set(coreC + 6, coreR+1, ".");
+  // Outer rock clusters.
+  const rockClusters = [
+    [10, 8], [50, 8], [10, 35], [50, 35], [30, 5], [30, 38],
+    [8, 22], [55, 22], [20, 14], [44, 14], [20, 30], [44, 30],
+  ];
+  for (const [cx, cy] of rockClusters) {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) set(cx! + dx, cy! + dy, "#");
+  }
+  // Crystal nodes (12+).
+  const crystals = [
+    [5, 5], [58, 5], [5, 38], [58, 38], [20, 10], [44, 10],
+    [20, 33], [44, 33], [15, 22], [48, 22], [32, 8], [32, 36],
+    [25, 18], [38, 18], [25, 26], [38, 26],
+  ];
+  for (const [cx, cy] of crystals) set(cx!, cy!, "C");
+  // Spawner markers.
+  set(32, 0, "N"); set(32, 43, "S"); set(0, 22, "W"); set(63, 22, "E");
+  set(58, 5, "."); set(5, 5, "."); // Clear crystals that overlap; re-place nearby.
+  set(56, 3, "C"); set(7, 3, "C");
+  // Extra spawners (NE, SW).
+  set(60, 3, "."); set(3, 40, ".");
+  return rows.map(r => r.join(""));
+}
+
+const expanseSpawners = [
+  { id: "north",     label: "North Gate",     c: 32, r: 0  },
+  { id: "south",     label: "South Gate",     c: 32, r: 43 },
+  { id: "east",      label: "East Gate",      c: 63, r: 22 },
+  { id: "west",      label: "West Gate",      c: 0,  r: 22 },
+  { id: "northeast", label: "NE Rift",        c: 60, r: 3  },
+  { id: "southwest", label: "SW Rift",        c: 3,  r: 40 },
+];
+
+function expanseWaves(): WaveDefinition[] {
+  // Extended 25-wave campaign using multi-lane pressure.
+  const waves = cloneWaves(defaultWaves);
+  // Scale up all existing waves by 1.5x count and add a few extra spawner lanes.
+  for (const w of waves) {
+    for (const lane of w.lanes) {
+      for (const g of lane.enemies) {
+        g.count = Math.ceil(g.count * 1.5);
+      }
+    }
+    w.rewardCredits = Math.round(w.rewardCredits * 1.4);
+  }
+  // Add 10 more waves of escalating pressure using all spawners.
+  const extraTypes: EnemyType[] = ["grunt", "brute", "phantom", "splitter", "shielder", "carrier", "jammer", "tunneler", "saboteur", "juggernaut"];
+  for (let i = 0; i < 10; i++) {
+    const mainType = extraTypes[i]!;
+    const supportType = extraTypes[(i + 3) % extraTypes.length]!;
+    const laneIds = ["north", "south", "east", "west", "northeast", "southwest"];
+    const wave: WaveDefinition = {
+      id: `s6_extra_${i + 16}`,
+      name: `Expanse ${i + 16}`,
+      description: `Multi-lane ${mainType} pressure.`,
+      warning: "Enemies attack from multiple directions.",
+      recommendedCounters: [],
+      rewardCredits: 180 + i * 20,
+      rewardChoice: i % 2 === 0,
+      lanes: [
+        { spawnerId: laneIds[i % 6]!, enemies: [{ type: mainType, count: 8 + i * 2, interval: 0.6 }] },
+        { spawnerId: laneIds[(i + 2) % 6]!, enemies: [{ type: supportType, count: 5 + i, interval: 0.8 }], startDelay: 2 },
+        { spawnerId: laneIds[(i + 4) % 6]!, enemies: [{ type: "grunt" as EnemyType, count: 6 + i, interval: 0.5 }], startDelay: 4 },
+      ],
+      isBossWave: i === 9,
+    };
+    if (i === 4) wave.waveEvent = "blitz";
+    if (i === 7) wave.waveEvent = "silence";
+    if (i === 9) {
+      wave.lanes.push({ spawnerId: "north", enemies: [{ type: "leviathan", count: 1, interval: 1 }], startDelay: 8 });
+    }
+    waves.push(wave);
+  }
+  return waves;
+}
+
 const baseSectorDefinitions: SectorDefinition[] = [
   {
     id: "sector_01_broken_relay",
@@ -292,10 +390,31 @@ const baseSectorDefinitions: SectorDefinition[] = [
     // Void: every hazard. Combined chaos is the point.
     hazards: { meteors: true, gravity: true, signalInterference: true, powerSurges: true },
   },
+  {
+    id: "sector_06_fractured_expanse",
+    name: "Sector 6 — Fractured Expanse",
+    description:
+      "A vast open battlefield with 6 spawners. Strategic depth through scale — control multiple chokepoints or get overwhelmed.",
+    accentColor: "#40c4ff",
+    layout: buildExpanseLayout(),
+    spawners: expanseSpawners,
+    waves: expanseWaves(),
+    startingCredits: 350,
+    coreIntegrity: 120,
+    cols: 64,
+    rows: 44,
+    lore: "The expanse stretches past sensor range. What you can't see, you can't defend.",
+    hazards: { meteors: true, gravity: false, signalInterference: false, powerSurges: true },
+  },
 ];
 
-export const sectorDefinitions: SectorDefinition[] = baseSectorDefinitions.map((s) => ({
-  ...s,
-  layout: expandLayout(s.layout),
-  spawners: expandSpawners(s.spawners, s.layout),
-}));
+export const sectorDefinitions: SectorDefinition[] = baseSectorDefinitions.map((s) => {
+  // Large sectors (those that specify cols/rows) use their layout as-is.
+  if (s.cols && s.rows) return { ...s };
+  // Legacy sectors get centered/expanded to COLS×ROWS.
+  return {
+    ...s,
+    layout: expandLayout(s.layout),
+    spawners: expandSpawners(s.spawners, s.layout),
+  };
+});

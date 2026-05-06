@@ -1,7 +1,7 @@
 import type { Game } from "../core/Game";
 import { CellKind, type TowerType } from "../core/Types";
 import { towerOrder } from "../data/towers";
-import { COLS, ROWS, TILE_SIZE } from "../core/Config";
+import { TILE_SIZE, VIEW_WIDTH, VIEW_HEIGHT } from "../core/Config";
 
 export class InputSystem {
   mouseX = 0;
@@ -18,6 +18,12 @@ export class InputSystem {
   private gamepadCursor = { c: 12, r: 10 };
   private gamepadButtons = new Set<number>();
   private placementGuideSeen = new Set<TowerType>();
+  /** Middle-mouse drag state for panning. */
+  private panDrag = false;
+  private panDragStartX = 0;
+  private panDragStartY = 0;
+  /** Keys currently held (for continuous pan). */
+  private heldKeys = new Set<string>();
 
   constructor(private readonly game: Game) {}
 
@@ -28,22 +34,56 @@ export class InputSystem {
       this.overCell = null;
       this.showPlacementPreview = false;
       this.lastPreviewKey = "";
+      // Stop edge-scroll when mouse leaves.
+      this.game.camera.edgePanX = 0;
+      this.game.camera.edgePanY = 0;
     });
     canvas.addEventListener("click", (e) => this.onPrimaryButton(e));
     canvas.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       this.onSecondaryButton(e);
     });
+    // Zoom with mouse wheel.
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const worldPos = this.worldFromClient(e.clientX, e.clientY);
+      this.game.camera.zoomAt(-Math.sign(e.deltaY), worldPos.x, worldPos.y);
+    }, { passive: false });
+    // Middle-mouse drag for panning.
+    canvas.addEventListener("mousedown", (e) => {
+      if (e.button === 1) { this.panDrag = true; this.panDragStartX = e.clientX; this.panDragStartY = e.clientY; e.preventDefault(); }
+    });
+    window.addEventListener("mouseup", (e) => {
+      if (e.button === 1) this.panDrag = false;
+    });
     canvas.addEventListener("touchstart", (e) => this.onTouchStart(e), { passive: false });
     canvas.addEventListener("touchmove", (e) => this.onTouchMove(e), { passive: false });
     canvas.addEventListener("touchend", () => this.onTouchEnd(), { passive: false });
-    window.addEventListener("keydown", (e) => this.onKey(e));
+    window.addEventListener("keydown", (e) => { this.heldKeys.add(e.code); this.onKey(e); });
+    window.addEventListener("keyup", (e) => { this.heldKeys.delete(e.code); });
   }
 
   update(dt: number): void {
     if (this.placementSnapTimer > 0) this.placementSnapTimer = Math.max(0, this.placementSnapTimer - dt);
     if (this.placementInvalidTimer > 0) this.placementInvalidTimer = Math.max(0, this.placementInvalidTimer - dt);
+    // Continuous WASD / arrow key panning.
+    const cam = this.game.camera;
+    cam.panLeft = this.heldKeys.has("KeyA") || this.heldKeys.has("ArrowLeft");
+    cam.panRight = this.heldKeys.has("KeyD") || this.heldKeys.has("ArrowRight");
+    cam.panUp = this.heldKeys.has("KeyW") || this.heldKeys.has("ArrowUp");
+    cam.panDown = this.heldKeys.has("KeyS") || this.heldKeys.has("ArrowDown");
     this.updateGamepad(dt);
+  }
+
+  /** Convert client (screen pixel) coords to world coordinates via camera. */
+  private worldFromClient(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.game.canvas.getBoundingClientRect();
+    const scaleX = this.game.canvas.width / rect.width;
+    const scaleY = this.game.canvas.height / rect.height;
+    const dpr = this.game.render.dpr;
+    const sx = (clientX - rect.left) * scaleX / dpr;
+    const sy = (clientY - rect.top) * scaleY / dpr;
+    return this.game.camera.screenToWorld(sx, sy);
   }
 
   private cellFromEvent(e: MouseEvent): { c: number; r: number } {
@@ -51,14 +91,10 @@ export class InputSystem {
   }
 
   private cellFromClient(clientX: number, clientY: number): { c: number; r: number } {
-    const rect = this.game.canvas.getBoundingClientRect();
-    const scaleX = this.game.canvas.width / rect.width;
-    const scaleY = this.game.canvas.height / rect.height;
-    const x = (clientX - rect.left) * scaleX;
-    const y = (clientY - rect.top) * scaleY;
-    this.mouseX = x;
-    this.mouseY = y;
-    return this.game.grid.worldToCell(x, y);
+    const world = this.worldFromClient(clientX, clientY);
+    this.mouseX = world.x;
+    this.mouseY = world.y;
+    return this.game.grid.worldToCell(world.x, world.y);
   }
 
   private onTouchStart(e: TouchEvent): void {
@@ -112,9 +148,30 @@ export class InputSystem {
   }
 
   private onMouseMove(e: MouseEvent): void {
+    // Middle-mouse pan.
+    if (this.panDrag) {
+      const rect = this.game.canvas.getBoundingClientRect();
+      const scaleX = this.game.canvas.width / rect.width;
+      const dpr = this.game.render.dpr;
+      const dx = (e.clientX - this.panDragStartX) * scaleX / dpr;
+      const dy = (e.clientY - this.panDragStartY) * scaleX / dpr;
+      const cam = this.game.camera;
+      cam.targetX -= dx / cam.zoom;
+      cam.targetY -= dy / cam.zoom;
+      this.panDragStartX = e.clientX;
+      this.panDragStartY = e.clientY;
+    }
     this.overCell = this.cellFromEvent(e);
     this.showPlacementPreview = Boolean(this.placementTowerType) && this.isBuildingState();
     this.updatePlacementFeedback();
+    // Edge scrolling.
+    const rect = this.game.canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const cam = this.game.camera;
+    const band = cam.edgeBand;
+    cam.edgePanX = mx < band ? -1 : mx > rect.width - band ? 1 : 0;
+    cam.edgePanY = my < band ? -1 : my > rect.height - band ? 1 : 0;
   }
 
   private onPrimaryButton(e: MouseEvent): void {
@@ -409,8 +466,8 @@ export class InputSystem {
 
     const axisX = pad.axes[0] ?? 0;
     const axisY = pad.axes[1] ?? 0;
-    if (Math.abs(axisX) > 0.6) this.gamepadCursor.c = Math.max(0, Math.min(COLS - 1, this.gamepadCursor.c + Math.sign(axisX)));
-    if (Math.abs(axisY) > 0.6) this.gamepadCursor.r = Math.max(0, Math.min(ROWS - 1, this.gamepadCursor.r + Math.sign(axisY)));
+    if (Math.abs(axisX) > 0.6) this.gamepadCursor.c = Math.max(0, Math.min(this.game.grid.cols - 1, this.gamepadCursor.c + Math.sign(axisX)));
+    if (Math.abs(axisY) > 0.6) this.gamepadCursor.r = Math.max(0, Math.min(this.game.grid.rows - 1, this.gamepadCursor.r + Math.sign(axisY)));
     this.overCell = { ...this.gamepadCursor };
     this.mouseX = (this.gamepadCursor.c + 0.5) * TILE_SIZE;
     this.mouseY = (this.gamepadCursor.r + 0.5) * TILE_SIZE;

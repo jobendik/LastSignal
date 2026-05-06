@@ -9,7 +9,8 @@ import {
   type GravityAnomaly,
   type SignalInterference,
 } from "./GameState";
-import { COLS, MAX_DT, ROWS, SPEED_MULTIPLIERS, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "./Config";
+import { MAX_DT, SPEED_MULTIPLIERS, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "./Config";
+import { Camera } from "./Camera";
 import type {
   EnemyType,
   GameStateId,
@@ -62,6 +63,7 @@ export class Game {
   persistence = new PersistenceSystem();
   settings!: SettingsSystem;
   audio = new AudioSystem();
+  camera = new Camera();
   grid = new GridSystem();
   enemies!: EnemySystem;
   towers!: TowerSystem;
@@ -268,6 +270,8 @@ export class Game {
     this.core.coreIntegrity = this.core.coreMax;
 
     this.grid.loadSector(sector);
+    this.camera.init(this.grid.worldW, this.grid.worldH, this.grid.corePos.x, this.grid.corePos.y);
+    this.camera.snap();
     this.render.invalidateTerrainCache();
     this.enemies.reset();
     this.towers.reset();
@@ -327,6 +331,8 @@ export class Game {
     // Clear the grid so darkness/tile-state from the old sector doesn't render.
     if (this.grid) this.grid.reset();
     if (this.render) this.render.invalidateTerrainCache();
+    this.camera.init(VIEW_WIDTH, VIEW_HEIGHT, VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
+    this.camera.snap();
     this.audio.stopMusic();
     this.audio.setMusicIntensity(0);
     this.setState("MAIN_MENU");
@@ -685,6 +691,7 @@ export class Game {
       this.particles.update(dt * 0.2);
     }
 
+    this.camera.update(dt);
     this.input.update(dt);
   }
 
@@ -712,8 +719,8 @@ export class Game {
   }
 
   // ----- Convenience world metrics -----
-  get width(): number { return VIEW_WIDTH; }
-  get height(): number { return VIEW_HEIGHT; }
+  get width(): number { return this.grid.worldW; }
+  get height(): number { return this.grid.worldH; }
 
   private updateEmergencyProtocol(dt: number): void {
     const corePct = this.core.coreIntegrity / this.core.coreMax;
@@ -804,8 +811,8 @@ export class Game {
     // Pick 2-4 non-rock, non-core tiles.
     const candidates: { c: number; r: number }[] = [];
     for (let attempt = 0; attempt < 80 && candidates.length < 4; attempt++) {
-      const tc = Math.floor(Math.random() * COLS);
-      const tr = Math.floor(Math.random() * ROWS);
+      const tc = Math.floor(Math.random() * this.grid.cols);
+      const tr = Math.floor(Math.random() * this.grid.rows);
       const kind = this.grid.cells[this.grid.idx(tc, tr)];
       if (kind === 0 || kind === 2 /* tower */) candidates.push({ c: tc, r: tr });
     }
@@ -833,8 +840,8 @@ export class Game {
       g.y += g.vy * dt;
 
       // Bounce off edges.
-      if (g.x < g.radius || g.x > VIEW_WIDTH - g.radius) g.vx *= -1;
-      if (g.y < g.radius || g.y > VIEW_HEIGHT - g.radius) g.vy *= -1;
+      if (g.x < g.radius || g.x > this.grid.worldW - g.radius) g.vx *= -1;
+      if (g.y < g.radius || g.y > this.grid.worldH - g.radius) g.vy *= -1;
 
       // Apply slow to enemies inside the anomaly.
       for (const e of this.enemies.list) {
@@ -855,8 +862,8 @@ export class Game {
     if (c.gravityAnomalyCooldown > 0) return;
     c.gravityAnomalyCooldown = 45 + Math.random() * 25;
 
-    const px = VIEW_WIDTH * (0.2 + Math.random() * 0.6);
-    const py = VIEW_HEIGHT * (0.2 + Math.random() * 0.6);
+    const px = this.grid.worldW * (0.2 + Math.random() * 0.6);
+    const py = this.grid.worldH * (0.2 + Math.random() * 0.6);
     const angle = Math.random() * Math.PI * 2;
     const speed = 28 + Math.random() * 22;
     c.gravityAnomaly = {
@@ -887,8 +894,8 @@ export class Game {
       if (si.moveTimer <= 0) {
         // Jump to a new random open tile center.
         for (let attempt = 0; attempt < 40; attempt++) {
-          const tc = Math.floor(Math.random() * COLS);
-          const tr = Math.floor(Math.random() * ROWS);
+          const tc = Math.floor(Math.random() * this.grid.cols);
+          const tr = Math.floor(Math.random() * this.grid.rows);
           const kind = this.grid.cells[this.grid.idx(tc, tr)];
           if (kind === 0 || kind === 2) {
             si.x = tc * TILE_SIZE + TILE_SIZE / 2;
@@ -914,10 +921,10 @@ export class Game {
     if (c.signalInterferenceCooldown > 0) return;
 
     // Spawn at a random open tile center.
-    let sx = VIEW_WIDTH / 2, sy = VIEW_HEIGHT / 2;
+    let sx = this.grid.worldW / 2, sy = this.grid.worldH / 2;
     for (let attempt = 0; attempt < 60; attempt++) {
-      const tc = Math.floor(Math.random() * COLS);
-      const tr = Math.floor(Math.random() * ROWS);
+      const tc = Math.floor(Math.random() * this.grid.cols);
+      const tr = Math.floor(Math.random() * this.grid.rows);
       const kind = this.grid.cells[this.grid.idx(tc, tr)];
       if (kind === 0 || kind === 2) {
         sx = tc * TILE_SIZE + TILE_SIZE / 2;

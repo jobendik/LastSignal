@@ -1,6 +1,6 @@
 import type { Game } from "../core/Game";
 import type { WaveDefinition, EnemyType, SpawnerDefinition } from "../core/Types";
-import { EARLY_START_BONUS, COLS, ROWS, TILE_SIZE } from "../core/Config";
+import { EARLY_START_BONUS, TILE_SIZE } from "../core/Config";
 
 interface PendingGroup {
   type: EnemyType;
@@ -23,7 +23,7 @@ export class WaveSystem {
   private dataCacheTriggered = false;
   private escalationTriggered = false;
   private ambushTriggered = false;
-  private chokepointHeat = new Float32Array(COLS * ROWS);
+  private chokepointHeat: Float32Array | null = null;
   private chokepointTriggered = false;
   private chokepointSampleTimer = 0;
 
@@ -38,7 +38,7 @@ export class WaveSystem {
     this.waveStartCoreDamageTaken = 0;
     this.dataCacheTriggered = false;
     this.escalationTriggered = false;
-    this.chokepointHeat.fill(0);
+    if (this.chokepointHeat) this.chokepointHeat.fill(0);
     this.chokepointTriggered = false;
     this.chokepointSampleTimer = 0;
     this.planningCountdown = 0;
@@ -123,7 +123,7 @@ export class WaveSystem {
     this.dataCacheTriggered = false;
     this.escalationTriggered = false;
     this.ambushTriggered = false;
-    this.chokepointHeat.fill(0);
+    this.chokepointHeat = new Float32Array(this.game.grid.cols * this.game.grid.rows);
     this.chokepointTriggered = false;
     this.chokepointSampleTimer = 0;
     for (const lane of wave.lanes) {
@@ -266,17 +266,19 @@ export class WaveSystem {
         this.chokepointSampleTimer = 0;
         for (const e of this.game.enemies.list) {
           if (!e.active) continue;
+          const COLS = this.game.grid.cols;
+          const ROWS = this.game.grid.rows;
           const c = Math.floor(e.pos.x / TILE_SIZE);
           const r = Math.floor(e.pos.y / TILE_SIZE);
           if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
-            this.chokepointHeat[r * COLS + c] = (this.chokepointHeat[r * COLS + c] ?? 0) + 1;
+            this.chokepointHeat![r * COLS + c] = (this.chokepointHeat![r * COLS + c] ?? 0) + 1;
           }
         }
         // Check if any tile crossed the chokepoint threshold (10 enemy-samples).
         let maxHeat = 0, maxIdx = 0;
-        for (let i = 0; i < this.chokepointHeat.length; i++) {
-          if ((this.chokepointHeat[i] ?? 0) > maxHeat) {
-            maxHeat = this.chokepointHeat[i]!;
+        for (let i = 0; i < this.chokepointHeat!.length; i++) {
+          if ((this.chokepointHeat![i] ?? 0) > maxHeat) {
+            maxHeat = this.chokepointHeat![i]!;
             maxIdx = i;
           }
         }
@@ -350,6 +352,8 @@ export class WaveSystem {
   private spawnAmbush(): void {
     // Pick a random walkable mid-map tile (not a spawner tile or core tile).
     const spawnerId = new Set(this.game.grid.spawners.map((s) => this.game.grid.idx(s.c, s.r)));
+    const COLS = this.game.grid.cols;
+    const ROWS = this.game.grid.rows;
     const candidates: { c: number; r: number }[] = [];
     for (let attempt = 0; attempt < 120 && candidates.length < 6; attempt++) {
       const c = 4 + Math.floor(Math.random() * (COLS - 8));
@@ -491,8 +495,8 @@ export class WaveSystem {
   }
 
   private spawnChokepointBonus(tileIdx: number): void {
-    const c = tileIdx % COLS;
-    const r = Math.floor(tileIdx / COLS);
+    const c = tileIdx % this.game.grid.cols;
+    const r = Math.floor(tileIdx / this.game.grid.cols);
     const x = c * TILE_SIZE + TILE_SIZE / 2;
     const y = r * TILE_SIZE + TILE_SIZE / 2;
     const bonus = 25 + Math.floor(this.game.core.waveIndex * 5);

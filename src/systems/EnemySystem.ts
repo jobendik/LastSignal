@@ -5,7 +5,7 @@ import type { EnemyType } from "../core/Types";
 import { Vector2 } from "../core/Vector2";
 import { rnd } from "../core/Random";
 import { enemyDefinitions } from "../data/enemies";
-import { VIEW_WIDTH, VIEW_HEIGHT, COLS, ROWS, TILE_SIZE } from "../core/Config";
+import { VIEW_WIDTH, VIEW_HEIGHT, TILE_SIZE } from "../core/Config";
 
 /** Enemy update, damage routing, boss phases, heal/phase/spawn behavior. */
 export class EnemySystem {
@@ -538,8 +538,8 @@ export class EnemySystem {
       const ty = cy + offY;
       this.game.core.meteorStrikes.push({
         // Use real grid bounds (Part 1.5 fix).
-        c: Math.max(0, Math.min(COLS - 1, Math.floor(tx / TILE_SIZE))),
-        r: Math.max(0, Math.min(ROWS - 1, Math.floor(ty / TILE_SIZE))),
+        c: Math.max(0, Math.min(this.game.grid.cols - 1, Math.floor(tx / TILE_SIZE))),
+        r: Math.max(0, Math.min(this.game.grid.rows - 1, Math.floor(ty / TILE_SIZE))),
         timer: warnTime,
         maxTimer: warnTime,
       });
