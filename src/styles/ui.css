@@ -522,9 +522,9 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  /* Sit to the right of the build menu so its top edge isn't covered. */
-  margin-left: 212px;
-  width: calc(100% - 212px - 248px); /* leave room for right sidebar (240px + 8px) */
+  /* Sit between the left build menu and the right info sidebar. */
+  margin-left: var(--ls-build-menu-edge);
+  width: calc(100% - var(--ls-build-menu-edge) - var(--ls-sidebar-edge));
   font-size: 10px;
   padding: 2px 0;
 }
@@ -572,10 +572,9 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  /* Sit to the right of the build menu (left:8px, width:200px) and leave
-     space for the right sidebar (240px + 8px). */
-  margin-left: 212px;
-  width: calc(100% - 212px - 248px);
+  /* Sit between the left build menu and the right info sidebar. */
+  margin-left: var(--ls-build-menu-edge);
+  width: calc(100% - var(--ls-build-menu-edge) - var(--ls-sidebar-edge));
   font-size: 10px;
 }
 .ls-wave-intel.visible,
@@ -632,8 +631,8 @@
 .ls-hud-right-sidebar {
   position: absolute;
   top: 64px;
-  right: 8px;
-  width: 240px;
+  right: var(--ls-sidebar-x);
+  width: var(--ls-sidebar-w);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -761,10 +760,10 @@
 /* ===== Build menu ===== */
 .ls-build-menu {
   position: absolute;
-  left: 8px;
+  left: var(--ls-build-menu-x);
   top: 64px;
   bottom: 10px;
-  width: 200px;
+  width: var(--ls-build-menu-w);
   background: rgba(4, 7, 12, 0.92);
   border: 1px solid rgba(102, 252, 241, 0.25);
   padding: 10px;
@@ -1516,7 +1515,12 @@
   .ls-hud-right {
     margin-left: 0;
   }
-  /* On mobile the build menu becomes a bottom bar; reset desktop layout. */
+  /* On mobile the build menu becomes a bottom bar; collapse the side-column
+     edges so the HUD top-bar panels span the full width. */
+  :root {
+    --ls-build-menu-edge: 0px;
+    --ls-sidebar-edge: 0px;
+  }
   .ls-modifier-strip,
   .ls-wave-intel,
   .ls-wave-timeline,

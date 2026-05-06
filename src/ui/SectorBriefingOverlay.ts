@@ -11,21 +11,14 @@ import { el, clear } from "./dom";
  */
 export class SectorBriefingOverlay {
   el: HTMLElement;
-  private dismissTimer = 0;
-  private rafId = 0;
+  private dismissHandle: number | null = null;
   private visible = false;
+  /** Seconds the briefing remains visible before auto-dismissing. */
+  private readonly autoDismissSec = 7;
 
   constructor(private readonly game: Game) {
     this.el = el("div", { class: "ls-sector-briefing" });
     this.bind();
-    const tick = () => {
-      if (this.visible && this.dismissTimer > 0) {
-        this.dismissTimer -= 1 / 60;
-        if (this.dismissTimer <= 0) this.hide();
-      }
-      this.rafId = requestAnimationFrame(tick);
-    };
-    this.rafId = requestAnimationFrame(tick);
   }
 
   private bind(): void {
@@ -70,14 +63,31 @@ export class SectorBriefingOverlay {
     }
     this.el.classList.add("visible");
     this.visible = true;
-    this.dismissTimer = 7;
     this.el.onclick = () => this.hide();
+    // Single setTimeout for auto-dismiss, no per-frame polling.
+    this.clearDismissTimer();
+    this.dismissHandle = window.setTimeout(() => this.hide(), this.autoDismissSec * 1000);
   }
 
   private hide(): void {
     if (!this.visible) return;
     this.visible = false;
-    this.dismissTimer = 0;
     this.el.classList.remove("visible");
+    this.clearDismissTimer();
+  }
+
+  private clearDismissTimer(): void {
+    if (this.dismissHandle != null) {
+      window.clearTimeout(this.dismissHandle);
+      this.dismissHandle = null;
+    }
+  }
+
+  /** Tear down listeners and pending timers; safe to call multiple times. */
+  dispose(): void {
+    this.clearDismissTimer();
+    this.visible = false;
+    this.el.classList.remove("visible");
+    this.el.onclick = null;
   }
 }

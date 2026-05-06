@@ -2,6 +2,19 @@
 
 * { box-sizing: border-box; }
 
+:root {
+  /* Single source of truth for HUD layout. The build menu lives on the left;
+     the HUD info sidebar lives on the right. Sub-panels in the HUD top bar
+     compute their margin-left/width from these so the layout stays consistent
+     if either column's dimensions change. */
+  --ls-build-menu-x: 8px;
+  --ls-build-menu-w: 200px;
+  --ls-build-menu-edge: calc(var(--ls-build-menu-x) + var(--ls-build-menu-w) + 4px);
+  --ls-sidebar-x: 8px;
+  --ls-sidebar-w: 240px;
+  --ls-sidebar-edge: calc(var(--ls-sidebar-x) + var(--ls-sidebar-w));
+}
+
 body {
   margin: 0;
   background: #05070a;
