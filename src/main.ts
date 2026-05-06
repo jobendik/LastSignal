@@ -49,6 +49,7 @@ function fit(): void {
     gameCanvas.width = backingW;
     gameCanvas.height = backingH;
   }
+  game.render.dpr = dpr;
   gameCanvas.style.width = `${Math.floor(VIEW_WIDTH * scale)}px`;
   gameCanvas.style.height = `${Math.floor(VIEW_HEIGHT * scale)}px`;
 }

@@ -26,6 +26,8 @@ export class RenderSystem {
   // Ambient ghost silhouettes for main menu background animation.
   private menuGhosts: { x: number; y: number; vx: number; vy: number; r: number; color: string; trail: { x: number; y: number }[] }[] = [];
   private dirtyRects: { x: number; y: number; w: number; h: number }[] = [];
+  /** Cached device pixel ratio — updated by notifyResize() when the window resizes. */
+  dpr = window.devicePixelRatio || 1;
 
   constructor(private readonly game: Game) {
     this.lightCanvas = document.createElement("canvas");
@@ -98,7 +100,7 @@ export class RenderSystem {
     const ctx = this.game.ctx;
     const quality = this.game.core.settings.graphicsQuality;
     const reducedMotion = this.game.core.settings.reducedMotion;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = this.dpr;
     this.previousFrameCtx.setTransform(1, 0, 0, 1, 0, 0);
     this.previousFrameCtx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
     this.previousFrameCtx.drawImage(ctx.canvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
