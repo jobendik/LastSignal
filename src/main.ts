@@ -17,8 +17,9 @@ if (!canvas) {
   canvas.id = "ls-canvas";
   appRoot.append(canvas);
 }
-canvas!.width = VIEW_WIDTH;
-canvas!.height = VIEW_HEIGHT;
+const initDpr = window.devicePixelRatio || 1;
+canvas!.width = VIEW_WIDTH * initDpr;
+canvas!.height = VIEW_HEIGHT * initDpr;
 canvas!.style.aspectRatio = `${VIEW_WIDTH} / ${VIEW_HEIGHT}`;
 
 // Reuse an existing UI root if provided, otherwise create one.
@@ -41,6 +42,13 @@ function fit(): void {
   const availW = window.innerWidth - margin * 2;
   const availH = window.innerHeight - margin * 2;
   const scale = Math.min(availW / VIEW_WIDTH, availH / VIEW_HEIGHT);
+  const dpr = window.devicePixelRatio || 1;
+  const backingW = VIEW_WIDTH * dpr;
+  const backingH = VIEW_HEIGHT * dpr;
+  if (gameCanvas.width !== backingW || gameCanvas.height !== backingH) {
+    gameCanvas.width = backingW;
+    gameCanvas.height = backingH;
+  }
   gameCanvas.style.width = `${Math.floor(VIEW_WIDTH * scale)}px`;
   gameCanvas.style.height = `${Math.floor(VIEW_HEIGHT * scale)}px`;
 }
