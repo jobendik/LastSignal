@@ -42,6 +42,12 @@ export class TowerSystem {
       return { ok: false, reason: `Build limit ${limit}` };
     }
     if (this.game.core.credits < this.buildCost(type, c, r)) return { ok: false, reason: "Insufficient credits" };
+    // Signal-territory gate: towers and harvesters can only be built on cells
+    // that are inside the active signal network. This is what makes relay
+    // expansion the central strategic loop on large maps.
+    if (!this.game.grid.isCellInSignalCoverage(c, r)) {
+      return { ok: false, reason: "Outside signal range" };
+    }
     const walkOk = this.game.grid.canPlaceTower(c, r, Boolean(def.requiresCrystal));
     if (!walkOk) return { ok: false, reason: "Invalid location" };
     // Check tile is currently empty / crystal as expected.

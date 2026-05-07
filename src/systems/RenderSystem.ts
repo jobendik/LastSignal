@@ -148,6 +148,7 @@ export class RenderSystem {
 
     this.drawTerrain(ctx);
     if (this.game.core.debug.showFlow) this.drawFlowDebug(ctx);
+    this.drawSignalCoverage(ctx);
     this.drawPathPreview(ctx);
     if (this.game.core.showHeatmap) this.drawHeatmap(ctx);
     this.drawKillZone(ctx);
@@ -172,6 +173,7 @@ export class RenderSystem {
     this.drawFloatingText(ctx);
     this.drawBuildSynergyHighlights(ctx);
     this.drawPlacementPreview(ctx);
+    this.drawRelayPlacementPreview(ctx);
     this.drawSelectionHighlights(ctx);
     if (this.game.core.debug.show) this.drawDebugOverlay(ctx);
 
@@ -240,12 +242,16 @@ export class RenderSystem {
       return hex;
     };
 
-    // Core ambient glow.
-    const core = this.game.grid.corePos;
+    // Core ambient glow — every cluster (primary + relays) emits its own
+    // light pool. The primary is brightest because its integrity also reflects
+    // run-end risk; relay clusters get a steady soft glow.
     const corePct = this.game.core.coreIntegrity / this.game.core.coreMax;
     const corePulse = 0.6 + Math.sin(this.game.time.elapsed * 2) * 0.2;
     const coreColor = corePct < 0.3 ? "rgb(244, 67, 54)" : "rgb(102, 252, 241)";
-    addLight(core.x, core.y, 80 * corePulse, coreColor, 0.5);
+    for (const cluster of this.game.grid.coreClusters) {
+      const radius = (cluster.isPrimary ? 80 : 56) * corePulse;
+      addLight(cluster.center.x, cluster.center.y, radius, coreColor, cluster.isPrimary ? 0.5 : 0.32);
+    }
 
     // Tower ambient glow (dim, always-on).
     for (const t of this.game.towers.list) {
@@ -360,7 +366,12 @@ export class RenderSystem {
       ctx.fill();
     };
 
-    reveal(this.game.grid.corePos.x, this.game.grid.corePos.y, 120);
+    // Each core (primary or relay) reveals its own signal radius plus a small
+    // ambient fall-off. This is what makes "expansion = exploration" for darkness sectors.
+    for (const cluster of grid.coreClusters) {
+      const reach = Math.max(140, cluster.signalRadiusCells * TILE_SIZE * 0.95);
+      reveal(cluster.center.x, cluster.center.y, reach);
+    }
     for (const t of this.game.towers.list) {
       const stats = this.game.towers.effectiveStats(t);
       reveal(t.pos.x, t.pos.y, Math.max(46, Math.min(150, stats.range * 0.75)));
@@ -814,6 +825,37 @@ export class RenderSystem {
     ctx.beginPath();
     ctx.arc(cx, cy, 10, 0, Math.PI * 2);
     ctx.fill();
+
+    // Relay clusters: smaller indicator rings + spinning antenna so the player
+    // can tell relay positions apart from the primary core at a glance.
+    for (const cluster of grid.coreClusters) {
+      if (cluster.isPrimary) continue;
+      const rx = cluster.center.x;
+      const ry = cluster.center.y;
+      ctx.save();
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#66fcf1";
+      ctx.strokeStyle = "rgba(102, 252, 241, 0.55)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(rx, ry, 22, 0, Math.PI * 2);
+      ctx.stroke();
+      // Spinning short arms (smaller than the main core).
+      ctx.strokeStyle = "rgba(102, 252, 241, 0.85)";
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) {
+        const angle = (i / 3) * Math.PI * 2 + elapsed * 0.6;
+        ctx.beginPath();
+        ctx.moveTo(rx + Math.cos(angle) * 8, ry + Math.sin(angle) * 8);
+        ctx.lineTo(rx + Math.cos(angle) * 14, ry + Math.sin(angle) * 14);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(102, 252, 241, 0.85)";
+      ctx.beginPath();
+      ctx.arc(rx, ry, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     ctx.restore();
   }
@@ -2402,6 +2444,138 @@ export class RenderSystem {
     return 0;
   }
 
+  /**
+   * Subtle blue tint over every cell that's inside the active signal network.
+   * Drawn during PLANNING / WAVE_COMPLETE / when the player is in build mode
+   * so the player can see "where can I build right now?" at a glance.
+   */
+  private drawSignalCoverage(ctx: CanvasRenderingContext2D): void {
+    const grid = this.game.grid;
+    if (grid.coreClusters.length === 0) return;
+    const state = this.game.state;
+    const isBuilding = Boolean(this.game.input?.placementTowerType) || this.game.core.coreDeployMode;
+    const showAlways = state === "PLANNING" || state === "WAVE_COMPLETE";
+    if (!showAlways && !isBuilding) return;
+
+    const elapsed = this.game.time.elapsed;
+    const baseAlpha = isBuilding ? 0.16 : 0.07;
+    const pulse = baseAlpha + Math.sin(elapsed * 1.6) * (isBuilding ? 0.04 : 0.015);
+    ctx.save();
+    ctx.fillStyle = `rgba(102, 252, 241, ${pulse.toFixed(3)})`;
+    for (const cluster of grid.coreClusters) {
+      const cx = cluster.center.x;
+      const cy = cluster.center.y;
+      const radius = cluster.signalRadiusCells * TILE_SIZE;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Soft outer rim for each cluster.
+    ctx.strokeStyle = `rgba(102, 252, 241, ${(isBuilding ? 0.5 : 0.26).toFixed(2)})`;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([6, 5]);
+    ctx.lineDashOffset = -elapsed * 12;
+    for (const cluster of grid.coreClusters) {
+      ctx.beginPath();
+      ctx.arc(cluster.center.x, cluster.center.y, cluster.signalRadiusCells * TILE_SIZE, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // While in relay deploy mode, also render the deploy reach ring so the
+    // player understands where they may leapfrog from.
+    if (this.game.core.coreDeployMode) {
+      ctx.strokeStyle = "rgba(176, 232, 255, 0.45)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 6]);
+      for (const cluster of grid.coreClusters) {
+        ctx.beginPath();
+        ctx.arc(cluster.center.x, cluster.center.y, grid.relayDeployRadiusCells * TILE_SIZE, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Visual feedback while placing a relay core: a 2x2 footprint preview that
+   * turns red on invalid placement and shows the projected signal radius.
+   */
+  private drawRelayPlacementPreview(ctx: CanvasRenderingContext2D): void {
+    if (!this.game.core.coreDeployMode) return;
+    const cell = this.game.input.hoverCell;
+    if (!cell) return;
+    const grid = this.game.grid;
+
+    const c = cell.c;
+    const r = cell.r;
+    const placement = grid.canPlaceCoreCluster(c, r);
+    const elapsed = this.game.time.elapsed;
+    const pulse = 0.65 + Math.sin(elapsed * 4) * 0.2;
+    const color = placement.ok ? "#66fcf1" : "#ff5252";
+    const fillColor = placement.ok
+      ? `rgba(102, 252, 241, ${(0.18 * pulse).toFixed(2)})`
+      : `rgba(255, 82, 82, ${(0.22 * pulse).toFixed(2)})`;
+
+    ctx.save();
+    // Draw 2x2 footprint.
+    const x = c * TILE_SIZE;
+    const y = r * TILE_SIZE;
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(x + 2, y + 2, TILE_SIZE * 2 - 4, TILE_SIZE * 2 - 4);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = color;
+    ctx.strokeRect(x + 2, y + 2, TILE_SIZE * 2 - 4, TILE_SIZE * 2 - 4);
+    ctx.shadowBlur = 0;
+    // Cross hatching for invalid placement to read at a glance.
+    if (!placement.ok) {
+      ctx.strokeStyle = "rgba(255, 82, 82, 0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y + 4);
+      ctx.lineTo(x + TILE_SIZE * 2 - 4, y + TILE_SIZE * 2 - 4);
+      ctx.moveTo(x + TILE_SIZE * 2 - 4, y + 4);
+      ctx.lineTo(x + 4, y + TILE_SIZE * 2 - 4);
+      ctx.stroke();
+    }
+
+    // Projected signal/build radius.
+    const px = (c + 1) * TILE_SIZE;
+    const py = (r + 1) * TILE_SIZE;
+    const radius = grid.relaySignalRadiusCells * TILE_SIZE;
+    ctx.strokeStyle = placement.ok
+      ? "rgba(102, 252, 241, 0.55)"
+      : "rgba(255, 82, 82, 0.45)";
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([6, 4]);
+    ctx.lineDashOffset = -elapsed * 14;
+    ctx.beginPath();
+    ctx.arc(px, py, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (placement.ok) {
+      // Semi-transparent fill of projected coverage so additive territory reads.
+      ctx.fillStyle = `rgba(102, 252, 241, ${(0.05 + Math.sin(elapsed * 2) * 0.02).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (placement.reason) {
+      // Floating reason text above the cursor.
+      ctx.fillStyle = "#ff8a80";
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = "#000000";
+      ctx.font = "12px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(placement.reason.toUpperCase(), px, y - 6);
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.restore();
+  }
+
   private drawPlacementPreview(ctx: CanvasRenderingContext2D): void {
     const input = this.game.input;
     const t = input.placementTowerType;
@@ -2409,6 +2583,16 @@ export class RenderSystem {
     const { c, r } = input.hoverCell;
     const check = this.game.towers.canPlace(t, c, r);
     const ok = check.ok;
+    if (!ok && check.reason) {
+      ctx.save();
+      ctx.fillStyle = "#ff8a80";
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = "#000";
+      ctx.font = "12px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(check.reason.toUpperCase(), c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE - 4);
+      ctx.restore();
+    }
 
     const def = towerDefinitions[t];
     const cx = c * TILE_SIZE + TILE_SIZE / 2;

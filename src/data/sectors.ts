@@ -224,19 +224,12 @@ function buildExpanseLayout(): string[] {
   const rows = Array.from({ length: H }, () => Array.from({ length: W }, () => "."));
   // Helper to set a cell.
   const set = (c: number, r: number, ch: string) => { if (r >= 0 && r < H && c >= 0 && c < W) rows[r]![c] = ch; };
-  // Place core cluster (2x2) at center.
+  // Place core cluster (2x2) at center. Center-of-cluster is roughly (32.5, 22.5).
   const coreC = 31, coreR = 21;
   set(coreC, coreR, "X"); set(coreC+1, coreR, "X"); set(coreC, coreR+1, "X"); set(coreC+1, coreR+1, "X");
-  // Place rock formations to create natural chokepoints.
-  // Central fortress walls.
-  for (let i = -4; i <= 5; i++) { set(coreC + i, coreR - 4, "#"); set(coreC + i, coreR + 5, "#"); }
-  for (let i = -3; i <= 4; i++) { set(coreC - 5, coreR + i, "#"); set(coreC + 6, coreR + i, "#"); }
-  // Open gaps in the fortress walls.
-  set(coreC, coreR - 4, "."); set(coreC+1, coreR - 4, ".");
-  set(coreC, coreR + 5, "."); set(coreC+1, coreR + 5, ".");
-  set(coreC - 5, coreR, "."); set(coreC - 5, coreR+1, ".");
-  set(coreC + 6, coreR, "."); set(coreC + 6, coreR+1, ".");
-  // Outer rock clusters.
+  // Outer rock clusters that form natural "between core and relay" chokepoints.
+  // Tuned so relay deployments at the edge of the initial signal radius
+  // (~8 cells) are funneled through readable lanes rather than open desert.
   const rockClusters = [
     [10, 8], [50, 8], [10, 35], [50, 35], [30, 5], [30, 38],
     [8, 22], [55, 22], [20, 14], [44, 14], [20, 30], [44, 30],
@@ -244,16 +237,25 @@ function buildExpanseLayout(): string[] {
   for (const [cx, cy] of rockClusters) {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) set(cx! + dx, cy! + dy, "#");
   }
-  // Crystal nodes (12+).
-  const crystals = [
-    [5, 5], [58, 5], [5, 38], [58, 38], [20, 10], [44, 10],
-    [20, 33], [44, 33], [15, 22], [48, 22], [32, 8], [32, 36],
+  // Crystal nodes — three tiers:
+  //   1. Inner ring (within initial signal range): playable economy from turn 1.
+  //   2. Mid ring (just outside initial range): unlocked by the first relay.
+  //   3. Outer ring (corners): unlocked by chained relays.
+  const innerCrystals = [
     [25, 18], [38, 18], [25, 26], [38, 26],
   ];
-  for (const [cx, cy] of crystals) set(cx!, cy!, "C");
+  const midCrystals = [
+    [20, 10], [44, 10], [20, 33], [44, 33], [15, 22], [48, 22], [32, 8], [32, 36],
+  ];
+  const outerCrystals = [
+    [5, 5], [58, 5], [5, 38], [58, 38],
+  ];
+  for (const [cx, cy] of innerCrystals) set(cx!, cy!, "C");
+  for (const [cx, cy] of midCrystals) set(cx!, cy!, "C");
+  for (const [cx, cy] of outerCrystals) set(cx!, cy!, "C");
   // Spawner markers.
   set(32, 0, "N"); set(32, 43, "S"); set(0, 22, "W"); set(63, 22, "E");
-  set(58, 5, "."); set(5, 5, "."); // Clear crystals that overlap; re-place nearby.
+  set(58, 5, "."); set(5, 5, "."); // Clear outer-corner crystals where spawners would overlap; re-place nearby.
   set(56, 3, "C"); set(7, 3, "C");
   // Extra spawners (NE, SW).
   set(60, 3, "."); set(3, 40, ".");
@@ -394,15 +396,20 @@ const baseSectorDefinitions: SectorDefinition[] = [
     id: "sector_06_fractured_expanse",
     name: "Sector 6 — Fractured Expanse",
     description:
-      "A vast open battlefield with 6 spawners. Strategic depth through scale — control multiple chokepoints or get overwhelmed.",
+      "A vast open battlefield with 6 spawners. Deploy relay cores to extend your signal network and reach distant crystals before the swarm does.",
     accentColor: "#40c4ff",
     layout: buildExpanseLayout(),
     spawners: expanseSpawners,
     waves: expanseWaves(),
-    startingCredits: 350,
+    // Tuned higher so the player can afford the early build-out + first relay
+    // by wave 3 without being forced into a lossy economy stall.
+    startingCredits: 420,
     coreIntegrity: 120,
     cols: 64,
     rows: 44,
+    // Sensor range shrinks past the initial signal network — taking the map
+    // means rolling new relays forward to push back the dark.
+    darkness: true,
     lore: "The expanse stretches past sensor range. What you can't see, you can't defend.",
     hazards: { meteors: true, gravity: false, signalInterference: false, powerSurges: true },
   },
