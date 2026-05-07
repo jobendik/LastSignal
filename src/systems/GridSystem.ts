@@ -411,32 +411,48 @@ export class GridSystem {
     return this._primaryCorePos;
   }
 
-  /** All core/relay cluster centers (world-space). */
+  /**
+   * Real core clusters only — excludes synthetic signal-node clusters that
+   * use `cells.length === 0` as a marker. Used by code paths that care about
+   * physical cores (breach detection, deflector coverage, core damage).
+   */
+  private isRealCluster(cluster: CoreCluster): boolean {
+    return cluster.isPrimary || cluster.cells.length > 0;
+  }
+
+  /** All real core/relay cluster centers (world-space) — excludes synthetic
+   *  signal-node clusters so callers don't accidentally treat captured signal
+   *  nodes as "cores" (e.g. for deflector range / breach tests). */
   getCoreCenters(): Vector2[] {
-    return this.coreClusters.map((c) => c.center);
+    const out: Vector2[] = [];
+    for (const c of this.coreClusters) if (this.isRealCluster(c)) out.push(c.center);
+    return out;
   }
 
   getCellCenter(c: number, r: number): { x: number; y: number } {
     return { x: c * TILE_SIZE + TILE_SIZE / 2, y: r * TILE_SIZE + TILE_SIZE / 2 };
   }
 
-  /** Nearest core/relay center to a world-space point. */
+  /** Nearest real core/relay center to a world-space point. Synthetic
+   *  signal-node clusters are excluded so enemy breach tests can't mis-fire
+   *  near a captured signal node that just happens to be on the enemy path. */
   getNearestCoreCenter(x: number, y: number): Vector2 {
-    if (this.coreClusters.length === 0) return this._primaryCorePos;
-    let best = this.coreClusters[0]!.center;
-    let bestSq = (x - best.x) * (x - best.x) + (y - best.y) * (y - best.y);
-    for (let i = 1; i < this.coreClusters.length; i++) {
-      const c = this.coreClusters[i]!.center;
-      const d = (x - c.x) * (x - c.x) + (y - c.y) * (y - c.y);
+    let best = this._primaryCorePos;
+    let bestSq = Infinity;
+    for (const cluster of this.coreClusters) {
+      if (!this.isRealCluster(cluster)) continue;
+      const dx = x - cluster.center.x;
+      const dy = y - cluster.center.y;
+      const d = dx * dx + dy * dy;
       if (d < bestSq) {
         bestSq = d;
-        best = c;
+        best = cluster.center;
       }
     }
     return best;
   }
 
-  /** Distance (px) to the nearest core/relay center. */
+  /** Distance (px) to the nearest real core/relay center. */
   getNearestCoreDistance(x: number, y: number): number {
     const c = this.getNearestCoreCenter(x, y);
     return Math.hypot(x - c.x, y - c.y);

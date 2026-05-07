@@ -153,6 +153,23 @@ function expandSpawners(spawners: SectorDefinition["spawners"], layout: string[]
   return spawners.map((s) => ({ ...s, c: s.c + offC, r: s.r + offR }));
 }
 
+/**
+ * Shift authored strategic-point positions by the same layout-centering
+ * offset that expandLayout/expandSpawners use, so authors can place strategic
+ * points relative to the source layout without needing to know the final grid.
+ */
+function expandStrategicPoints(
+  points: StrategicPointDefinition[] | undefined,
+  layout: string[]
+): StrategicPointDefinition[] | undefined {
+  if (!points) return undefined;
+  const srcH = layout.length;
+  const srcW = Math.max(...layout.map((r) => r.length));
+  const offC = Math.max(0, Math.floor((COLS - srcW) / 2));
+  const offR = Math.max(0, Math.floor((ROWS - srcH) / 2));
+  return points.map((p) => ({ ...p, c: p.c + offC, r: p.r + offR }));
+}
+
 function cloneWaves(waves: WaveDefinition[]): WaveDefinition[] {
   // Structural clone so sector tweaks don't leak across sectors.
   return waves.map((w) => ({
@@ -270,26 +287,37 @@ function buildExpanseLayout(): string[] {
 /**
  * Sector 6 strategic map points.
  *
- * Positions are chosen to sit on empty tiles outside the rock-cluster
- * footprints. They form a ring of objectives that the player must roll relays
- * out to reach:
- *   - 2 SIGNAL_NODE  : reachable shortly after the first relay (N/S of core).
- *   - 1 RADAR_DISH   : sits near a mid-ring choke; clears wave intel for darkness.
- *   - 2 DATA_CACHE   : on the diagonals; pure exploration reward.
- *   - 2 RIFT_ANCHOR  : near opposite spawners; suppress to weaken pressure.
- *   - 1 JAMMER       : on the side opposite the radar; punishes turtling.
+ * The Fractured Expanse is the main "command-defense showcase". The point
+ * selection here teaches the full system in roughly the same order the player
+ * naturally encounters it during a run:
+ *
+ *   1. North Repeater (signal_node)         — easy capture, in initial reach.
+ *   2. South Repeater (signal_node)         — second teaching capture.
+ *   3. Western Radar Dish (radar_dish)      — relay-roll target; reveals threats.
+ *   4. NE Data Cache (data_cache)           — risk/reward exploration reward.
+ *   5. SW Data Cache (data_cache)           — second cache to confirm the loop.
+ *   6. NE Wreckage Turret (abandoned_turret)— forward foothold near NE rift anchor.
+ *   7. East Rift Anchor (rift_anchor)       — forces the player to push east.
+ *   8. South Rift Anchor (rift_anchor)      — pressures the south spawner lane.
+ *   9. East Jammer (jammer)                 — prevents pure turtle play.
  */
 const expanseStrategicPoints: StrategicPointDefinition[] = [
-  // Friendly signal repeaters — reachable from the first relay.
-  { id: "s6_signal_north", type: "signal_node", c: 32, r: 12, name: "North Repeater" },
-  { id: "s6_signal_south", type: "signal_node", c: 32, r: 32, name: "South Repeater" },
-  // Big sensor dish — captures unlock radar reveal.
+  // Friendly signal repeaters — the North one is intentionally inside the
+  // initial main-core signal radius so the player can capture it during the
+  // very first wave to learn the mechanic.
+  { id: "s6_signal_north", type: "signal_node", c: 32, r: 14, name: "North Repeater" },
+  { id: "s6_signal_south", type: "signal_node", c: 32, r: 30, name: "South Repeater" },
+  // Big sensor dish — needs a relay roll west to be capturable.
   { id: "s6_radar_west", type: "radar_dish", c: 12, r: 22, name: "Western Radar Dish" },
   // One-time research/credit caches in the corners (exploration reward).
   { id: "s6_cache_ne", type: "data_cache", c: 52, r: 11, name: "NE Data Cache",
     rewardCredits: 110, rewardResearch: 1 },
   { id: "s6_cache_sw", type: "data_cache", c: 12, r: 33, name: "SW Data Cache",
     rewardCredits: 110, rewardResearch: 1 },
+  // Free static turret on the NE forward route — sitting between the NE
+  // rift anchor and the home core, so capturing it gives the player a real
+  // foothold for pushing the rift anchor down.
+  { id: "s6_turret_ne", type: "abandoned_turret", c: 40, r: 14, name: "Wreckage Auto-Gun" },
   // Hostile rift anchors near opposite gates — destroying them weakens waves.
   { id: "s6_rift_east", type: "rift_anchor", c: 56, r: 14, name: "East Rift Anchor" },
   { id: "s6_rift_south", type: "rift_anchor", c: 28, r: 39, name: "South Rift Anchor" },
@@ -349,6 +377,133 @@ function expanseWaves(): WaveDefinition[] {
   return waves;
 }
 
+// ──────────────────────────────────────────────────────────
+// SECTOR 7 — BLACKOUT ARRAY (64×44) — hostile-structure showcase
+// Companion sector to Sector 6: where Sector 6 teaches expansion via friendly
+// signal nodes and radar, Sector 7 teaches *suppression* — the player must
+// dismantle hostile rifts/jammers to survive instead of relying on captures.
+// ──────────────────────────────────────────────────────────
+function buildBlackoutLayout(): string[] {
+  const W = 64, H = 44;
+  const rows = Array.from({ length: H }, () => Array.from({ length: W }, () => "."));
+  const set = (c: number, r: number, ch: string) => {
+    if (r >= 0 && r < H && c >= 0 && c < W) rows[r]![c] = ch;
+  };
+  // Place core cluster near (28, 22) — slightly west of center so the eastern
+  // half of the map (where most hostile structures sit) feels like enemy turf.
+  const coreC = 27, coreR = 21;
+  set(coreC, coreR, "X"); set(coreC + 1, coreR, "X");
+  set(coreC, coreR + 1, "X"); set(coreC + 1, coreR + 1, "X");
+
+  // Tighter rock-cluster pattern — fewer hard chokepoints than Sector 6 but
+  // the rocks form distinct lanes so the player can read enemy approaches.
+  const rockClusters: [number, number][] = [
+    [12, 6], [44, 6], [54, 12], [40, 18], [18, 28], [50, 30],
+    [12, 36], [40, 36], [22, 14], [22, 36], [56, 22], [8, 22],
+  ];
+  for (const [cx, cy] of rockClusters) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) set(cx + dx, cy + dy, "#");
+    }
+  }
+  // Crystals are scarcer than Sector 6 — the sector intentionally feels
+  // resource-tight so suppression payoffs (rift/jammer destruction credits)
+  // matter more than passive harvesting.
+  const crystals: [number, number][] = [
+    [22, 22], [33, 22],   // inner ring (within reach without relays)
+    [16, 14], [38, 14], [32, 30], [22, 32], [44, 26],
+    [50, 38], [10, 32], [56, 6], [6, 8], [58, 38],
+  ];
+  for (const [cx, cy] of crystals) set(cx, cy, "C");
+
+  // Spawners — only 4 (no NE/SW). Less omnidirectional pressure than Sector 6
+  // because the sector's threat budget is spent on hostile structures.
+  set(32, 0, "N"); set(32, 43, "S"); set(0, 22, "W"); set(63, 22, "E");
+  return rows.map((r) => r.join(""));
+}
+
+const blackoutSpawners = [
+  { id: "north", label: "North Gate", c: 32, r: 0  },
+  { id: "south", label: "South Gate", c: 32, r: 43 },
+  { id: "east",  label: "East Gate",  c: 63, r: 22 },
+  { id: "west",  label: "West Gate",  c: 0,  r: 22 },
+];
+
+/**
+ * Sector 7 strategic map points.
+ *
+ * The player starts close to friendly territory and the "good" signal node,
+ * but most of the map is enemy turf — three rift anchors and two jammers
+ * form a defensive belt across the eastern half of the map. The radar dish
+ * is a high-value but contested mid-route capture; a single abandoned turret
+ * gives the player a forward foothold mid-game.
+ */
+const blackoutStrategicPoints: StrategicPointDefinition[] = [
+  // Friendly captures (the "good news" half).
+  { id: "s7_signal_north", type: "signal_node",     c: 28, r: 12, name: "North Repeater" },
+  { id: "s7_signal_south", type: "signal_node",     c: 28, r: 32, name: "South Repeater" },
+  { id: "s7_radar_mid",    type: "radar_dish",      c: 14, r: 22, name: "Damaged Radar Dish" },
+  { id: "s7_turret_mid",   type: "abandoned_turret",c: 36, r: 22, name: "Forward Auto-Gun" },
+  { id: "s7_cache_se",     type: "data_cache",      c: 56, r: 32, name: "SE Data Cache",
+    rewardCredits: 130, rewardResearch: 1 },
+  // Hostile structures (the "bad news" half) — eastern wall. Positions are
+  // chosen so they don't overlap any rock cluster (clusters span ±1 around
+  // their listed centers in buildBlackoutLayout).
+  { id: "s7_rift_north",   type: "rift_anchor",     c: 50, r: 8,  name: "North Rift Anchor" },
+  { id: "s7_rift_east",    type: "rift_anchor",     c: 58, r: 22, name: "East Rift Anchor" },
+  { id: "s7_rift_south",   type: "rift_anchor",     c: 48, r: 36, name: "South Rift Anchor" },
+  { id: "s7_jammer_ne",    type: "jammer",          c: 44, r: 12, name: "NE Jammer Array" },
+  { id: "s7_jammer_se",    type: "jammer",          c: 44, r: 32, name: "SE Jammer Array" },
+];
+
+function blackoutWaves(): WaveDefinition[] {
+  // A tighter 18-wave campaign that pushes hostile-structure pressure early
+  // rather than scaling up gradually. Reuse the default wave shape but cut
+  // it short and add a few authored "structure-focus" waves.
+  const base = cloneWaves(defaultWaves);
+  const trimmed = base.slice(0, 12);
+  for (const w of trimmed) {
+    for (const lane of w.lanes) {
+      for (const g of lane.enemies) g.count = Math.ceil(g.count * 1.2);
+    }
+    w.rewardCredits = Math.round(w.rewardCredits * 1.3);
+  }
+  // Authored "blackout" waves emphasising suppression — fewer enemies but
+  // jammers/phantoms that punish unsupported towers.
+  const extraTypes: EnemyType[] = ["jammer", "phantom", "splitter", "saboteur", "shielder", "juggernaut"];
+  const laneIds = ["north", "south", "east", "west"];
+  for (let i = 0; i < 6; i++) {
+    const main = extraTypes[i]!;
+    const wave: WaveDefinition = {
+      id: `s7_blackout_${i + 13}`,
+      name: `Blackout ${i + 13}`,
+      description: `${main}-led suppression wave.`,
+      warning: "Hostile infrastructure aiding enemy push.",
+      recommendedCounters: [],
+      rewardCredits: 200 + i * 25,
+      rewardChoice: i % 2 === 1,
+      lanes: [
+        { spawnerId: laneIds[i % 4]!, enemies: [{ type: main, count: 6 + i, interval: 0.7 }] },
+        {
+          spawnerId: laneIds[(i + 2) % 4]!,
+          enemies: [{ type: "grunt" as EnemyType, count: 8 + i, interval: 0.5 }],
+          startDelay: 2,
+        },
+      ],
+      isBossWave: i === 5,
+    };
+    if (i === 5) {
+      wave.lanes.push({
+        spawnerId: "east",
+        enemies: [{ type: "harbinger", count: 1, interval: 1 }],
+        startDelay: 6,
+      });
+    }
+    trimmed.push(wave);
+  }
+  return trimmed;
+}
+
 const baseSectorDefinitions: SectorDefinition[] = [
   {
     id: "sector_01_broken_relay",
@@ -395,6 +550,22 @@ const baseSectorDefinitions: SectorDefinition[] = [
     darkness: true,
     // Phantom Gate: signal interference + gravity anomaly fit the disruptor theme.
     hazards: { meteors: false, gravity: true, signalInterference: true, powerSurges: false },
+    // One captured wreckage turret near the western lane teaches the
+    // strategic-point mechanic in a smaller, focused sector before the
+    // sprawling Sector 6 introduces the full system.
+    strategicPoints: [
+      {
+        id: "s3_wreck_turret",
+        type: "abandoned_turret",
+        // Source-layout coords; expandStrategicPoints shifts to (8, 10) at
+        // runtime so it sits on the western approach to the home core.
+        c: 5,
+        r: 9,
+        name: "Wreckage Auto-Gun",
+        description:
+          "Salvageable turret half-buried in the hull plating. Capture to wake it.",
+      },
+    ],
   },
   {
     id: "sector_04_hostile_core",
@@ -447,16 +618,37 @@ const baseSectorDefinitions: SectorDefinition[] = [
     darkness: true,
     lore: "The expanse stretches past sensor range. What you can't see, you can't defend.",
     hazards: { meteors: true, gravity: false, signalInterference: false, powerSurges: true },
+    strategicPoints: expanseStrategicPoints,
+  },
+  {
+    id: "sector_07_blackout_array",
+    name: "Sector 7 — Blackout Array",
+    description:
+      "A jammed, hostile frontier. Most of the map belongs to the rift. Suppress hostile infrastructure to survive — turtling fails here.",
+    accentColor: "#ff5252",
+    layout: buildBlackoutLayout(),
+    spawners: blackoutSpawners,
+    waves: blackoutWaves(),
+    startingCredits: 460,
+    coreIntegrity: 130,
+    cols: 64,
+    rows: 44,
+    darkness: true,
+    lore: "Three rifts and two jammer arrays form a wall across the array. Tearing them down is the mission, not a bonus.",
+    hazards: { meteors: true, gravity: false, signalInterference: true, powerSurges: false },
+    strategicPoints: blackoutStrategicPoints,
   },
 ];
 
 export const sectorDefinitions: SectorDefinition[] = baseSectorDefinitions.map((s) => {
   // Large sectors (those that specify cols/rows) use their layout as-is.
   if (s.cols && s.rows) return { ...s };
-  // Legacy sectors get centered/expanded to COLS×ROWS.
+  // Legacy sectors get centered/expanded to COLS×ROWS, including their
+  // authored strategic points so source-layout coords stay accurate.
   return {
     ...s,
     layout: expandLayout(s.layout),
     spawners: expandSpawners(s.spawners, s.layout),
+    strategicPoints: expandStrategicPoints(s.strategicPoints, s.layout),
   };
 });

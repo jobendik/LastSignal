@@ -58,6 +58,22 @@ export class TowerPanel {
       }),
     );
 
+    // Jammer warning banner — surfaces the suppression status so the player
+    // doesn't think the tower is bugged when its fire rate falls.
+    const sps = this.game.strategicPoints;
+    const inJammerField = sps ? sps.isWorldPointJammed(t.pos.x, t.pos.y) : false;
+    const jammerEnemyNearby = this.game.enemies.list.some(
+      (e) => e.active && e.type === "jammer" && e.pos.dist(t.pos) < 80
+    );
+    if (inJammerField || jammerEnemyNearby) {
+      this.el.append(
+        el("div", {
+          class: "ls-tp-jammed",
+          text: "JAMMED — fire rate -30%. Destroy the source to clear.",
+        })
+      );
+    }
+
     if (synergies.length > 0) {
       const list = el("div", { class: "ls-tp-synergy-list" });
       for (const s of synergies) {
