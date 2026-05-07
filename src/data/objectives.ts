@@ -392,17 +392,18 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
 
   sector_07_blackout_array: {
     briefing:
-      "The Blackout Array belongs to the rift. Two jammers smother your towers and three anchors pump scout pressure. Capturing isn't optional — destroying enemy infrastructure IS the mission.",
+      "Blackout Array — A hostile suppression operation inside a jammed frontier. Expand carefully, restore visibility with the radar, then dismantle enemy infrastructure before the final blackout assault.",
     counterplay: [
-      "Push east to bring towers in range of rift anchors",
-      "Destroy a jammer before tower fire rate cripples you",
-      "Use the forward auto-gun as a midline foothold",
+      "Restore visibility with the western radar",
+      "Activate the forward auto-gun for a midline foothold",
+      "Destroy rift anchors to cut pulse pressure",
+      "Silence jammers before fire rate cripples you",
     ],
-    hazards: "Multiple rift anchors and jammers. Signal interference rolls. Darkness.",
+    hazards: "Three rift anchors, two jammers, signal interference, darkness. 18 waves.",
     primary: {
       id: "s7_primary",
-      label: "Survive the suppression and hold the array.",
-      detail: "Hold the home core through every wave of the Blackout Array.",
+      label: "Survive the Array's 18-wave blackout assault.",
+      detail: "Hold the home core through the full bespoke 18-wave campaign, including the Harbinger and the Leviathan.",
       kind: "survive_all",
     },
     secondary: [

@@ -38,6 +38,9 @@ export class HUD {
    *  overlap the build menu on the left. Auto-hides when the tower panel is
    *  shown so player info doesn't fight for the same space. */
   private rightSidebar = el("div", { class: "ls-hud-right-sidebar" });
+  /** Global "rift pulse imminent" warning shown when any discovered rift
+   *  anchor is within 2 s of pulsing. Sized to be small and unobtrusive. */
+  private riftWarning = el("div", { class: "ls-rift-warning" });
   private criticalOverlay = el("div", { class: "ls-critical-overlay" });
   private rafId = 0;
   private displayedCredits = 0;
@@ -163,6 +166,7 @@ export class HUD {
       this.codexAlert,
       this.modifierStrip,
       this.bossBar,
+      this.riftWarning,
       this.criticalOverlay
     );
 
@@ -182,9 +186,51 @@ export class HUD {
       this.updateCommandPanel();
       this.updateObjectivesPanel();
       this.updateRightSidebarVisibility();
+      this.updateRiftWarning();
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
+  }
+
+  /**
+   * Show a small "RIFT PULSE IMMINENT" line in the HUD when any discovered
+   * rift anchor is within 2 seconds of pulsing. Adds a global glance-target
+   * for sectors with multiple anchors (Sector 7) so the player doesn't have
+   * to track each anchor's local countdown ring during heavy combat.
+   */
+  private updateRiftWarning(): void {
+    const sps = this.game.strategicPoints;
+    if (!sps || sps.list.length === 0) {
+      this.riftWarning.classList.remove("visible");
+      return;
+    }
+    const stateActive =
+      this.game.state === "PLANNING" ||
+      this.game.state === "WAVE_ACTIVE" ||
+      this.game.state === "WAVE_COMPLETE";
+    if (!stateActive) {
+      this.riftWarning.classList.remove("visible");
+      return;
+    }
+    let imminent = 0;
+    let soonest = Infinity;
+    for (const p of sps.list) {
+      if (p.type !== "rift_anchor" || p.state !== "enemy") continue;
+      if (!p.discovered) continue;
+      if (p.effectTimer <= 2 && p.effectTimer > 0) {
+        imminent++;
+        if (p.effectTimer < soonest) soonest = p.effectTimer;
+      }
+    }
+    if (imminent === 0) {
+      this.riftWarning.classList.remove("visible");
+      return;
+    }
+    const label = imminent > 1
+      ? `RIFT PULSE IMMINENT × ${imminent}  (${soonest.toFixed(1)}s)`
+      : `RIFT PULSE IMMINENT  (${soonest.toFixed(1)}s)`;
+    if (this.riftWarning.textContent !== label) this.riftWarning.textContent = label;
+    this.riftWarning.classList.add("visible");
   }
 
   private updateRightSidebarVisibility(): void {
@@ -243,7 +289,7 @@ export class HUD {
           corePos.x, corePos.y - 60, "OBJECTIVE COMPLETE", "#9be7a7", 1.6, 13
         );
         this.game.particles.spawnRing(corePos.x, corePos.y, 70, "#9be7a7", 0.45);
-        this.game.audio.sfxReward();
+        this.game.audio.sfxObjective();
       }
       this.objectiveLastCompleted.set(sec.id, isDone);
     }

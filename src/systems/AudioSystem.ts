@@ -498,6 +498,74 @@ export class AudioSystem {
     });
   }
 
+  /**
+   * Distinct cue for "strategic point captured". Sine arpeggio rising to a
+   * sustained note — meant to read as "secured" rather than "money pickup".
+   */
+  sfxCapture(position?: AudioPosition): void {
+    this.emitSubtitle("STRATEGIC POINT CAPTURED", "reward", 1.6, 0.8, 1);
+    if (!this.ready() || !this.beginVoice("reward", 0.5)) return;
+    const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("reward", position, 0.5);
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + i * 0.08);
+      gain.gain.setValueAtTime(0.16, now + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.08 + 0.32);
+      osc.connect(gain);
+      gain.connect(out);
+      osc.start(now + i * 0.08);
+      osc.stop(now + i * 0.08 + 0.34);
+    });
+  }
+
+  /**
+   * Distinct cue for "data cache recovered". Two short rising blips followed
+   * by a brighter top note — maps to the "+CR / +RES" floating text.
+   */
+  sfxDataCache(position?: AudioPosition): void {
+    this.emitSubtitle("DATA CACHE RECOVERED", "reward", 1.6, 0.8, 1);
+    if (!this.ready() || !this.beginVoice("reward", 0.45)) return;
+    const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("reward", position, 0.45);
+    [880, 1175, 1396].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, now + i * 0.06);
+      gain.gain.setValueAtTime(0.10, now + i * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.06 + 0.20);
+      osc.connect(gain);
+      gain.connect(out);
+      osc.start(now + i * 0.06);
+      osc.stop(now + i * 0.06 + 0.22);
+    });
+  }
+
+  /**
+   * Distinct cue for "objective complete". Triangle wave chord with a slower
+   * tail than sfxCapture — meant to read as "milestone", not "pickup".
+   */
+  sfxObjective(): void {
+    this.emitSubtitle("OBJECTIVE COMPLETE", "reward", 1.8, 0.8, 1);
+    if (!this.ready() || !this.beginVoice("reward", 0.6)) return;
+    const now = this.ctx!.currentTime;
+    [392, 523, 659, 784].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, now + i * 0.10);
+      gain.gain.setValueAtTime(0.14, now + i * 0.10);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.10 + 0.36);
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(now + i * 0.10);
+      osc.stop(now + i * 0.10 + 0.38);
+    });
+  }
+
   sfxCardFlip(): void {
     this.sfxShoot(2.6, 0.055, "ui");
   }

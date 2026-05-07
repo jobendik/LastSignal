@@ -154,6 +154,28 @@ export class WaveSystem {
     this.game.audio.sfxWaveStart();
     this.game.bus.emit("wave:started", wave);
 
+    // Boss waves and the final wave get a brief on-screen banner so the
+    // player gets a clear "this one matters" beat that complements the wave
+    // name shown in the HUD status text. Skipped for blitz/silence which
+    // already have their own dramatic banners. Audio uses the existing
+    // sfxWaveStart fired above; the boss-spawn alert plays separately when
+    // the boss enemy actually arrives a few seconds later.
+    const isFinal =
+      this.game.core.sector !== null &&
+      this.game.core.waveIndex === (this.game.core.sector?.waves.length ?? 0) - 1;
+    if (!wave.waveEvent && (wave.isBossWave || isFinal)) {
+      const cx = this.game.grid.corePos.x;
+      const cy = this.game.grid.corePos.y;
+      const label = isFinal && wave.isBossWave
+        ? "FINAL ASSAULT"
+        : wave.isBossWave
+        ? "BOSS WAVE"
+        : "FINAL WAVE";
+      this.game.particles.spawnFloatingText(cx, cy - 64, label, "#ff5252", 2.6, 17);
+      this.game.particles.spawnRing(cx, cy, 90, "#ff5252", 0.45);
+      this.game.particles.spawnRing(cx, cy, 130, "#ff5252", 0.55);
+    }
+
     if (wave.waveEvent === "blitz") {
       this.triggerBlitzWave(wave);
     } else if (wave.waveEvent === "silence") {

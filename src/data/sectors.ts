@@ -4,7 +4,7 @@ import type {
   EnemyType,
   StrategicPointDefinition,
 } from "../core/Types";
-import { defaultWaves, sector2Waves, sector3Waves, sector4Waves } from "./waves";
+import { defaultWaves, sector2Waves, sector3Waves, sector4Waves, summarize } from "./waves";
 import { COLS, ROWS } from "../core/Config";
 import { mulberry32 } from "../core/Random";
 
@@ -432,20 +432,31 @@ const blackoutSpawners = [
 /**
  * Sector 7 strategic map points.
  *
- * The player starts close to friendly territory and the "good" signal node,
- * but most of the map is enemy turf — three rift anchors and two jammers
- * form a defensive belt across the eastern half of the map. The radar dish
- * is a high-value but contested mid-route capture; a single abandoned turret
- * gives the player a forward foothold mid-game.
+ * Layout-vs-coverage tuning (main core at (28.5, 22.5), main signal radius 11
+ * cells, relay signal radius 8 cells, relay deploy radius 11 cells):
+ *
+ *   - Both signal nodes sit just inside main coverage (~10c) so the player
+ *     can capture them turn 1 and learn the mechanic. They each extend the
+ *     network a bit — useful but not transformational.
+ *   - The radar dish at (14, 22) is just outside main coverage and requires
+ *     one relay roll west. Captured radar is the "vision" win condition.
+ *   - The forward auto-gun at (45, 22) is well outside main coverage. The
+ *     player must roll a relay east to capture it; once captured, its
+ *     170 px (~5 c) range covers the east lane into the core. Real foothold.
+ *   - The data cache deep in SE corner is only reachable after the player
+ *     has expanded all the way down the east lane — it's the trip-fee for
+ *     the Phase 3 reward. Bumped reward to 150 credits for the trek.
+ *   - Hostile structures form the eastern wall. The player must dismantle
+ *     them to relieve pulse pressure during Phases 3–5.
  */
 const blackoutStrategicPoints: StrategicPointDefinition[] = [
   // Friendly captures (the "good news" half).
   { id: "s7_signal_north", type: "signal_node",     c: 28, r: 12, name: "North Repeater" },
   { id: "s7_signal_south", type: "signal_node",     c: 28, r: 32, name: "South Repeater" },
   { id: "s7_radar_mid",    type: "radar_dish",      c: 14, r: 22, name: "Damaged Radar Dish" },
-  { id: "s7_turret_mid",   type: "abandoned_turret",c: 36, r: 22, name: "Forward Auto-Gun" },
+  { id: "s7_turret_mid",   type: "abandoned_turret",c: 45, r: 22, name: "Forward Auto-Gun" },
   { id: "s7_cache_se",     type: "data_cache",      c: 56, r: 32, name: "SE Data Cache",
-    rewardCredits: 130, rewardResearch: 1 },
+    rewardCredits: 150, rewardResearch: 1 },
   // Hostile structures (the "bad news" half) — eastern wall. Positions are
   // chosen so they don't overlap any rock cluster (clusters span ±1 around
   // their listed centers in buildBlackoutLayout).
@@ -456,52 +467,301 @@ const blackoutStrategicPoints: StrategicPointDefinition[] = [
   { id: "s7_jammer_se",    type: "jammer",          c: 44, r: 32, name: "SE Jammer Array" },
 ];
 
+/**
+ * Sector 7 — Blackout Array — bespoke 18-wave campaign.
+ *
+ * Five-phase structure:
+ *
+ *   PHASE 1 (1–4)   : "Entry into the blackout zone"
+ *                     Light contact while the player learns the sector.
+ *   PHASE 2 (5–8)   : "Jammer pressure / contested expansion"
+ *                     Mixed pressure; jammers and phantoms force expansion
+ *                     toward the radar / abandoned turret.
+ *   PHASE 3 (9–13)  : "Rift suppression war"
+ *                     Heavier waves; rift anchors actively pulse extra
+ *                     scouts. Destroying anchors visibly reduces pressure.
+ *   PHASE 4 (14–17) : "Blackout escalation"
+ *                     Multi-lane chaos with a Harbinger mid-boss.
+ *   PHASE 5 (18)    : "The Array Awakens"
+ *                     Climactic 4-lane Leviathan finale.
+ *
+ * Every wave is hand-authored with name / warning / counter hints so the
+ * Wave Preview Panel and HUD status text read as a real mission, not as
+ * "wave 12 of default-seq". Thresholds (counts, intervals, startDelay) are
+ * tuned around 460 starting credits + 130 core integrity.
+ */
 function blackoutWaves(): WaveDefinition[] {
-  // A tighter 18-wave campaign that pushes hostile-structure pressure early
-  // rather than scaling up gradually. Reuse the default wave shape but cut
-  // it short and add a few authored "structure-focus" waves.
-  const base = cloneWaves(defaultWaves);
-  const trimmed = base.slice(0, 12);
-  for (const w of trimmed) {
-    for (const lane of w.lanes) {
-      for (const g of lane.enemies) g.count = Math.ceil(g.count * 1.2);
-    }
-    w.rewardCredits = Math.round(w.rewardCredits * 1.3);
-  }
-  // Authored "blackout" waves emphasising suppression — fewer enemies but
-  // jammers/phantoms that punish unsupported towers.
-  const extraTypes: EnemyType[] = ["jammer", "phantom", "splitter", "saboteur", "shielder", "juggernaut"];
-  const laneIds = ["north", "south", "east", "west"];
-  for (let i = 0; i < 6; i++) {
-    const main = extraTypes[i]!;
-    const wave: WaveDefinition = {
-      id: `s7_blackout_${i + 13}`,
-      name: `Blackout ${i + 13}`,
-      description: `${main}-led suppression wave.`,
-      warning: "Hostile infrastructure aiding enemy push.",
-      recommendedCounters: [],
-      rewardCredits: 200 + i * 25,
-      rewardChoice: i % 2 === 1,
+  return [
+    // ── PHASE 1 — Entry into the blackout zone ────────────────────────────
+    summarize({
+      id: "s7_w01_contact_static",
+      name: "Wave 1: Contact in the Static",
+      description: "Recon scouts probe the western perimeter.",
+      warning: "Light scout pressure. Build a Pulse on the west lane and read the map.",
+      recommendedCounters: ["Pulse", "Blaster"],
+      rewardCredits: 45,
+      rewardChoice: false,
       lanes: [
-        { spawnerId: laneIds[i % 4]!, enemies: [{ type: main, count: 6 + i, interval: 0.7 }] },
-        {
-          spawnerId: laneIds[(i + 2) % 4]!,
-          enemies: [{ type: "grunt" as EnemyType, count: 8 + i, interval: 0.5 }],
-          startDelay: 2,
-        },
+        { spawnerId: "west", enemies: [{ type: "scout", count: 7, interval: 0.85 }] },
       ],
-      isBossWave: i === 5,
-    };
-    if (i === 5) {
-      wave.lanes.push({
-        spawnerId: "east",
-        enemies: [{ type: "harbinger", count: 1, interval: 1 }],
-        startDelay: 6,
-      });
-    }
-    trimmed.push(wave);
-  }
-  return trimmed;
+    }),
+    summarize({
+      id: "s7_w02_probing_perimeter",
+      name: "Wave 2: Probing the Perimeter",
+      description: "Standard grunts test the southern approach.",
+      warning: "A second lane opens. Consider expanding toward the North Repeater.",
+      recommendedCounters: ["Pulse", "Blaster"],
+      rewardCredits: 60,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 9, interval: 0.95 }] },
+      ],
+    }),
+    summarize({
+      id: "s7_w03_blackout_echo",
+      name: "Wave 3: Blackout Echo",
+      description: "Light pressure from two spawners simultaneously.",
+      warning: "Multi-lane scouts. The radar dish to the west would help here.",
+      recommendedCounters: ["Pulse", "Blaster", "Stasis on chokepoints"],
+      rewardCredits: 70,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "west", enemies: [{ type: "scout", count: 6, interval: 0.55 }] },
+        { spawnerId: "east", enemies: [{ type: "scout", count: 6, interval: 0.55 }], startDelay: 1.2 },
+      ],
+    }),
+    summarize({
+      id: "s7_w04_first_surge",
+      name: "Wave 4: First Surge",
+      description: "Sprinters punctuate a grunt column.",
+      warning: "Sprinters are very fast. Slow effects matter — Stasis pays off here.",
+      recommendedCounters: ["Stasis", "Blaster"],
+      rewardCredits: 85,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 8, interval: 0.7 }] },
+        { spawnerId: "north", enemies: [{ type: "sprinter", count: 5, interval: 0.55 }], startDelay: 2.0 },
+      ],
+    }),
+
+    // ── PHASE 2 — Jammer pressure and contested expansion ────────────────
+    summarize({
+      id: "s7_w05_static_convergence",
+      name: "Wave 5: Static Convergence",
+      description: "Phantoms blend into a multi-lane probe.",
+      warning: "Phantoms are immune while phased. Capture the radar to spot them.",
+      recommendedCounters: ["Tesla Phase Disruptor", "Scanner Drone", "Wide coverage"],
+      rewardCredits: 105,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "west", enemies: [{ type: "grunt", count: 8, interval: 0.7 }] },
+        { spawnerId: "east", enemies: [{ type: "scout", count: 6, interval: 0.6 }], startDelay: 1.5 },
+        { spawnerId: "east", enemies: [{ type: "phantom", count: 2, interval: 1.6 }], startDelay: 5.0 },
+      ],
+    }),
+    summarize({
+      id: "s7_w06_jammer_echo",
+      name: "Wave 6: Jammer Echo",
+      description: "Hostile Jammer units suppress nearby towers.",
+      warning: "Jammer enemies dim your fire rate. Focus them down or retreat the line.",
+      recommendedCounters: ["Tesla", "Mortar splash", "Forward kill zone"],
+      rewardCredits: 120,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 9, interval: 0.7 }] },
+        { spawnerId: "west", enemies: [{ type: "jammer", count: 3, interval: 1.4 }], startDelay: 2.5 },
+      ],
+    }),
+    summarize({
+      id: "s7_w07_forward_pressure",
+      name: "Wave 7: Forward Pressure",
+      description: "Brutes anchor a mixed assault from three sides.",
+      warning: "Brutes need armor-piercing. Capture the abandoned auto-gun for a forward foothold.",
+      recommendedCounters: ["Mortar", "Railgun", "Stasis"],
+      rewardCredits: 140,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "south", enemies: [{ type: "brute", count: 4, interval: 1.4 }] },
+        { spawnerId: "west", enemies: [{ type: "grunt", count: 8, interval: 0.65 }], startDelay: 1.0 },
+        { spawnerId: "east", enemies: [{ type: "scout", count: 6, interval: 0.5 }], startDelay: 3.0 },
+      ],
+    }),
+    summarize({
+      id: "s7_w08_suppression_test",
+      name: "Wave 8: Suppression Test",
+      description: "Tower systems offline for 5s — pre-position your defenses.",
+      warning: "SILENCE WAVE: tower fire suppressed for 5s. Layout matters more than DPS.",
+      recommendedCounters: ["Layout discipline", "Drones", "Kill zone"],
+      rewardCredits: 160,
+      rewardChoice: true,
+      waveEvent: "silence",
+      lanes: [
+        { spawnerId: "west", enemies: [{ type: "grunt", count: 8, interval: 0.6 }] },
+        { spawnerId: "south", enemies: [{ type: "jammer", count: 4, interval: 1.0 }], startDelay: 2.0 },
+        { spawnerId: "east", enemies: [{ type: "phantom", count: 2, interval: 1.5 }], startDelay: 5.0 },
+      ],
+    }),
+
+    // ── PHASE 3 — Rift suppression war ────────────────────────────────────
+    summarize({
+      id: "s7_w09_rift_bloom",
+      name: "Wave 9: Rift Bloom",
+      description: "Rift anchors pulse aggressively. Splitters multiply on death.",
+      warning: "Rift anchors empower nearby enemies — destroying one will lighten this pressure.",
+      recommendedCounters: ["Mortar splash", "Stasis", "Tesla chain"],
+      rewardCredits: 175,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "west", enemies: [{ type: "splitter", count: 5, interval: 1.1 }] },
+        { spawnerId: "north", enemies: [{ type: "grunt", count: 6, interval: 0.6 }], startDelay: 1.5 },
+        { spawnerId: "east", enemies: [{ type: "sprinter", count: 5, interval: 0.55 }], startDelay: 3.0 },
+      ],
+    }),
+    summarize({
+      id: "s7_w10_armored_tide",
+      name: "Wave 10: Armored Tide",
+      description: "Brutes and Juggernauts wall up multiple lanes.",
+      warning: "Heavy armor across two lanes. Railguns and pierce shots earn their cost.",
+      recommendedCounters: ["Railgun", "Reflector", "Armor-pierce specs"],
+      rewardCredits: 200,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "brute", count: 5, interval: 1.1 }] },
+        { spawnerId: "west", enemies: [{ type: "juggernaut", count: 4, interval: 1.4 }], startDelay: 1.5 },
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 8, interval: 0.6 }], startDelay: 2.5 },
+      ],
+    }),
+    summarize({
+      id: "s7_w11_saboteur_cascade",
+      name: "Wave 11: Saboteur Cascade",
+      description: "Tower-disabler infiltrators arrive with phantom support.",
+      warning: "Saboteurs disable towers on contact. Snare/EMP and detection are crucial.",
+      recommendedCounters: ["Snare", "Tesla EMP arc", "Scanner drone"],
+      rewardCredits: 220,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "saboteur", count: 4, interval: 0.9 }] },
+        { spawnerId: "west", enemies: [{ type: "phantom", count: 5, interval: 0.8 }], startDelay: 1.5 },
+        { spawnerId: "north", enemies: [{ type: "scout", count: 9, interval: 0.45 }], startDelay: 3.0 },
+      ],
+    }),
+    summarize({
+      id: "s7_w12_rift_surge",
+      name: "Wave 12: Rift Surge",
+      description: "All four lanes activate. Weavers stitch the line back together.",
+      warning: "Weavers heal nearby enemies — focus them. Rift anchors compound the pressure.",
+      recommendedCounters: ["Tesla chain", "Mortar splash", "Stasis on choke"],
+      rewardCredits: 240,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "sprinter", count: 8, interval: 0.4 }] },
+        { spawnerId: "south", enemies: [{ type: "weaver", count: 4, interval: 1.4 }], startDelay: 1.8 },
+        { spawnerId: "west", enemies: [{ type: "brute", count: 4, interval: 1.0 }], startDelay: 2.8 },
+        { spawnerId: "north", enemies: [{ type: "splitter", count: 5, interval: 1.0 }], startDelay: 4.0 },
+      ],
+    }),
+    summarize({
+      id: "s7_w13_mirror_convergence",
+      name: "Wave 13: Mirror Convergence",
+      description: "Mirror units reflect projectiles. Jammers thicken the suppression.",
+      warning: "Mirrors absorb three projectile hits and disable the firing tower each time.",
+      recommendedCounters: ["Tesla chain", "Mortar splash", "Sustained pressure"],
+      rewardCredits: 260,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "west", enemies: [{ type: "mirror", count: 4, interval: 1.5 }] },
+        { spawnerId: "east", enemies: [{ type: "jammer", count: 5, interval: 1.1 }], startDelay: 2.0 },
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 10, interval: 0.55 }], startDelay: 3.0 },
+        { spawnerId: "north", enemies: [{ type: "sprinter", count: 5, interval: 0.5 }], startDelay: 4.5 },
+      ],
+    }),
+
+    // ── PHASE 4 — Blackout escalation ─────────────────────────────────────
+    summarize({
+      id: "s7_w14_heavy_eclipse",
+      name: "Wave 14: Heavy Eclipse",
+      description: "Juggernauts and Brutes form a slow armored siege.",
+      warning: "Fielding two armor-piercing setups on the front line is non-negotiable now.",
+      recommendedCounters: ["Railgun", "Mortar", "Stasis stack"],
+      rewardCredits: 285,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "south", enemies: [{ type: "juggernaut", count: 5, interval: 1.2 }] },
+        { spawnerId: "west", enemies: [{ type: "brute", count: 6, interval: 1.0 }], startDelay: 2.0 },
+        { spawnerId: "east", enemies: [{ type: "weaver", count: 4, interval: 1.2 }], startDelay: 3.5 },
+        { spawnerId: "north", enemies: [{ type: "grunt", count: 7, interval: 0.55 }], startDelay: 4.5 },
+      ],
+    }),
+    summarize({
+      id: "s7_w15_blackout_cascade",
+      name: "Wave 15: Blackout Cascade",
+      description: "Everything spawns at once. Coordination collapses.",
+      warning: "BLITZ WAVE: no stagger. Volume hits all four spawners simultaneously.",
+      recommendedCounters: ["Tesla chain", "Mortar splash", "Pre-set kill zone"],
+      rewardCredits: 310,
+      rewardChoice: false,
+      waveEvent: "blitz",
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "sprinter", count: 12, interval: 0.18 }] },
+        { spawnerId: "west", enemies: [{ type: "phantom", count: 6, interval: 0.4 }] },
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 10, interval: 0.25 }] },
+        { spawnerId: "north", enemies: [{ type: "saboteur", count: 5, interval: 0.45 }] },
+      ],
+    }),
+    summarize({
+      id: "s7_w16_harbinger_approach",
+      name: "Wave 16: Harbinger Approach",
+      description: "An artillery boss anchors a coordinated assault.",
+      warning: "HARBINGER INCOMING. Spread your towers — artillery clusters are lethal.",
+      recommendedCounters: ["Spread placement", "Railgun + Reflector", "Snare"],
+      rewardCredits: 340,
+      rewardChoice: true,
+      isBossWave: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "harbinger", count: 1, interval: 1 }] },
+        { spawnerId: "south", enemies: [{ type: "brute", count: 6, interval: 1.0 }], startDelay: 2.0 },
+        { spawnerId: "north", enemies: [{ type: "phantom", count: 5, interval: 0.85 }], startDelay: 3.5 },
+        { spawnerId: "west", enemies: [{ type: "jammer", count: 4, interval: 1.1 }], startDelay: 5.0 },
+      ],
+    }),
+    summarize({
+      id: "s7_w17_final_bloom",
+      name: "Wave 17: Final Bloom",
+      description: "Carriers and weavers feed an HP-dense assault.",
+      warning: "Carriers split into scouts on death — kill them far from the core.",
+      recommendedCounters: ["Stasis", "Mortar", "Tesla chain"],
+      rewardCredits: 360,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "splitter", count: 6, interval: 1.1 }] },
+        { spawnerId: "west", enemies: [{ type: "carrier", count: 4, interval: 1.8 }], startDelay: 1.5 },
+        { spawnerId: "south", enemies: [{ type: "weaver", count: 5, interval: 1.2 }], startDelay: 3.0 },
+        { spawnerId: "north", enemies: [{ type: "saboteur", count: 5, interval: 0.9 }], startDelay: 4.5 },
+      ],
+    }),
+
+    // ── PHASE 5 — Final assault ────────────────────────────────────────────
+    summarize({
+      id: "s7_w18_array_awakens",
+      name: "Wave 18: The Array Awakens",
+      description: "The Blackout Array surges in unison. The Leviathan emerges.",
+      warning: "FINAL BLACKOUT ASSAULT. All four lanes push. Leviathan from the east.",
+      recommendedCounters: ["Boss damage", "Spread placement", "Sustained AoE"],
+      rewardCredits: 450,
+      rewardChoice: false,
+      isBossWave: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "leviathan", count: 1, interval: 1 }] },
+        { spawnerId: "east", enemies: [{ type: "phantom", count: 6, interval: 0.85 }], startDelay: 4.0 },
+        { spawnerId: "west", enemies: [{ type: "mirror", count: 4, interval: 1.4 }], startDelay: 1.0 },
+        { spawnerId: "west", enemies: [{ type: "brute", count: 6, interval: 1.0 }], startDelay: 5.0 },
+        { spawnerId: "north", enemies: [{ type: "sprinter", count: 8, interval: 0.4 }], startDelay: 2.0 },
+        { spawnerId: "north", enemies: [{ type: "saboteur", count: 4, interval: 0.9 }], startDelay: 6.5 },
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 10, interval: 0.5 }], startDelay: 1.5 },
+        { spawnerId: "south", enemies: [{ type: "splitter", count: 4, interval: 1.0 }], startDelay: 7.0 },
+      ],
+    }),
+  ];
 }
 
 const baseSectorDefinitions: SectorDefinition[] = [
@@ -624,12 +884,15 @@ const baseSectorDefinitions: SectorDefinition[] = [
     id: "sector_07_blackout_array",
     name: "Sector 7 — Blackout Array",
     description:
-      "A jammed, hostile frontier. Most of the map belongs to the rift. Suppress hostile infrastructure to survive — turtling fails here.",
+      "A jammed, hostile frontier. Expand carefully, restore visibility with the radar, then dismantle enemy infrastructure before the final blackout assault.",
     accentColor: "#ff5252",
     layout: buildBlackoutLayout(),
     spawners: blackoutSpawners,
     waves: blackoutWaves(),
-    startingCredits: 460,
+    // 480 starting credits leaves room to plant 2-3 starter towers and have
+    // spare for a relay roll by wave 4. Core 130 lets the player eat one or
+    // two early breaches without the run instantly collapsing.
+    startingCredits: 480,
     coreIntegrity: 130,
     cols: 64,
     rows: 44,

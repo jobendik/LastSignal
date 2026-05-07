@@ -265,7 +265,13 @@ export class StrategicPointSystem {
       default:
         break;
     }
-    this.game.audio.sfxReward();
+    // Distinct audio cues so capture moments are easy to tell apart from
+    // generic reward/pickup sounds during heavy combat.
+    if (p.type === "data_cache") {
+      this.game.audio.sfxDataCache(p.pos);
+    } else {
+      this.game.audio.sfxCapture(p.pos);
+    }
     this.game.bus.emit("strategic:captured", { id: p.id, type: p.type });
   }
 
