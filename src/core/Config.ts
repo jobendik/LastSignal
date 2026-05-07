@@ -61,6 +61,59 @@ export const MIN_RELAY_SPACING_CELLS = 6;
 /** Minimum distance (in cells) a relay must be from any spawner. */
 export const MIN_RELAY_TO_SPAWNER_CELLS = 3;
 
+// ──────────────────────────────────────────────────────────
+// Strategic map points
+// Capturable nodes (signal node, radar dish, data cache, abandoned turret) and
+// hostile structures (rift anchor, jammer) live on the grid. They give the
+// large-format maps a reason to expand beyond economy: the player chases
+// scouting, suppression, and tactical rewards.
+// ──────────────────────────────────────────────────────────
+/** Default seconds it takes to fully capture a neutral strategic point. */
+export const CAPTURE_TIME_SECONDS = 7;
+/** Pixel radius around a point where enemy presence pauses/reverses capture. */
+export const CAPTURE_CONTEST_RADIUS = 96;
+/** Capture progress drains per second while contested by enemies. */
+export const CAPTURE_DECAY_PER_SECOND = 0.35;
+
+/** Coverage radius (cells) granted by a captured signal node. */
+export const SIGNAL_NODE_RADIUS_CELLS = 5;
+/** Reveal radius (cells) granted by a captured radar dish in darkness sectors. */
+export const RADAR_REVEAL_BONUS_CELLS = 14;
+
+/** One-time credit reward for recovering a data cache. */
+export const DATA_CACHE_CREDIT_REWARD = 90;
+/** One-time research reward for recovering a data cache (also given to the run profile). */
+export const DATA_CACHE_RESEARCH_REWARD = 1;
+
+/** Health pool of a Rift Anchor enemy structure. */
+export const RIFT_ANCHOR_HEALTH = 320;
+/** Seconds between rift-anchor minor spawns / aura pulses. */
+export const RIFT_ANCHOR_PULSE_INTERVAL = 9;
+/** Credit reward for destroying a Rift Anchor. */
+export const RIFT_ANCHOR_DESTROY_REWARD = 110;
+/** Aura radius (px) around a rift anchor that buffs enemies inside it. */
+export const RIFT_ANCHOR_AURA_RADIUS = 200;
+
+/** Health pool of a Jammer enemy structure. */
+export const JAMMER_HEALTH = 220;
+/** Effect radius (cells) of a jammer (suppresses signal/radar/tower fire). */
+export const JAMMER_RADIUS_CELLS = 6;
+/** Credit reward for destroying a Jammer. */
+export const JAMMER_DESTROY_REWARD = 70;
+
+/**
+ * Tower-targeting priority for hostile structures. Higher = more attractive.
+ * < 1 means towers prefer real enemies and only swing onto a structure when no
+ * regular threat is in range.
+ */
+export const STRUCTURE_TARGET_PRIORITY = 0.35;
+/** Auto-finder for an Abandoned Turret: shooting cooldown in seconds. */
+export const ABANDONED_TURRET_COOLDOWN = 1.1;
+/** Damage of a captured Abandoned Turret per shot. */
+export const ABANDONED_TURRET_DAMAGE = 12;
+/** Range (px) of a captured Abandoned Turret. */
+export const ABANDONED_TURRET_RANGE = 170;
+
 export const COLOR = {
   accent: "#66fcf1",
   accentDim: "#45a29e",

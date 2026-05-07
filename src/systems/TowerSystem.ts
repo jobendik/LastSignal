@@ -5,6 +5,7 @@ import type { TowerType } from "../core/Types";
 import { towerDefinitions } from "../data/towers";
 import { Projectile } from "../entities/Projectile";
 import { Vector2 } from "../core/Vector2";
+import { STRUCTURE_TARGET_PRIORITY } from "../core/Config";
 
 /** Handles tower behavior: targeting, firing, specialization effects, upgrades, economy ticks. */
 export class TowerSystem {
@@ -47,6 +48,14 @@ export class TowerSystem {
     // expansion the central strategic loop on large maps.
     if (!this.game.grid.isCellInSignalCoverage(c, r)) {
       return { ok: false, reason: "Outside signal range" };
+    }
+    // Don't allow placement on top of an active strategic map point —
+    // they own the tile until destroyed/depleted.
+    if (this.game.strategicPoints) {
+      const sp = this.game.strategicPoints.pointAtCell(c, r);
+      if (sp && sp.state !== "destroyed" && sp.state !== "depleted") {
+        return { ok: false, reason: "Strategic point" };
+      }
     }
     const walkOk = this.game.grid.canPlaceTower(c, r, Boolean(def.requiresCrystal));
     if (!walkOk) return { ok: false, reason: "Invalid location" };
@@ -388,6 +397,10 @@ export class TowerSystem {
           if (t.type === "flamer") {
             t.heatTimer = Math.min(10, t.heatTimer + stats.cooldown + 0.25);
           }
+        } else if (this.fireAtStructure(t, stats)) {
+          t.timer = stats.cooldown;
+          t.recoil = 3;
+          t.overcharge = 0;
         } else {
           t.overcharge = Math.min(5, t.overcharge + dt);
         }
@@ -550,6 +563,8 @@ export class TowerSystem {
       if (!e.active || e.type !== "jammer") continue;
       if (e.pos.dist(t.pos) < 80) return true;
     }
+    // Strategic-point jammers also suppress fire rate inside their field.
+    if (this.game.strategicPoints?.isWorldPointJammed(t.pos.x, t.pos.y)) return true;
     return false;
   }
 
@@ -1032,6 +1047,48 @@ export class TowerSystem {
       burningGround: Boolean(t.flags.burningGround) || up.mortarAlwaysBurn,
     });
     this.game.projectiles.spawn(p);
+  }
+
+  /**
+   * Secondary targeting pass — when no enemy is in range, take a shot at the
+   * closest hostile strategic structure within range. Damage is scaled down by
+   * STRUCTURE_TARGET_PRIORITY so towers feel less effective vs. structures
+   * than vs. enemies (encouraging the player to bring the structure into
+   * range deliberately rather than getting it for free).
+   *
+   * Returns true if a shot was fired so the caller can spend the cooldown.
+   */
+  private fireAtStructure(t: Tower, stats: ReturnType<TowerSystem["effectiveStats"]>): boolean {
+    const sps = this.game.strategicPoints;
+    if (!sps || stats.damage <= 0) return false;
+    if (t.type === "harvester" || t.type === "amplifier" || t.type === "reflector") return false;
+
+    let best: import("../entities/StrategicPoint").StrategicPoint | null = null;
+    let bestSq = stats.range * stats.range;
+    for (const p of sps.list) {
+      if (p.state !== "enemy") continue;
+      const dx = p.pos.x - t.pos.x;
+      const dy = p.pos.y - t.pos.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestSq) {
+        bestSq = d2;
+        best = p;
+      }
+    }
+    if (!best) return false;
+
+    const towerMul = this.getTowerDamageMultiplier(t);
+    const dmg = stats.damage * towerMul * STRUCTURE_TARGET_PRIORITY;
+    const ang = Math.atan2(best.pos.y - t.pos.y, best.pos.x - t.pos.x);
+    t.angle = ang;
+    this.game.audio.sfxTowerFire(t.type, t.pos);
+    this.game.particles.spawnMuzzleFlash(t.pos.x, t.pos.y, ang, t.def.color);
+    this.game.particles.spawnBeam(
+      t.pos.x, t.pos.y, best.pos.x, best.pos.y, t.def.color, 0.12,
+      { kind: t.type === "railgun" ? "railgun" : "standard", width: 4 }
+    );
+    sps.damageStructure(best, dmg, { source: "tower" });
+    return true;
   }
 
   private fireTesla(t: Tower, target: Enemy, stats: ReturnType<TowerSystem["effectiveStats"]>): void {

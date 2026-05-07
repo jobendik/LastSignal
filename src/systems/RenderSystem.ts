@@ -6,7 +6,8 @@ import type { Drone } from "../entities/Drone";
 import type { Projectile } from "../entities/Projectile";
 import { TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
 import { towerDefinitions } from "../data/towers";
-import type { TowerType } from "../core/Types";
+import type { TowerType, StrategicPointState, StrategicPointType } from "../core/Types";
+import type { StrategicPoint } from "../entities/StrategicPoint";
 
 /** Canvas 2D render pipeline with ordered layers. */
 export class RenderSystem {
@@ -149,6 +150,7 @@ export class RenderSystem {
     this.drawTerrain(ctx);
     if (this.game.core.debug.showFlow) this.drawFlowDebug(ctx);
     this.drawSignalCoverage(ctx);
+    this.drawStrategicPointFields(ctx);
     this.drawPathPreview(ctx);
     if (this.game.core.showHeatmap) this.drawHeatmap(ctx);
     this.drawKillZone(ctx);
@@ -156,6 +158,7 @@ export class RenderSystem {
     this.drawGravityAnomaly(ctx);
     this.drawSignalInterference(ctx);
     this.drawCore(ctx);
+    this.drawStrategicPoints(ctx);
     this.drawDamageZones(ctx);
     this.drawScorchDecals(ctx);
     this.drawRings(ctx);
@@ -375,6 +378,24 @@ export class RenderSystem {
     for (const t of this.game.towers.list) {
       const stats = this.game.towers.effectiveStats(t);
       reveal(t.pos.x, t.pos.y, Math.max(46, Math.min(150, stats.range * 0.75)));
+    }
+    // Captured radar dishes light up a wide area; captured signal nodes a small
+    // pool. Discovered enemy structures gleam slightly so the player can see
+    // them through the dark.
+    if (this.game.strategicPoints) {
+      for (const p of this.game.strategicPoints.list) {
+        if (p.state === "captured") {
+          if (p.type === "radar_dish") {
+            reveal(p.pos.x, p.pos.y, p.radiusCells * TILE_SIZE);
+          } else if (p.type === "signal_node") {
+            reveal(p.pos.x, p.pos.y, p.radiusCells * TILE_SIZE * 0.9);
+          } else {
+            reveal(p.pos.x, p.pos.y, 70);
+          }
+        } else if (p.discovered && (p.state === "enemy" || p.state === "neutral")) {
+          reveal(p.pos.x, p.pos.y, 64);
+        }
+      }
     }
     ctx.restore();
   }
@@ -830,6 +851,9 @@ export class RenderSystem {
     // can tell relay positions apart from the primary core at a glance.
     for (const cluster of grid.coreClusters) {
       if (cluster.isPrimary) continue;
+      // Synthetic signal-node clusters have no backing cells and are drawn by
+      // the strategic-point renderer — skip them here.
+      if (cluster.cells.length === 0) continue;
       const rx = cluster.center.x;
       const ry = cluster.center.y;
       ctx.save();
@@ -2499,6 +2523,153 @@ export class RenderSystem {
   }
 
   /**
+   * Background-layer rendering for strategic-point influence radii: jammer
+   * fields, rift-anchor auras, and hint glows for points the player has
+   * discovered but not yet captured. Drawn underneath towers so they read as
+   * world geometry rather than UI.
+   */
+  private drawStrategicPointFields(ctx: CanvasRenderingContext2D): void {
+    const sps = this.game.strategicPoints;
+    if (!sps || sps.list.length === 0) return;
+    const elapsed = this.game.time.elapsed;
+    ctx.save();
+    for (const p of sps.list) {
+      if (p.state === "destroyed" || p.state === "depleted") continue;
+      // Active hostile influence: jammer field + rift anchor aura.
+      if (p.state === "enemy") {
+        if (p.type === "jammer") {
+          const radiusPx = p.radiusCells * TILE_SIZE;
+          const pulse = 0.10 + Math.sin(elapsed * 2.4) * 0.04;
+          ctx.fillStyle = `rgba(239, 108, 0, ${pulse.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(p.pos.x, p.pos.y, radiusPx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(239, 108, 0, 0.55)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 6]);
+          ctx.lineDashOffset = -elapsed * 14;
+          ctx.beginPath();
+          ctx.arc(p.pos.x, p.pos.y, radiusPx, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else if (p.type === "rift_anchor") {
+          const radiusPx = 200; // Mirrors RIFT_ANCHOR_AURA_RADIUS.
+          const pulse = 0.07 + Math.sin(elapsed * 1.8) * 0.03;
+          ctx.fillStyle = `rgba(244, 67, 54, ${pulse.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(p.pos.x, p.pos.y, radiusPx, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      // Friendly captured signal node: render its added coverage so the player
+      // can see the new build territory.
+      if (p.state === "captured" && p.type === "signal_node") {
+        const radiusPx = p.radiusCells * TILE_SIZE;
+        const pulse = 0.08 + Math.sin(elapsed * 1.6) * 0.025;
+        ctx.fillStyle = `rgba(102, 252, 241, ${pulse.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(p.pos.x, p.pos.y, radiusPx, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(102, 252, 241, 0.45)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 5]);
+        ctx.lineDashOffset = -elapsed * 12;
+        ctx.beginPath();
+        ctx.arc(p.pos.x, p.pos.y, radiusPx, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Foreground rendering for strategic points themselves — icons, capture
+   * progress arcs, and structure health bars. Each type has its own glyph so
+   * the map reads at a glance.
+   */
+  private drawStrategicPoints(ctx: CanvasRenderingContext2D): void {
+    const sps = this.game.strategicPoints;
+    if (!sps || sps.list.length === 0) return;
+    const elapsed = this.game.time.elapsed;
+    const hovered = this.game.input?.hoverWorld ?? null;
+    const hoverPoint = hovered ? sps.pointNearWorld(hovered.x, hovered.y, TILE_SIZE) : null;
+
+    ctx.save();
+    for (const p of sps.list) {
+      if (p.state === "destroyed") continue;
+      const x = p.pos.x;
+      const y = p.pos.y;
+      const isHostile = p.state === "enemy";
+      const isCaptured = p.state === "captured";
+      const isDepleted = p.state === "depleted";
+      const baseColor = strategicTint(p.type, p.state);
+      const flash = p.flashTimer > 0 ? p.flashTimer / 0.6 : 0;
+
+      // Drop a base disc so the icon sits on a readable platform.
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.shadowBlur = isCaptured ? 14 : isHostile ? 10 : 6;
+      ctx.shadowColor = baseColor;
+      ctx.fillStyle = "rgba(8, 12, 18, 0.85)";
+      ctx.beginPath();
+      ctx.arc(0, 0, 13, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = baseColor;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, 13, 0, Math.PI * 2);
+      ctx.stroke();
+
+      drawStrategicGlyph(ctx, p.type, p.state, baseColor, elapsed);
+
+      // Capture progress arc.
+      if (p.state === "neutral" && p.captureProgress > 0) {
+        ctx.strokeStyle = "#66fcf1";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.captureProgress);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Health bar above hostile structures (and damaged friendly turrets).
+      if (isHostile && p.maxHealth > 0) {
+        drawHealthBar(ctx, x, y - 22, p.health / p.maxHealth, p.health <= p.maxHealth * 0.35);
+      }
+
+      // Capture flash ring.
+      if (flash > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = baseColor;
+        ctx.globalAlpha = flash;
+        ctx.lineWidth = 3;
+        ctx.arc(x, y, 18 + (1 - flash) * 24, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      // Faint depleted/destroyed indicator (only depleted survives this point).
+      if (isDepleted) {
+        ctx.strokeStyle = "rgba(160, 160, 160, 0.6)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x - 9, y - 9);
+        ctx.lineTo(x + 9, y + 9);
+        ctx.moveTo(x + 9, y - 9);
+        ctx.lineTo(x - 9, y + 9);
+        ctx.stroke();
+      }
+
+      // Hover tooltip.
+      if (p === hoverPoint) {
+        drawStrategicTooltip(ctx, p, baseColor);
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
    * Visual feedback while placing a relay core: a 2x2 footprint preview that
    * turns red on invalid placement and shows the projected signal radius.
    */
@@ -3310,6 +3481,26 @@ export class RenderSystem {
       ctx.fillRect(ex - 0.5, ey - 0.5, 1.5, 1.5);
     }
 
+    // Strategic point markers — diamond glyphs colored by state/type.
+    const sps = this.game.strategicPoints;
+    if (sps && sps.list.length > 0) {
+      for (const p of sps.list) {
+        if (p.state === "destroyed") continue;
+        // Hide undiscovered hostile structures in darkness sectors.
+        const isDark = Boolean(this.game.core.sector?.darkness);
+        if (isDark && !p.discovered && (p.state === "enemy" || p.state === "neutral")) continue;
+        const px = mx + (p.c + 0.5) * tileW;
+        const py = my + (p.r + 0.5) * tileH;
+        const tint = strategicTint(p.type, p.state);
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = tint;
+        ctx.fillRect(-3, -3, 6, 6);
+        ctx.restore();
+      }
+    }
+
     // Camera viewport rectangle.
     const vb = cam.getVisibleBounds();
     const vx = mx + (vb.x / (COLS * TILE_SIZE)) * mapW;
@@ -3327,5 +3518,215 @@ export class RenderSystem {
     );
 
     ctx.restore();
+  }
+}
+
+// ──────────────────────────────────────────────────────────
+// Strategic-point rendering helpers (module-scope so they don't bloat the
+// RenderSystem class with one-shot drawing routines).
+// ──────────────────────────────────────────────────────────
+
+function strategicTint(type: StrategicPointType, state: StrategicPointState): string {
+  if (state === "depleted") return "#9e9e9e";
+  if (state === "destroyed") return "#616161";
+  if (state === "captured") {
+    if (type === "abandoned_turret") return "#ffeb3b";
+    if (type === "radar_dish") return "#80d8ff";
+    return "#66fcf1";
+  }
+  if (type === "rift_anchor") return "#ff5252";
+  if (type === "jammer") return "#ef6c00";
+  if (type === "data_cache") return "#ffd54f";
+  if (type === "abandoned_turret") return "#ffeb3b";
+  if (type === "radar_dish") return "#80d8ff";
+  return "#90a4ae"; // neutral signal_node before capture
+}
+
+function drawStrategicGlyph(
+  ctx: CanvasRenderingContext2D,
+  type: StrategicPointType,
+  state: StrategicPointState,
+  color: string,
+  elapsed: number
+): void {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 1.5;
+  switch (type) {
+    case "signal_node": {
+      // Vertical antenna with three concentric arcs.
+      ctx.beginPath();
+      ctx.moveTo(0, 5);
+      ctx.lineTo(0, -7);
+      ctx.stroke();
+      for (let i = 1; i <= 3; i++) {
+        ctx.beginPath();
+        ctx.arc(0, -7, 3 * i, -Math.PI * 0.7, -Math.PI * 0.3);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "radar_dish": {
+      // Rotating dish silhouette.
+      ctx.rotate(elapsed * 0.6);
+      ctx.beginPath();
+      ctx.arc(0, 0, 7, Math.PI * 0.1, Math.PI * 0.9);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-7, 0);
+      ctx.lineTo(7, 0);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "data_cache": {
+      // Crate icon — pulses when neutral, dims when depleted.
+      const pulse = state === "neutral" ? 0.7 + Math.sin(elapsed * 4) * 0.3 : 0.45;
+      ctx.globalAlpha = pulse;
+      ctx.fillRect(-6, -6, 12, 12);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = state === "depleted" ? "#888888" : "#000000";
+      ctx.strokeRect(-6, -6, 12, 12);
+      ctx.beginPath();
+      ctx.moveTo(-6, 0);
+      ctx.lineTo(6, 0);
+      ctx.moveTo(0, -6);
+      ctx.lineTo(0, 6);
+      ctx.stroke();
+      break;
+    }
+    case "abandoned_turret": {
+      // Cannon with rotating muzzle when active.
+      if (state === "captured") ctx.rotate(elapsed * 0.4);
+      ctx.fillStyle = state === "captured" ? color : "#5d6f7a";
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(0, -2, 10, 4);
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.6)";
+      ctx.strokeRect(0, -2, 10, 4);
+      break;
+    }
+    case "rift_anchor": {
+      // Three-pointed star with a violently pulsing core.
+      const pulse = 0.5 + Math.sin(elapsed * 3.4) * 0.4;
+      ctx.rotate(elapsed * 0.5);
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        const x = Math.cos(a) * 9;
+        const y = Math.sin(a) * 9;
+        ctx.moveTo(0, 0);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      ctx.fillStyle = `rgba(244, 67, 54, ${pulse.toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "jammer": {
+      // Distorted broadcast cross with sweeping jammer ticks.
+      const pulse = 0.5 + Math.sin(elapsed * 4) * 0.5;
+      ctx.strokeStyle = "#ef6c00";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-7, -7);
+      ctx.lineTo(7, 7);
+      ctx.moveTo(7, -7);
+      ctx.lineTo(-7, 7);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(239, 108, 0, ${pulse.toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, 3, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+function drawHealthBar(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  pct: number,
+  critical: boolean
+): void {
+  const w = 30;
+  const h = 4;
+  ctx.save();
+  ctx.translate(x - w / 2, y);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+  ctx.fillRect(-1, -1, w + 2, h + 2);
+  ctx.fillStyle = critical ? "#ff5252" : "#ff9800";
+  ctx.fillRect(0, 0, w * Math.max(0, Math.min(1, pct)), h);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(0, 0, w, h);
+  ctx.restore();
+}
+
+function drawStrategicTooltip(
+  ctx: CanvasRenderingContext2D,
+  p: StrategicPoint,
+  color: string
+): void {
+  const lines: string[] = [];
+  lines.push(p.name.toUpperCase());
+  lines.push(stateLabel(p));
+  if (p.state === "neutral") {
+    lines.push(`Capture ${Math.round(p.captureProgress * 100)}%`);
+  } else if (p.state === "enemy") {
+    lines.push(`HP ${Math.max(0, Math.ceil(p.health))}/${p.maxHealth}`);
+  }
+  if (p.description) lines.push(p.description);
+
+  const pad = 6;
+  const lineH = 12;
+  const fontSize = 10;
+  ctx.save();
+  ctx.font = `${fontSize}px monospace`;
+  let maxW = 0;
+  for (const l of lines) {
+    const w = ctx.measureText(l).width;
+    if (w > maxW) maxW = w;
+  }
+  const boxW = maxW + pad * 2;
+  const boxH = lines.length * lineH + pad * 2;
+  const tx = p.pos.x + 22;
+  const ty = p.pos.y - boxH - 14;
+  ctx.fillStyle = "rgba(8, 12, 18, 0.92)";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.2;
+  ctx.fillRect(tx, ty, boxW, boxH);
+  ctx.strokeRect(tx, ty, boxW, boxH);
+  ctx.fillStyle = color;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (i === 0) {
+      ctx.fillStyle = color;
+    } else if (i === 1) {
+      ctx.fillStyle = "#ffffff";
+    } else {
+      ctx.fillStyle = "rgba(197, 198, 199, 0.85)";
+    }
+    ctx.fillText(line, tx + pad, ty + pad + (i + 1) * lineH - 3);
+  }
+  ctx.restore();
+}
+
+function stateLabel(p: StrategicPoint): string {
+  switch (p.state) {
+    case "captured": return "CAPTURED";
+    case "enemy": return p.type === "jammer" ? "ENEMY • JAMMER" : "ENEMY • RIFT";
+    case "neutral": return "NEUTRAL — CAPTURABLE";
+    case "depleted": return "DEPLETED";
+    case "destroyed": return "DESTROYED";
   }
 }

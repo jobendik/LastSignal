@@ -1,4 +1,4 @@
-import type { EnemyType, TowerType } from "../core/Types";
+import type { EnemyType, StrategicPointType, TowerType } from "../core/Types";
 
 /**
  * Sector objectives — primary (required to clear) and secondary (optional, reward research).
@@ -36,7 +36,11 @@ export type ObjectiveKind =
   /** Sector-specific: end run with at least N harvesters built. */
   | "harvesters_at_least"
   /** Difficulty reach: clear in <= N total seconds (for fast clears). */
-  | "fast_clear";
+  | "fast_clear"
+  /** Strategic map points: capture at least N points of a given type. */
+  | "capture_n_strategic"
+  /** Strategic map points: destroy at least N hostile structures of a given type. */
+  | "destroy_n_strategic";
 
 export interface ObjectiveDefinition {
   id: string;
@@ -52,6 +56,8 @@ export interface ObjectiveDefinition {
   enemyTypes?: EnemyType[];
   /** Tower type referenced by build_* / scanner_alive objectives. */
   towerType?: TowerType;
+  /** Strategic point type referenced by capture_/destroy_ objectives. */
+  strategicType?: StrategicPointType;
   /** Research point reward for completing this secondary objective. */
   rewardResearch?: number;
   /** Optional credit reward at run end. */
@@ -299,6 +305,80 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
       },
     ],
   },
+
+  sector_06_fractured_expanse: {
+    briefing:
+      "Lost relays, hostile rifts, and dead-air zones stretch past the dish. Push your signal network outward — capture what helps you, suppress what's killing you, and survive the multi-front swarm.",
+    counterplay: [
+      "Roll relays toward signal nodes",
+      "Capture the radar dish for wave intel",
+      "Bring towers within range of rift anchors",
+    ],
+    hazards: "Hostile rift anchors and a jammer dim the map until destroyed.",
+    primary: {
+      id: "s6_primary",
+      label: "Survive every wave of the Fractured Expanse.",
+      detail: "Hold the home core through all 25 waves.",
+      kind: "survive_all",
+    },
+    secondary: [
+      {
+        id: "s6_destroy_rifts",
+        label: "Destroy 2 Rift Anchors.",
+        detail: "Bring towers into range and tear down both corruption spires.",
+        kind: "destroy_n_strategic",
+        strategicType: "rift_anchor",
+        value: 2,
+        rewardResearch: 3,
+        rewardCredits: 60,
+      },
+      {
+        id: "s6_capture_signal_nodes",
+        label: "Capture 2 Signal Nodes.",
+        detail: "Extend your network through the captured repeaters.",
+        kind: "capture_n_strategic",
+        strategicType: "signal_node",
+        value: 2,
+        rewardResearch: 2,
+        rewardCredits: 40,
+      },
+      {
+        id: "s6_capture_radar",
+        label: "Capture the Western Radar Dish.",
+        detail: "Wave intel and reveal range scale up once it's online.",
+        kind: "capture_n_strategic",
+        strategicType: "radar_dish",
+        value: 1,
+        rewardResearch: 2,
+      },
+      {
+        id: "s6_recover_caches",
+        label: "Recover 2 Data Caches.",
+        detail: "Each cache gives credits and a research breakthrough.",
+        kind: "capture_n_strategic",
+        strategicType: "data_cache",
+        value: 2,
+        rewardResearch: 1,
+      },
+      {
+        id: "s6_silence_jammers",
+        label: "Destroy all Jammers.",
+        detail: "Clears the suppression field around your network.",
+        kind: "destroy_n_strategic",
+        strategicType: "jammer",
+        value: 1,
+        rewardResearch: 2,
+      },
+      {
+        id: "s6_core_above_50",
+        label: "Finish with core integrity above 50%.",
+        detail: "Steady defense across the long campaign.",
+        kind: "core_above_pct",
+        value: 0.5,
+        rewardResearch: 2,
+      },
+    ],
+  },
 };
 
 /** Sector-id ordered list, useful for UI iteration. */
@@ -308,4 +388,5 @@ export const sectorObjectiveOrder: string[] = [
   "sector_03_deep_space_wreckage",
   "sector_04_hostile_core",
   "sector_void",
+  "sector_06_fractured_expanse",
 ];
