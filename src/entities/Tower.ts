@@ -7,7 +7,22 @@ import type {
   TargetMode,
 } from "../core/Types";
 import { towerDefinitions, towerSpecializations } from "../data/towers";
-import { TILE_SIZE, UPGRADE_COST_BASE_MUL } from "../core/Config";
+import {
+  TILE_SIZE,
+  TOWER_BASE_HP,
+  TOWER_HP_BY_TYPE,
+  TOWER_DAMAGED_THRESHOLD,
+  TOWER_CRITICAL_THRESHOLD,
+  UPGRADE_COST_BASE_MUL,
+} from "../core/Config";
+
+/** Coarse durability state derived from HP percent. */
+export type TowerDurabilityState =
+  | "operational"
+  | "damaged"
+  | "critical"
+  | "disabled"
+  | "destroyed";
 
 /** Runtime tower entity. Behavior runs in TowerSystem; this class holds state. */
 export class Tower {
@@ -42,6 +57,29 @@ export class Tower {
   mods: TowerMod[] = [];
   targetMode: TargetMode = "closest_to_core";
 
+  // ──────────────────────────────────────────────────────────
+  // Durability — towers are no longer abstract immortal guns.
+  // hp / maxHp drive the operational/damaged/critical/disabled states.
+  // ──────────────────────────────────────────────────────────
+  hp: number;
+  maxHp: number;
+  /** Bonus HP added by upgrades (Hardened Circuits etc.). */
+  hpBonus = 0;
+  /** Brief flash timer (seconds) used by the renderer for hit feedback. */
+  damageFlashTimer = 0;
+  /** Time of last incoming damage (game.time.elapsed) — used for HUD readout + sfx throttling. */
+  lastDamagedAt = -Infinity;
+  /** Game time of last "damaged" sfx so we don't spam audio. */
+  lastDamageSfxAt = -Infinity;
+  /** True while hp <= 0 — the tower is offline and visually broken. */
+  disabled = false;
+  /** Game time the tower entered the disabled state. */
+  disabledSinceGameTime = -Infinity;
+  /** True while an Engineer squad is actively channeling repair. Rendered as a soft beam halo. */
+  underRepair = false;
+  /** Cleared each frame; set by MobileSquadSystem when a Shield field overlaps. */
+  shielded = false;
+
   constructor(type: TowerType, c: number, r: number, buildCost: number) {
     const def = towerDefinitions[type];
     this.type = type;
@@ -51,7 +89,25 @@ export class Tower {
     this.pos = new Vector2(c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2);
     this.totalInvested = buildCost;
     this.timer = def.cooldown * 0.45;
+    this.maxHp = baseTowerMaxHp(type);
+    this.hp = this.maxHp;
   }
+
+  /** HP percent 0..1. */
+  get hpPct(): number {
+    if (this.maxHp <= 0) return 1;
+    return Math.max(0, Math.min(1, this.hp / this.maxHp));
+  }
+
+  /** Coarse durability state used by UI / firing penalty / rendering. */
+  get durabilityState(): TowerDurabilityState {
+    if (this.disabled || this.hp <= 0) return "disabled";
+    const pct = this.hpPct;
+    if (pct <= TOWER_CRITICAL_THRESHOLD) return "critical";
+    if (pct <= TOWER_DAMAGED_THRESHOLD) return "damaged";
+    return "operational";
+  }
+
 
   get name(): string {
     return this.def.name;
@@ -59,6 +115,17 @@ export class Tower {
 
   get isEco(): boolean {
     return Boolean(this.def.isEco);
+  }
+
+  /**
+   * Lifecycle predicate used by TowerSystem hot paths. Towers don't "die" the
+   * way enemies do — sold towers are pulled out of the active list and moved
+   * into the dissolving list, so any tower the system iterates over is active
+   * by definition. This getter exists so we can write defensive checks like
+   * `if (!t.active) continue;` symmetrically with Enemy.
+   */
+  get active(): boolean {
+    return this.dissolveTimer === 0;
   }
 
   /** Effective stats after level + specialization, before global/run-wide upgrades. */
@@ -138,4 +205,9 @@ export class Tower {
       }
     }
   }
+}
+
+/** Base maxHp for a tower type — used by Tower constructor and refreshMaxHp. */
+function baseTowerMaxHp(type: TowerType): number {
+  return TOWER_HP_BY_TYPE[type] ?? TOWER_BASE_HP;
 }

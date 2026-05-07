@@ -23,10 +23,21 @@ export class SectorSelect {
 
     this.el.append(this.buildDifficultyPicker());
 
+    // Training simulation banner — rendered above the campaign grid so it
+    // never has to compete with locked sectors for attention. Always
+    // available, never gates progression.
+    const trainingDef = sectorDefinitions.find((s) => s.isTraining);
+    if (trainingDef) {
+      this.el.append(this.buildTrainingCard(trainingDef));
+    }
+
     const grid = el("div", { class: "ls-sector-grid ls-sector-starmap" });
     const bestCleared = this.game.core.profile.bestSectorCleared;
     const hasEndless = this.game.meta.aggregate().hasEndless;
     sectorDefinitions.forEach((s, i) => {
+      // Training is rendered separately above; skip it here so it never
+      // appears as a numbered campaign card.
+      if (s.isTraining) return;
       const sectorIndex = i + 1; // 1-based
       const isVoid = s.id === "sector_void";
       const isExpanse = s.id === "sector_06_fractured_expanse";
@@ -81,9 +92,21 @@ export class SectorSelect {
         block.append(
           el("div", { class: "ls-sector-obj-primary", text: `PRIMARY · ${obj.primary.label}` })
         );
+        // Cap the rendered secondary list to 4 so massive sectors (Sector 6/7
+        // with 8+ objectives) don't visually blow out the card. The full
+        // list is still visible in the in-run objectives panel.
         const secList = el("div", { class: "ls-sector-obj-secondary" });
-        for (const sec of obj.secondary) {
+        const secondaryShown = obj.secondary.slice(0, 4);
+        for (const sec of secondaryShown) {
           secList.append(el("div", { class: "ls-sector-obj-row", text: `+ ${sec.label}` }));
+        }
+        if (obj.secondary.length > secondaryShown.length) {
+          secList.append(
+            el("div", {
+              class: "ls-sector-obj-row",
+              text: `+ ${obj.secondary.length - secondaryShown.length} more secondary`,
+            })
+          );
         }
         block.append(secList);
         if (obj.counterplay.length) {
@@ -93,6 +116,12 @@ export class SectorSelect {
         }
         if (obj.hazards) {
           block.append(el("div", { class: "ls-sector-obj-hazard", text: `Hazard: ${obj.hazards}` }));
+        }
+        // Surface the "new mechanic" tag here too so the sector picker tells
+        // the player upfront when a sector adds a major system.
+        const mech = newMechanicForSector(s.id);
+        if (mech) {
+          block.append(el("div", { class: "ls-sector-obj-mech", text: `NEW · ${mech}` }));
         }
         card.append(block);
       }
@@ -131,7 +160,10 @@ export class SectorSelect {
     back.onclick = () => this.game.setState("MAIN_MENU");
     const research = el("button", { class: "ls-btn", text: "RESEARCH" });
     research.onclick = () => this.game.ui.openMeta();
-    buttons.append(back, research);
+    const codex = el("button", { class: "ls-btn ls-btn-ghost", text: "FIELD MANUAL (H)" });
+    codex.title = "Open the codex to read up on systems before launching.";
+    codex.onclick = () => this.game.ui.openCodex();
+    buttons.append(back, codex, research);
     this.el.append(buttons);
   }
 
@@ -176,6 +208,53 @@ export class SectorSelect {
     return card;
   }
 
+  /**
+   * Renders the dedicated Training Simulation card. Unlike campaign cards
+   * this one is always available, never numbered, and skips the loadout
+   * picker — the player launches directly into a fixed training run.
+   */
+  private buildTrainingCard(sector: SectorDefinition): HTMLElement {
+    const wrap = el("div", { class: "ls-training-card" });
+    wrap.style.borderColor = sector.accentColor;
+    const completed = this.game.core.profile.trainingCompleted;
+    const stagesCompleted = this.game.core.profile.trainingStagesCompleted;
+
+    const head = el("div", { class: "ls-training-card-head" });
+    head.append(
+      el("div", { class: "ls-training-tag", text: "OPTIONAL · TRAINING" }),
+      el("div", { class: "ls-training-name", text: sector.name }),
+      el("div", { class: "ls-training-desc", text: sector.description })
+    );
+    if (completed) {
+      head.append(
+        el("div", {
+          class: "ls-training-status complete",
+          text: `Training Complete · ${stagesCompleted} stage${stagesCompleted === 1 ? "" : "s"} cleared`,
+        })
+      );
+    }
+    wrap.append(head);
+
+    const actions = el("div", { class: "ls-training-card-actions" });
+    const startBtn = el("button", {
+      class: "ls-btn ls-btn-primary",
+      text: completed ? "REPLAY TRAINING" : "START TRAINING",
+    });
+    startBtn.title =
+      "Launch the optional training simulation. Eight short drills. No campaign progress required.";
+    startBtn.onclick = () => {
+      // Skip the loadout picker — training uses a fixed starting setup.
+      this.game.beginSector(sector, { endless: false });
+    };
+    const codexBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "FIELD MANUAL (H)" });
+    codexBtn.title = "Open the codex for system reference before starting.";
+    codexBtn.onclick = () => this.game.ui.openCodex();
+    actions.append(startBtn, codexBtn);
+    wrap.append(actions);
+
+    return wrap;
+  }
+
   private buildMapPreview(sector: SectorDefinition): HTMLElement {
     const preview = el("div", { class: "ls-sector-preview" });
     preview.style.borderColor = sector.accentColor;
@@ -197,6 +276,8 @@ export class SectorSelect {
     if ("NESW".includes(ch)) return "spawn";
     return "empty";
   }
+
+  // (helper newMechanicForSector lives at module scope below.)
 
   private buildDifficultyPicker(): HTMLElement {
     const wrap = el("div", { class: "ls-diff-picker" });
@@ -222,5 +303,24 @@ export class SectorSelect {
     }
     wrap.append(row);
     return wrap;
+  }
+}
+
+/**
+ * One-line summary of the major mechanic this sector introduces. Returns
+ * null for sectors that don't add a new system on top of the basics.
+ * Mirrors the same helper inside SectorBriefingOverlay so the sector card
+ * and the in-run briefing share the same wording.
+ */
+function newMechanicForSector(id: string): string | null {
+  switch (id) {
+    case "sector_03_deep_space_wreckage":
+      return "Strategic capture points";
+    case "sector_06_fractured_expanse":
+      return "Relay expansion + map control";
+    case "sector_07_blackout_array":
+      return "Hostile suppression + tower durability";
+    default:
+      return null;
   }
 }

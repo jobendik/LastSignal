@@ -229,6 +229,17 @@ export interface SectorDefinition {
    * Sectors that omit this array behave exactly as before.
    */
   strategicPoints?: StrategicPointDefinition[];
+  /**
+   * Marks this sector as the optional Operator Training simulation. Training
+   * sectors:
+   *  - skip random run modifiers,
+   *  - never update bestSectorCleared (so completing training does NOT
+   *    unlock campaign sectors),
+   *  - get a longer planning countdown and gentler tuning,
+   *  - render with a distinct "TRAINING" tag in Sector Select and are
+   *    always available regardless of campaign progress.
+   */
+  isTraining?: boolean;
 }
 
 // ---------- Strategic map points ----------
@@ -377,6 +388,23 @@ export interface UpgradeEffect {
   squadShieldStrengthMul?: number;
   /** Reduce jammer/rift suppression effect on squads (0..1, fraction subtracted from penalty). */
   squadJammerResistance?: number;
+  // ---------- TOWER DURABILITY (Part 15) ----------
+  /** Multiplier on Engineer repair-per-second on towers and abandoned turrets. */
+  engineerRepairMul?: number;
+  /** Flat HP added to every player tower's max HP (also raises armor pool). */
+  towerHpAdd?: number;
+  /** Multiplier on tower max HP. */
+  towerHpMul?: number;
+  /** Reduces Saboteur-applied tower disable duration (0..1 fraction subtracted). */
+  saboteurDisableReduction?: number;
+  /** Multiplier on damage that towers take from Saboteurs (< 1 = tower hardened). */
+  saboteurTowerDamageMul?: number;
+  /** Each wave end: first disabled tower auto-recovers to this fraction of HP. */
+  emergencyNanitesPct?: number;
+  /** Shield Squad damage reduction is multiplied by this when applied to towers. */
+  shieldTowerStrengthMul?: number;
+  /** Abandoned turret HP multiplier (Auto-Gun Plating upgrade). */
+  abandonedTurretHpMul?: number;
   /** Economy: harvester also shields adjacent towers (reduces incoming disable durations). */
   harvesterShieldAdjacent?: boolean;
   /** Economy: bonus credits per non-harvester tower adjacent to harvester. */
@@ -599,6 +627,20 @@ export interface PersistedProfile {
   dailyBestDate: string;
   /** True after the player has dismissed the in-game commander briefing. */
   commanderBriefingSeen: boolean;
+  /**
+   * Set of guidance ids the player has already seen + dismissed (cross-run).
+   * Tutorial cards and "new mechanic" banners check this so a returning
+   * commander never gets the same first-time popup twice.
+   */
+  guidanceSeen: string[];
+  /** Player toggle: show first-time tutorial cards. Defaults true. */
+  tutorialHintsEnabled: boolean;
+  /** Player toggle: show contextual gameplay hints. Defaults true. */
+  contextualHintsEnabled: boolean;
+  /** True after the player has completed the optional Operator Training run. */
+  trainingCompleted: boolean;
+  /** Number of training-stage objectives reached (for the summary screen). */
+  trainingStagesCompleted: number;
 }
 
 // ---------- Difficulty ----------

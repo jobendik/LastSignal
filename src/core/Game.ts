@@ -54,6 +54,7 @@ import { EndlessSystem } from "../systems/EndlessSystem";
 import { ObjectivesSystem } from "../systems/ObjectivesSystem";
 import { StrategicPointSystem } from "../systems/StrategicPointSystem";
 import { MobileSquadSystem } from "../systems/MobileSquadSystem";
+import { GuidanceSystem } from "../systems/GuidanceSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
@@ -92,6 +93,7 @@ export class Game {
   objectives!: ObjectivesSystem;
   strategicPoints!: StrategicPointSystem;
   squads!: MobileSquadSystem;
+  guidance!: GuidanceSystem;
   render!: RenderSystem;
   input!: InputSystem;
   ui!: UIManager;
@@ -179,6 +181,7 @@ export class Game {
     this.objectives = new ObjectivesSystem(this);
     this.strategicPoints = new StrategicPointSystem(this);
     this.squads = new MobileSquadSystem(this);
+    this.guidance = new GuidanceSystem(this);
     this.render = new RenderSystem(this);
     this.input = new InputSystem(this);
     this.ui = new UIManager(this);
@@ -188,6 +191,7 @@ export class Game {
     this.audio.applySettings(this.core.settings);
     this.input.attach();
     this.ui.attach();
+    this.guidance.attach();
     this.settings.applyVisualSettings();
     this.setState("MAIN_MENU");
     this.running = true;
@@ -269,9 +273,11 @@ export class Game {
     this.core.speed = 1;
     this.time.timeScale = 1;
 
-    // Roll run modifiers (skip on very first sector to ease new players in).
+    // Roll run modifiers (skip on very first sector to ease new players in,
+    // and always skip on the optional Operator Training run so the
+    // simulation stays predictable).
     const sectorIdx = sectorDefinitions.findIndex((s) => s.id === sector.id);
-    const mods = rollModifiers(sectorIdx);
+    const mods = sector.isTraining ? [] : rollModifiers(sectorIdx);
     this.core.activeModifiers = mods;
     // Apply core integrity modifier, then sync coreIntegrity to final coreMax.
     for (const m of mods) {
@@ -295,6 +301,7 @@ export class Game {
     this.squads.reset();
     this.waves.reset();
     this.codex.reset();
+    this.guidance.reset();
     this.endless.reset();
     if (opts.endless) this.endless.enable();
 
@@ -409,6 +416,24 @@ export class Game {
         this.core.coreMax,
         this.core.coreIntegrity + u.effect.coreIntegrityAdd
       );
+    }
+    // Hardened Circuits / Tower HP upgrades: refresh existing towers' max HP.
+    if (
+      u.effect.towerHpAdd != null ||
+      u.effect.towerHpMul != null
+    ) {
+      for (const t of this.towers.list) this.towers.applyDurabilityAggregate(t);
+    }
+    // Auto-Gun Plating: bump captured abandoned turret HP cap retroactively.
+    if (u.effect.abandonedTurretHpMul != null && this.strategicPoints) {
+      const mul = u.effect.abandonedTurretHpMul;
+      for (const p of this.strategicPoints.list) {
+        if (p.type !== "abandoned_turret" || p.state !== "captured") continue;
+        const newMax = Math.max(1, Math.round(p.maxHealth * mul));
+        const pct = p.maxHealth > 0 ? p.health / p.maxHealth : 1;
+        (p as { maxHealth: number }).maxHealth = newMax;
+        p.health = Math.max(1, Math.round(newMax * pct));
+      }
     }
     // Cursed upgrades also add a permanent debuff modifier for the rest of the run.
     if (u.curse) {
@@ -714,10 +739,22 @@ export class Game {
     const p = this.core.profile;
     if (!this.core.sector) return;
     const result = this.state === "VICTORY" ? "victory" : "defeat";
+    const isTraining = this.core.sector.isTraining === true;
     const sectorIndex =
       sectorDefinitions.findIndex((s) => s.id === this.core.sector!.id) + 1;
     if (this.state === "VICTORY") {
-      p.bestSectorCleared = Math.max(p.bestSectorCleared, sectorIndex);
+      // Training never updates campaign progression — it's optional and
+      // sits outside the Sector 1 → 7 unlock chain.
+      if (!isTraining) {
+        p.bestSectorCleared = Math.max(p.bestSectorCleared, sectorIndex);
+      } else {
+        // Mark training as completed + count secondary stages cleared so the
+        // completion screen and Sector Select can show "Training Complete".
+        p.trainingCompleted = true;
+        const secondaries = this.objectives.evaluateSecondaries(true);
+        const cleared = secondaries.filter((r) => r.completed).length;
+        p.trainingStagesCompleted = Math.max(p.trainingStagesCompleted, cleared);
+      }
     }
     p.bestWaveReached = Math.max(p.bestWaveReached, this.core.waveIndex);
     const corePct = Math.floor(
@@ -732,6 +769,11 @@ export class Game {
     const dailyScore = this.core.waveIndex * 1000 + this.core.stats.enemiesKilled + corePct * 10;
     if (p.dailyBestDate === today) p.dailyBestScore = Math.max(p.dailyBestScore, dailyScore);
     this.persistence.saveProfile(p);
+  }
+
+  /** Convenience getter — true while the active sector is the training run. */
+  get isTraining(): boolean {
+    return this.core.sector?.isTraining === true;
   }
 
   // ----- Update -----
@@ -821,6 +863,9 @@ export class Game {
 
     this.camera.update(dt);
     this.input.update(dt);
+    // Guidance ticks regardless of state so tutorials persist on pause and
+    // hints can wind down naturally. Uses raw dt so pause freezes the timers.
+    if (this.guidance) this.guidance.update(this.time.dt);
   }
 
   private saveRunSnapshot(): void {

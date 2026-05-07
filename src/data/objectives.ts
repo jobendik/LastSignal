@@ -46,7 +46,19 @@ export type ObjectiveKind =
   /** Deploy at least N squads of the named type during the run. */
   | "deploy_n_squad"
   /** Strike-squad damage destroyed at least N hostile structures of a given type. */
-  | "squad_destroy_n_strategic";
+  | "squad_destroy_n_strategic"
+  /** Engineer/Engineer-driven repair completed at least N times this run. */
+  | "tower_repairs_at_least"
+  /** Finish the run with no towers in disabled state at the end. */
+  | "no_disabled_towers_at_end"
+  /** Deploy at least N relay cores during the run. */
+  | "deploy_n_relays"
+  /** Survive at least N waves (waveIndex >= N). */
+  | "survive_wave_at_least"
+  /** Upgrade to at least Command Tier N (1, 2, or 3). */
+  | "command_tier_at_least"
+  /** EVAC at least one squad during the run. */
+  | "squad_evac_any";
 
 export interface ObjectiveDefinition {
   id: string;
@@ -235,9 +247,14 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
 
   sector_04_hostile_core: {
     briefing:
-      "The hostile core itself. Sabotage, artillery, multi-boss pressure. Spread your towers, defend in depth, expect the unexpected.",
-    counterplay: ["Spread placement (anti-artillery)", "Snare/EMP for Saboteurs", "Railgun + Reflector for boss damage"],
-    hazards: "Harbinger artillery and Saboteur sabotage punish dense clusters. Spacing matters.",
+      "The hostile core itself. Sabotage, artillery, multi-boss pressure. Saboteurs damage and disable real tower HP — keep an Engineer Squad available for repairs and don't cluster expensive towers.",
+    counterplay: [
+      "Spread placement (anti-artillery)",
+      "Snare/EMP for Saboteurs",
+      "Engineer Squad to repair / restore towers",
+      "Railgun + Reflector for boss damage",
+    ],
+    hazards: "Harbinger artillery and Saboteur HP-damage punish dense clusters. Engineer recovery is now meaningful.",
     primary: {
       id: "s4_primary",
       label: "Defeat the Leviathan.",
@@ -316,14 +333,15 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
 
   sector_06_fractured_expanse: {
     briefing:
-      "Lost relays, hostile rifts, and dead-air zones stretch past the dish. Push your signal network outward — deploy Recon to scout dark corridors, Engineer to accelerate captures, and survive the multi-front swarm.",
+      "Lost relays, hostile rifts, and dead-air zones stretch past the dish. Push your signal network outward — deploy Recon to scout dark corridors, Engineer to capture and repair forward towers, and survive the multi-front swarm.",
     counterplay: [
       "Roll relays toward signal nodes",
       "Capture the radar dish for wave intel",
       "Bring towers within range of rift anchors",
       "Deploy Recon squads to scout the eastern frontier",
+      "Engineer Squad repairs forward towers and the wreckage turret",
     ],
-    hazards: "Hostile rift anchors and a jammer dim the map until destroyed.",
+    hazards: "Hostile rift anchors and a jammer dim the map until destroyed. Saboteurs damage exposed forward towers — keep an Engineer ready.",
     primary: {
       id: "s6_primary",
       label: "Survive every wave of the Fractured Expanse.",
@@ -500,12 +518,149 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
         value: 3,
         rewardResearch: 2,
       },
+      {
+        id: "s7_keep_infrastructure_online",
+        label: "Finish the assault with no towers offline.",
+        detail: "Engineer recovery is critical — every disabled gun is a hole in the line.",
+        kind: "no_disabled_towers_at_end",
+        rewardResearch: 3,
+        rewardCredits: 80,
+      },
+    ],
+  },
+  sector_00_operator_training: {
+    briefing:
+      "Operator Training simulation. Optional. Eight short drills introduce towers, signal expansion, capture, mobile squads, repair, and hostile-structure suppression. Failure here costs you nothing.",
+    counterplay: [
+      "Build inside Signal Coverage",
+      "Deploy a Relay Core (R) for Stage 2",
+      "Capture nodes / radar / turret / cache",
+      "Try every squad: F1 Recon, F2 Engineer, F3 Strike, F4 Shield",
+      "Repair damaged towers with Engineer",
+      "Tear down the Rift Anchor and Jammer",
+    ],
+    hazards: "No environmental hazards. The only pressure is authored waves.",
+    primary: {
+      id: "tr_primary",
+      label: "Complete the certification wave (Wave 8).",
+      detail: "Survive every drill in the simulation.",
+      kind: "survive_all",
+    },
+    // Stage objectives — each maps onto a teaching beat from the training spec.
+    // They complete as soon as their predicate is met, so the player feels
+    // forward progress every couple minutes, not only at the end.
+    secondary: [
+      {
+        id: "tr_build_two",
+        label: "Stage 1 — Build 2 towers in coverage.",
+        detail: "Any combination — Pulse, Blaster, etc. all count.",
+        kind: "build_n_of_type",
+        // No towerType set ⇒ counts every tower built this run.
+        value: 2,
+      },
+      {
+        id: "tr_deploy_relay",
+        label: "Stage 2 — Deploy a Relay Core.",
+        detail: "Press R to enter relay deploy mode, then click a valid spot.",
+        kind: "deploy_n_relays",
+        value: 1,
+      },
+      {
+        id: "tr_capture_signal",
+        label: "Stage 3 — Capture the Signal Node.",
+        detail: "Channel friendlies on the North Repeater.",
+        kind: "capture_n_strategic",
+        strategicType: "signal_node",
+        value: 1,
+      },
+      {
+        id: "tr_capture_radar",
+        label: "Stage 3 — Capture the Radar Dish.",
+        detail: "Push west and capture the damaged dish to widen reveal.",
+        kind: "capture_n_strategic",
+        strategicType: "radar_dish",
+        value: 1,
+      },
+      {
+        id: "tr_recover_cache",
+        label: "Stage 3 — Recover the Data Cache.",
+        detail: "The eastern cache awards credits and a research point.",
+        kind: "capture_n_strategic",
+        strategicType: "data_cache",
+        value: 1,
+      },
+      {
+        id: "tr_capture_turret",
+        label: "Stage 4 — Capture the Abandoned Turret.",
+        detail: "Wake the south-lane auto-gun.",
+        kind: "capture_n_strategic",
+        strategicType: "abandoned_turret",
+        value: 1,
+      },
+      {
+        id: "tr_squad_recon",
+        label: "Stage 5 — Deploy a Recon Squad.",
+        detail: "F1 to arm. Click the world to drop. Recon reveals darkness.",
+        kind: "deploy_any_squad",
+        squadType: "recon",
+      },
+      {
+        id: "tr_squad_engineer",
+        label: "Stage 5 — Deploy an Engineer Squad.",
+        detail: "F2 to arm. Engineers capture faster and repair towers.",
+        kind: "deploy_any_squad",
+        squadType: "engineer",
+      },
+      {
+        id: "tr_squad_strike",
+        label: "Stage 5 — Deploy a Strike Squad.",
+        detail: "F3 to arm. Strike squads suppress hostile structures.",
+        kind: "deploy_any_squad",
+        squadType: "strike",
+      },
+      {
+        id: "tr_squad_shield",
+        label: "Stage 5 — Deploy a Shield Squad.",
+        detail: "F4 to arm. Shield squads protect cores and towers.",
+        kind: "deploy_any_squad",
+        squadType: "shield",
+      },
+      {
+        id: "tr_repair_tower",
+        label: "Stage 6 — Repair a tower.",
+        detail: "Engineer a damaged or disabled tower back online.",
+        kind: "tower_repairs_at_least",
+        value: 1,
+      },
+      {
+        id: "tr_destroy_jammer",
+        label: "Stage 7 — Silence the Jammer.",
+        detail: "Bring down the eastern Short-Range Jammer.",
+        kind: "destroy_n_strategic",
+        strategicType: "jammer",
+        value: 1,
+      },
+      {
+        id: "tr_destroy_rift",
+        label: "Stage 7 — Destroy the Rift Anchor.",
+        detail: "Tear down the eastern anchor before it cripples your line.",
+        kind: "destroy_n_strategic",
+        strategicType: "rift_anchor",
+        value: 1,
+      },
+      {
+        id: "tr_squad_evac",
+        label: "Stage 8 — EVAC a squad.",
+        detail: "Press Q to recall a damaged squad. Saving units matters.",
+        kind: "squad_evac_any",
+      },
     ],
   },
 };
 
 /** Sector-id ordered list, useful for UI iteration. */
 export const sectorObjectiveOrder: string[] = [
+  "sector_00_operator_training",
   "sector_01_broken_relay",
   "sector_02_orbital_platform",
   "sector_03_deep_space_wreckage",

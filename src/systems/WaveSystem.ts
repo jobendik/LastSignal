@@ -56,7 +56,14 @@ export class WaveSystem {
 
   /** Planning-phase countdown (seconds) until auto-start. 0 disables auto-start. */
   planningCountdown = 0;
-  readonly planningDuration = 20;
+  /**
+   * Auto-start countdown duration. The training simulation extends planning
+   * to 35 seconds so a new player has more time to read tutorial cards
+   * between drills; campaign sectors keep the brisk 20-second default.
+   */
+  get planningDuration(): number {
+    return this.game.core.sector?.isTraining ? 35 : 20;
+  }
 
   get currentWaveDef(): WaveDefinition | null {
     const sector = this.game.core.sector;
@@ -214,6 +221,14 @@ export class WaveSystem {
     // Supply Drop: flat credit bonus per wave.
     if (up.waveCompleteCredits > 0) {
       this.game.addCredits(up.waveCompleteCredits);
+    }
+    // Field repairs: damaged towers inside coverage heal a small amount; the
+    // first disabled tower per wave can auto-recover with the Emergency
+    // Nanites upgrade. Disabled towers otherwise stay disabled until the
+    // player engineer-restores them.
+    this.game.towers.applyWaveEndRecovery();
+    if (this.game.strategicPoints) {
+      this.game.strategicPoints.applyWaveEndRecovery();
     }
     this.game.economy.onWaveComplete();
     this.checkMilestones();

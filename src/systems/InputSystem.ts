@@ -474,6 +474,13 @@ export class InputSystem {
 
     switch (code) {
       case "Escape":
+        // Esc precedence: close any open help overlay first so the player
+        // can dismiss the Codex without also nuking their tower selection.
+        if (this.isHelpOpen()) {
+          this.game.ui.closeCodex();
+          this.game.bus.emit("ui:esc");
+          break;
+        }
         this.clearSelection();
         this.game.core.coreDeployMode = false;
         this.game.core.killZoneMode = false;
@@ -509,8 +516,24 @@ export class InputSystem {
         e.preventDefault();
         break;
       case "KeyH":
-        this.game.core.showHeatmap = !this.game.core.showHeatmap;
+        // Default H opens the Help / Codex overlay. Shift+H still toggles
+        // the debug heatmap so power users keep the visualization.
+        if (e.shiftKey) {
+          this.game.core.showHeatmap = !this.game.core.showHeatmap;
+        } else if (this.isHelpOpen()) {
+          this.game.ui.closeCodex();
+        } else {
+          this.game.ui.openCodex();
+        }
         e.preventDefault();
+        break;
+      case "Slash":
+        // '?' (Shift+/) is the universal help shortcut.
+        if (e.shiftKey) {
+          if (this.isHelpOpen()) this.game.ui.closeCodex();
+          else this.game.ui.openCodex();
+          e.preventDefault();
+        }
         break;
       case bindings.killZone:
         if (this.isBuildingState()) {
@@ -606,6 +629,11 @@ export class InputSystem {
   get hoverWorld(): { x: number; y: number } | null {
     if (!this.overCell) return null;
     return { x: this.overCell.c * TILE_SIZE + TILE_SIZE / 2, y: this.overCell.r * TILE_SIZE + TILE_SIZE / 2 };
+  }
+
+  /** Whether the Help / Codex overlay is currently open. */
+  private isHelpOpen(): boolean {
+    return this.game.ui?.codexPanel?.el.classList.contains("visible") ?? false;
   }
 
   /** Find an active squad whose center is within `maxPx` of (x,y). */

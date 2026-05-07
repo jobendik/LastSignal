@@ -864,6 +864,10 @@
   gap: 2px;
   font-size: 10px;
   box-sizing: border-box;
+  /* Cap the panel so the 15-stage training list (and any future verbose
+   * sector) scrolls inside the sidebar instead of overflowing it. */
+  max-height: 38vh;
+  overflow-y: auto;
 }
 .ls-objectives-panel.visible { display: flex; }
 .ls-obj-title {
@@ -1088,6 +1092,49 @@
   letter-spacing: 1px;
   text-transform: uppercase;
   animation: ls-jam-flicker 1.4s ease-in-out infinite;
+}
+.ls-tp-hp { margin-top: 8px; }
+.ls-tp-hp-label {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 10px; color: #c5c6c7; letter-spacing: 1px;
+}
+.ls-tp-hp-label b { color: #66fcf1; }
+.ls-tp-hp-state { font-weight: 600; letter-spacing: 1px; }
+.ls-tp-hp-bar {
+  margin-top: 4px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  position: relative;
+}
+.ls-tp-hp-fill {
+  height: 100%;
+  background: #9be7a7;
+  transition: width 0.18s ease;
+}
+.ls-tp-fx-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.ls-tp-fx {
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  background: rgba(255, 255, 255, 0.04);
+}
+.ls-tp-fx-shield { color: #80deea; }
+.ls-tp-fx-repair { color: #9be7a7; animation: ls-jam-flicker 1.6s ease-in-out infinite; }
+.ls-tp-fx-hit { color: #ff8a65; }
+.ls-tp-hint {
+  font-size: 10px;
+  color: #c5c6c7;
+  background: rgba(102, 252, 241, 0.08);
+  border-left: 2px solid rgba(102, 252, 241, 0.6);
+  padding: 4px 6px;
+  margin-top: 6px;
+}
+.ls-tp-hint-warn {
+  color: #ff8a65;
+  background: rgba(244, 67, 54, 0.10);
+  border-left-color: #ff5252;
 }
 @keyframes ls-jam-flicker {
   0%, 100% { opacity: 0.95; }
@@ -1802,5 +1849,516 @@
   .ls-title {
     font-size: 40px;
     letter-spacing: 5px;
+  }
+}
+
+/* ===== Codex / Help screen — tabbed layout ===== */
+.ls-codex {
+  /* Centered card with internal scroll. The wrapping ls-overlay already
+   * handles the dark backdrop and z-index. */
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 4vh 4vw;
+}
+.ls-codex-card-root {
+  width: 100%;
+  height: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: rgba(6, 10, 16, 0.96);
+  border: 1px solid rgba(102, 252, 241, 0.32);
+  box-shadow: 0 0 18px rgba(102, 252, 241, 0.18);
+  padding: 14px 18px;
+  box-sizing: border-box;
+  text-align: left;
+  gap: 10px;
+}
+.ls-codex-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ls-codex-header .ls-overlay-title {
+  font-size: 24px;
+  letter-spacing: 4px;
+}
+.ls-codex-subtitle {
+  font-size: 11px;
+  color: #8a9099;
+  letter-spacing: 1.5px;
+  margin-top: 4px;
+}
+.ls-codex-close-row {
+  display: flex;
+  gap: 6px;
+}
+.ls-codex-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(102, 252, 241, 0.14);
+}
+.ls-codex-tab {
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid rgba(102, 252, 241, 0.22);
+  color: #c5c6c7;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.1s ease;
+}
+.ls-codex-tab:hover { background: rgba(102, 252, 241, 0.08); transform: translateY(-1px); }
+.ls-codex-tab.active {
+  background: rgba(102, 252, 241, 0.10);
+  box-shadow: 0 0 10px rgba(102, 252, 241, 0.25);
+}
+.ls-codex-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 2px;
+}
+
+.ls-help-section { display: flex; flex-direction: column; gap: 8px; }
+.ls-help-section-title {
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: #66fcf1;
+}
+.ls-help-section-subtitle {
+  font-size: 11px;
+  color: #8a9099;
+  letter-spacing: 1px;
+}
+.ls-help-entry-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+.ls-help-entry {
+  background: rgba(10, 14, 20, 0.78);
+  border: 1px solid rgba(102, 252, 241, 0.22);
+  border-left-width: 3px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ls-help-entry-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #66fcf1;
+  text-transform: uppercase;
+}
+.ls-help-entry-body {
+  color: #c5c6c7;
+}
+.ls-help-entry-bullets {
+  margin: 2px 0 2px 14px;
+  padding: 0;
+  color: #c5c6c7;
+}
+.ls-help-entry-bullets li {
+  margin: 1px 0;
+  font-size: 11px;
+  list-style: square;
+}
+.ls-help-entry-tip {
+  font-size: 11px;
+  color: #ffe082;
+  border-top: 1px dashed rgba(255, 224, 130, 0.22);
+  padding-top: 5px;
+}
+
+/* ===== Guidance overlays (tutorial cards + banners + hints) ===== */
+.ls-guidance-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 70;
+}
+.ls-guidance-tutorial,
+.ls-guidance-banner,
+.ls-guidance-hint {
+  display: none;
+  pointer-events: auto;
+  position: absolute;
+  background: rgba(6, 10, 16, 0.95);
+  border: 1px solid rgba(102, 252, 241, 0.4);
+  color: #c5c6c7;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 0 14px rgba(102, 252, 241, 0.25);
+  animation: ls-guidance-pop 0.22s ease-out;
+}
+.ls-guidance-tutorial.visible,
+.ls-guidance-banner.visible,
+.ls-guidance-hint.visible { display: flex; flex-direction: column; gap: 6px; }
+@keyframes ls-guidance-pop {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ls-guidance-tutorial {
+  /* Pinned to bottom-center so it doesn't overlap HUD or sidebar. */
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  min-width: 320px;
+  max-width: 480px;
+  border-color: #ffeb3b;
+  box-shadow: 0 0 18px rgba(255, 235, 59, 0.25);
+}
+.ls-guidance-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ls-guidance-eyebrow {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: #ffeb3b;
+}
+.ls-guidance-title {
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #ffffff;
+  flex: 1 1 auto;
+}
+.ls-guidance-hint-pill {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border: 1px solid rgba(102, 252, 241, 0.4);
+  color: #66fcf1;
+  letter-spacing: 1px;
+}
+.ls-guidance-body {
+  font-size: 12px;
+  color: #c5c6c7;
+  line-height: 1.5;
+}
+.ls-guidance-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.ls-guidance-btn {
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 5px 10px;
+}
+
+.ls-guidance-banner {
+  /* Top-center, just under the boss bar / rift warning. */
+  left: 50%;
+  top: 132px;
+  transform: translateX(-50%);
+  min-width: 320px;
+  max-width: 540px;
+  border-color: #80deea;
+  box-shadow: 0 0 14px rgba(128, 222, 234, 0.3);
+  padding-right: 28px;
+}
+.ls-guidance-banner-title {
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: #80deea;
+  text-transform: uppercase;
+}
+.ls-guidance-banner-body {
+  font-size: 12px;
+  color: #c5c6c7;
+}
+.ls-guidance-banner-link {
+  background: transparent;
+  border: 1px solid rgba(128, 222, 234, 0.5);
+  color: #80deea;
+  padding: 3px 7px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.ls-guidance-banner-link:hover { background: rgba(128, 222, 234, 0.12); }
+.ls-guidance-banner-close {
+  position: absolute;
+  top: 4px; right: 6px;
+  background: transparent;
+  border: none;
+  color: #8a9099;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.ls-guidance-banner-close:hover { color: #ffffff; }
+
+.ls-guidance-hint {
+  /* Top-right, narrow, fades automatically. */
+  top: 156px;
+  right: 12px;
+  width: 260px;
+  border-color: rgba(255, 179, 0, 0.5);
+  box-shadow: 0 0 10px rgba(255, 179, 0, 0.18);
+  padding: 8px 10px;
+}
+.ls-guidance-hint-title {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #ffb300;
+  text-transform: uppercase;
+}
+.ls-guidance-hint-body {
+  font-size: 11px;
+  color: #c5c6c7;
+}
+
+/* ===== Wave preview panel — richer layout ===== */
+.ls-wp-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ls-wp-eyebrow {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: #66fcf1;
+  opacity: 0.8;
+}
+.ls-wp-boss-chip {
+  margin-left: auto;
+  font-size: 9px;
+  padding: 2px 6px;
+  letter-spacing: 2px;
+  background: rgba(255, 82, 82, 0.15);
+  border: 1px solid #ff5252;
+  color: #ffd2cc;
+}
+.ls-wp-desc {
+  font-size: 11px;
+  color: #c5c6c7;
+  margin: 4px 0 6px;
+  line-height: 1.45;
+}
+.ls-wp-event {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #b39ddb;
+  border: 1px dashed rgba(179, 157, 219, 0.45);
+  padding: 3px 6px;
+  align-self: flex-start;
+}
+.ls-wp-warning.danger {
+  border-color: #ff5252;
+  color: #ffb3b3;
+}
+.ls-wp-enemy-meta {
+  margin-left: auto;
+  font-size: 10px;
+  color: #8a9099;
+  letter-spacing: 0.5px;
+}
+.ls-wp-counter-chip.squad {
+  border-color: rgba(128, 216, 255, 0.55);
+  color: #a4dffc;
+  background: rgba(128, 216, 255, 0.08);
+}
+.ls-wp-fallback {
+  font-size: 11px;
+  color: #8a9099;
+  font-style: italic;
+}
+.ls-wp-hotkey {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #6a737d;
+  margin-top: 6px;
+  border-top: 1px solid rgba(102, 252, 241, 0.12);
+  padding-top: 5px;
+}
+
+/* ===== Sector briefing additions ===== */
+.ls-sb-secondary {
+  display: inline-block;
+  margin-right: 8px;
+  color: #9be7a7;
+  font-size: 10px;
+}
+.ls-sb-mechanic {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 235, 59, 0.4);
+  background: rgba(255, 235, 59, 0.07);
+  padding: 5px 8px;
+  align-self: flex-start;
+  font-size: 11px;
+  color: #ffeb3b;
+}
+.ls-sb-mechanic-tag {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #ffeb3b;
+  border: 1px solid rgba(255, 235, 59, 0.5);
+  padding: 1px 5px;
+}
+.ls-sb-mechanic-text {
+  color: #ffe082;
+}
+.ls-sb-footer {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #6a737d;
+  margin-top: 4px;
+}
+
+/* Sector card "new mechanic" tag (sector picker). */
+.ls-sector-obj-mech {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #ffeb3b;
+  letter-spacing: 1px;
+}
+
+/* ===== Training Simulation card (Sector Select) ===== */
+.ls-training-card {
+  width: min(860px, calc(100vw - 32px));
+  margin: 0 auto 14px;
+  padding: 12px 16px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 235, 59, 0.08),
+    rgba(255, 179, 0, 0.04) 60%,
+    rgba(102, 252, 241, 0.05)
+  );
+  border: 1px solid rgba(255, 235, 59, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  text-align: left;
+  box-shadow: 0 0 12px rgba(255, 235, 59, 0.15);
+}
+.ls-training-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ls-training-tag {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: #ffeb3b;
+  align-self: flex-start;
+  border: 1px solid rgba(255, 235, 59, 0.5);
+  padding: 1px 6px;
+}
+.ls-training-name {
+  font-size: 18px;
+  letter-spacing: 2px;
+  color: #ffe082;
+  text-shadow: 0 0 8px rgba(255, 224, 130, 0.3);
+}
+.ls-training-desc {
+  font-size: 12px;
+  color: #c5c6c7;
+  line-height: 1.45;
+}
+.ls-training-status {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #8a9099;
+  margin-top: 2px;
+}
+.ls-training-status.complete {
+  color: #9be7a7;
+  border-left: 2px solid #9be7a7;
+  padding-left: 6px;
+}
+.ls-training-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ===== Training completion screen (training-specific Victory) ===== */
+.ls-training-complete .ls-training-complete-eyebrow {
+  font-size: 11px;
+  letter-spacing: 5px;
+  color: #ffeb3b;
+  margin-bottom: -8px;
+  text-shadow: 0 0 10px rgba(255, 235, 59, 0.45);
+}
+.ls-training-complete .ls-overlay-title {
+  color: #ffe082;
+  text-shadow:
+    0 0 18px rgba(255, 224, 130, 0.6),
+    0 0 36px rgba(255, 179, 0, 0.35);
+}
+.ls-training-complete .ls-stats {
+  text-align: left;
+  background: rgba(8, 12, 18, 0.78);
+  border-color: rgba(255, 235, 59, 0.28);
+  max-width: 520px;
+}
+.ls-training-complete .ls-victory-unlock {
+  color: #80deea;
+  border: 1px dashed rgba(128, 222, 234, 0.35);
+  padding: 6px 10px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+}
+
+/* ===== Mobile / responsive overrides for guidance and codex ===== */
+@media (max-width: 760px), (orientation: portrait) {
+  .ls-codex {
+    padding: 2vh 2vw;
+  }
+  .ls-codex-card-root {
+    padding: 10px 12px;
+  }
+  .ls-help-entry-list {
+    grid-template-columns: 1fr;
+  }
+  .ls-guidance-tutorial {
+    bottom: 64px;
+    min-width: unset;
+    max-width: calc(100vw - 24px);
+    width: calc(100vw - 24px);
+  }
+  .ls-guidance-banner {
+    top: 110px;
+    min-width: unset;
+    max-width: calc(100vw - 24px);
+    width: calc(100vw - 24px);
+  }
+  .ls-guidance-hint {
+    top: auto;
+    bottom: 24vh;
+    right: 8px;
+    width: calc(100vw - 18px);
+    max-width: 320px;
+  }
+  .ls-training-card {
+    width: calc(100vw - 24px);
+    padding: 10px 12px;
+  }
+  .ls-training-name {
+    font-size: 15px;
+    letter-spacing: 1.5px;
   }
 }

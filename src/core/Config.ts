@@ -228,3 +228,105 @@ export const SQUAD_EVAC_SPEED_MUL = 1.6;
 export const SQUAD_EVAC_ARRIVAL_RADIUS = 36;
 /** Fraction of base cooldown returned when a squad evacuates safely. */
 export const SQUAD_EVAC_REFUND = 0.5;
+
+// ──────────────────────────────────────────────────────────
+// Tower durability / repair (Part 1–2)
+// Tower HP is intentionally generous — towers stay operational through normal
+// combat, but Saboteurs/bosses/rifts can grind them down enough that the player
+// notices state changes (damaged/critical/disabled) and reaches for Engineer
+// or Shield squads. We do NOT want a maintenance simulator: damage is rare and
+// recovery is cheap relative to rebuilding, so the loop adds tension and
+// agency without becoming chore-like.
+// ──────────────────────────────────────────────────────────
+import type { TowerType } from "./Types";
+
+/** Default HP for a tower if its type isn't listed below. */
+export const TOWER_BASE_HP = 60;
+
+/**
+ * Per-type max HP. Cheap/disposable towers are softer; expensive heavies and
+ * support towers are sturdier. Long-range fragiles (Railgun) take more hits
+ * than a Pulse but less than a Mortar. Harvester is the toughest non-combat
+ * structure to make economic loss reads as painful but recoverable.
+ */
+export const TOWER_HP_BY_TYPE: Record<TowerType, number> = {
+  pulse: 50,
+  blaster: 50,
+  stasis: 55,
+  mortar: 80,
+  tesla: 70,
+  harvester: 90,
+  railgun: 60,
+  flamer: 55,
+  barrier: 75,
+  amplifier: 65,
+  reflector: 60,
+  snare: 50,
+  overclock: 65,
+};
+
+/**
+ * Per-level HP multiplier. Levels are explicit investment — keeping towers
+ * leveled means they can absorb more sabotage before going offline. We keep
+ * the curve gentle (×1.20 per level) so this does not eclipse the level-based
+ * damage curve and become the dominant upgrade reason.
+ */
+export const TOWER_HP_PER_LEVEL_MUL = 1.20;
+
+/** HP percent thresholds. ≤ damaged → "damaged", ≤ critical → "critical". */
+export const TOWER_DAMAGED_THRESHOLD = 0.65;
+export const TOWER_CRITICAL_THRESHOLD = 0.30;
+
+/** Fire-rate / range / damage mults applied while in damaged or critical state. */
+export const TOWER_DAMAGED_FIRE_RATE_MUL = 0.92;
+export const TOWER_CRITICAL_FIRE_RATE_MUL = 0.70;
+export const TOWER_CRITICAL_RANGE_MUL = 0.85;
+export const TOWER_CRITICAL_DAMAGE_MUL = 0.85;
+
+/** Engineer squad HP-restored-per-second when channeling on a damaged tower. */
+export const ENGINEER_TOWER_REPAIR_RATE = 14;
+/** Bonus rate added when reviving a fully disabled tower (faster restart). */
+export const ENGINEER_DISABLED_REPAIR_BONUS = 1.5;
+/** When inside a jammer field, repair speed is multiplied by this. */
+export const JAMMER_REPAIR_PENALTY = 0.5;
+/** Fraction of repair throughput retained per additional engineer (diminishing returns). */
+export const ENGINEER_REPAIR_STACK_FACTOR = 0.5;
+/** Cap on simultaneous engineers contributing to one tower's repair. */
+export const ENGINEER_REPAIR_STACK_CAP = 2;
+
+/** Saboteur tower-damage tuning (replaces hard-disable at full HP). */
+export const SABOTEUR_TOWER_DAMAGE = 22;
+/**
+ * Seconds a tower stays disabled when a Saboteur kills its HP. Note: this is
+ * the soft-disable timer — once HP regenerates above 0 (via repair / passive),
+ * the tower comes back online sooner. This timer guarantees a minimum offline
+ * window when the saboteur scores a finishing blow.
+ */
+export const SABOTEUR_DISABLE_DURATION = 3.0;
+/** Seconds between sabotage applications from the same saboteur. */
+export const SABOTEUR_TOWER_COOLDOWN = 5.0;
+/** Saboteur sabotage radius (px) — slightly tighter than v1 since damage replaces disable. */
+export const SABOTEUR_TOWER_RADIUS = 38;
+
+/** Boss corruption pulse: per-tower HP damage applied on top of the existing disable. */
+export const BOSS_TOWER_DAMAGE = 14;
+/** Multiplier to BOSS_TOWER_DAMAGE for Leviathan / Harbinger so their pulses really threaten infrastructure. */
+export const BOSS_TOWER_DAMAGE_MULTIPLIER = 1.4;
+
+/** HP per second drained from towers caught in a rift-anchor pulse aura. */
+export const RIFT_TOWER_DAMAGE_PER_SECOND = 3.5;
+
+/** Extra damage reduction Shield Squad applies specifically to towers (on top of core protection). */
+export const SHIELD_TOWER_DAMAGE_REDUCTION = 0.45;
+
+/** Abandoned turret HP (durable but not immortal). */
+export const ABANDONED_TURRET_HP = 130;
+/** HP/s an Engineer restores when reinforcing a captured abandoned turret. */
+export const ABANDONED_TURRET_REPAIR_RATE = 12;
+
+/**
+ * End-of-wave passive recovery (Part 16). Damaged towers inside coverage heal
+ * 12% of max HP at wave complete. Disabled towers stay disabled — the player
+ * has to actively repair them, which preserves saboteur threat across waves.
+ */
+export const WAVE_END_PASSIVE_HEAL_PCT = 0.12;

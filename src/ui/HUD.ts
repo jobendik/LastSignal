@@ -20,7 +20,7 @@ export class HUD {
   private empBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "EMP" });
   private pauseBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "PAUSE (P)" });
   private settingsBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "⚙" });
-  private codexBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "CODEX" });
+  private codexBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "CODEX (H)" });
   private codexAlert = el("div", { class: "ls-codex-alert" });
   private bossBar = el("div", { class: "ls-boss-bar" });
   private modifierStrip = el("div", { class: "ls-modifier-strip" });
@@ -150,8 +150,18 @@ export class HUD {
     this.pauseBtn.onclick = () => this.game.togglePause();
     this.repairBtn.onclick = () => this.game.repairCore();
     this.commandTierBtn.onclick = () => this.game.upgradeCommandTier();
-    this.relayCoreBtn.title = "Relay cores extend signal range and unlock new build zones.";
-    this.commandTierBtn.title = "Command Tier increases drone cap, militia pulse, and relay reach.";
+    this.relayCoreBtn.title =
+      "Relay Core: extends signal coverage so you can build farther from the home core. " +
+      "Click to enter deploy mode (R), then click a valid spot. Esc cancels.";
+    this.commandTierBtn.title =
+      "Command Tier: upgrades your command network. Higher tiers unlock new squads " +
+      "(Engineer at T2, Strike + Shield at T3) and increase relay caps and coverage. (Y)";
+    this.codexBtn.title = "Open the Field Manual / Codex (H or ?). Reference for every system, control, and threat.";
+    this.startWaveBtn.title = "Start the next wave early (Space). Earlier starts award bonus credits.";
+    this.repairBtn.title = "Spend 30 CR to restore Core Integrity (capped at 80%).";
+    this.empBtn.title = "Core EMP: stuns all active enemies for 2 seconds (1 minute cooldown).";
+    this.pauseBtn.title = "Pause / resume the simulation (P).";
+    this.settingsBtn.title = "Settings: audio, graphics, hotkeys, tutorial toggles.";
     this.relayCoreBtn.onclick = () => {
       if (!this.game.canDeployRelayCore()) return;
       this.game.core.coreDeployMode = !this.game.core.coreDeployMode;
@@ -807,7 +817,14 @@ export class HUD {
           : `${status.active}/${status.capPerType} active · T${def.tierRequired}+`,
       });
       btn.append(header, meta, detail);
-      btn.title = `${def.name}\n${def.description}\nUnlock: Command Tier ${def.tierRequired}\nCost: ${status.effectiveCost} CR · Cooldown: ${Math.round(status.effectiveCooldown)}s\nHotkey: ${hotkey}`;
+      // Tooltip: role-aware summary so hovering reads like a quick reference
+      // card. Includes unlock tier, cost, cooldown, cap, and hotkey.
+      btn.title =
+        `${def.name} — ${def.role}\n${def.description}\n` +
+        `Unlock: Command Tier ${def.tierRequired}\n` +
+        `Cost: ${status.effectiveCost} CR · Cooldown: ${Math.round(status.effectiveCooldown)}s · Cap ${def.capPerType}\n` +
+        `Hotkey: ${hotkey}\n` +
+        `Right-click world to retask · Q to evac · Shift+Q to evac all`;
       btn.onclick = () => {
         if (!status.unlocked) return;
         sys.armCommand(status.type);

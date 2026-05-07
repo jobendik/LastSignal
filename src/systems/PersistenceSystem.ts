@@ -72,6 +72,11 @@ export const defaultProfile: PersistedProfile = {
   dailyBestScore: 0,
   dailyBestDate: "",
   commanderBriefingSeen: false,
+  guidanceSeen: [],
+  tutorialHintsEnabled: true,
+  contextualHintsEnabled: true,
+  trainingCompleted: false,
+  trainingStagesCompleted: 0,
 };
 
 export class PersistenceSystem {
@@ -115,6 +120,11 @@ export class PersistenceSystem {
         dailyBestScore: parsed.dailyBestScore ?? 0,
         dailyBestDate: parsed.dailyBestDate ?? "",
         commanderBriefingSeen: parsed.commanderBriefingSeen ?? false,
+        guidanceSeen: parsed.guidanceSeen ?? [],
+        tutorialHintsEnabled: parsed.tutorialHintsEnabled ?? true,
+        contextualHintsEnabled: parsed.contextualHintsEnabled ?? true,
+        trainingCompleted: parsed.trainingCompleted ?? false,
+        trainingStagesCompleted: parsed.trainingStagesCompleted ?? 0,
       };
     } catch {
       return this.emptyProfile();
@@ -166,6 +176,11 @@ export class PersistenceSystem {
       dailyBestScore: 0,
       dailyBestDate: "",
       commanderBriefingSeen: false,
+      guidanceSeen: [],
+      tutorialHintsEnabled: true,
+      contextualHintsEnabled: true,
+      trainingCompleted: false,
+      trainingStagesCompleted: 0,
     };
   }
 }

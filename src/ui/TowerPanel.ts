@@ -18,6 +18,17 @@ export class TowerPanel {
     game.bus.on("tower:manualFired", () => this.refresh());
     game.bus.on("credits:changed", () => this.refresh());
     game.bus.on("ui:cleared", () => this.refresh());
+    // Durability state changes — keep the HP/state readout live without
+    // forcing the panel to re-render every frame.
+    game.bus.on("tower:sabotaged", () => this.refresh());
+    game.bus.on("tower:disabled", () => this.refresh());
+    game.bus.on("tower:restored", () => this.refresh());
+    // Lightweight 4 Hz tick so HP bar fills visibly while the tower is still
+    // selected. Only re-rendering when a tower is actually selected so the
+    // panel is cheap when nothing is open.
+    setInterval(() => {
+      if (this.game.towers.selected) this.refresh();
+    }, 250);
   }
 
   refresh(): void {
@@ -49,6 +60,47 @@ export class TowerPanel {
         (stats.chainMax ? `<div>CHN <b>${stats.chainMax}</b></div>` : "") +
         (stats.income ? `<div>INC <b>${Math.round(stats.income)}/tick</b></div>` : "")
       }),
+    );
+
+    // ──────────────────────────────────────────────────────────
+    // Durability summary: HP bar + state label + active effects.
+    // The bar color tracks state so a glance reads as
+    // operational / damaged / critical / disabled.
+    // ──────────────────────────────────────────────────────────
+    const ds = t.durabilityState;
+    const stateLabel = ds === "operational" ? "OPERATIONAL"
+      : ds === "damaged" ? "DAMAGED"
+      : ds === "critical" ? "CRITICAL"
+      : "DISABLED";
+    const stateColor = ds === "operational" ? "#9be7a7"
+      : ds === "damaged" ? "#ffd54f"
+      : ds === "critical" ? "#ff8a65"
+      : "#ff5252";
+    const hpRow = el("div", { class: "ls-tp-hp" });
+    const hpLabel = el("div", { class: "ls-tp-hp-label" });
+    hpLabel.innerHTML =
+      `<span>HP <b>${Math.max(0, Math.round(t.hp))} / ${Math.round(t.maxHp)}</b></span>` +
+      `<span class="ls-tp-hp-state" style="color:${stateColor}">${stateLabel}</span>`;
+    const bar = el("div", { class: "ls-tp-hp-bar" });
+    const fill = el("div", { class: "ls-tp-hp-fill" });
+    fill.style.width = `${Math.max(0, Math.min(100, t.hpPct * 100)).toFixed(1)}%`;
+    fill.style.background = stateColor;
+    bar.append(fill);
+    hpRow.append(hpLabel, bar);
+    this.el.append(hpRow);
+
+    // Active-effect chips for shielded / under repair / sabotaged.
+    const effects: string[] = [];
+    if (t.shielded) effects.push('<span class="ls-tp-fx ls-tp-fx-shield">SHIELDED</span>');
+    if (t.underRepair) effects.push('<span class="ls-tp-fx ls-tp-fx-repair">UNDER REPAIR</span>');
+    if (this.game.time.elapsed - t.lastDamagedAt < 1.5 && ds !== "operational") {
+      effects.push('<span class="ls-tp-fx ls-tp-fx-hit">RECENT HIT</span>');
+    }
+    if (effects.length > 0) {
+      this.el.append(el("div", { class: "ls-tp-fx-row", html: effects.join("") }));
+    }
+
+    this.el.append(
       el("div", { class: "ls-tp-kills", text: `Kills: ${t.kills} | Damage: ${Math.round(t.totalDamage)}` }),
       el("div", {
         class: "ls-tp-kills",
@@ -69,8 +121,22 @@ export class TowerPanel {
       this.el.append(
         el("div", {
           class: "ls-tp-jammed",
-          text: "JAMMED — fire rate -30%. Destroy the source to clear.",
+          text: "JAMMED — fire rate -30%. Repairs slowed. Destroy the source to clear.",
         })
+      );
+    }
+    // State-driven repair hint. Disabled = top priority; damaged = soft hint.
+    if (ds === "disabled") {
+      this.el.append(
+        el("div", { class: "ls-tp-hint ls-tp-hint-warn", text: "Tower offline. Send Engineer to restore." })
+      );
+    } else if (ds === "critical") {
+      this.el.append(
+        el("div", { class: "ls-tp-hint ls-tp-hint-warn", text: "Critical damage. Fire rate / range reduced. Engineer recommended." })
+      );
+    } else if (ds === "damaged") {
+      this.el.append(
+        el("div", { class: "ls-tp-hint", text: "Damaged. Engineer can restore HP." })
       );
     }
 
@@ -108,9 +174,11 @@ export class TowerPanel {
 
     const actions = el("div", { class: "ls-tp-actions" });
     const upg = el("button", { class: "ls-btn", text: `UPGRADE (${t.upgradeCost}CR)` });
+    upg.title = `Upgrade to level ${t.level + 1}. Improves damage, range, and cooldown. (U)`;
     upg.onclick = () => this.game.towers.upgrade(t);
     if (this.game.core.credits < t.upgradeCost) upg.classList.add("disabled");
     const sell = el("button", { class: "ls-btn ls-btn-ghost", text: `SELL (${Math.floor(t.totalInvested * this.game.core.upgrades.sellRefundMul)}CR)` });
+    sell.title = "Sell this tower for a partial refund. (S)";
     sell.onclick = () => this.game.towers.sell(t);
     actions.append(upg, sell);
     this.el.append(actions);
