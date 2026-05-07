@@ -141,36 +141,43 @@ export const SQUAD_CAP_BASE = 2;
 export const SQUAD_CAP_TIER_BONUS = 1;
 
 // Recon — fast, fragile, reveals darkness and exposes hidden strategic points.
-export const RECON_COST = 45;
-export const RECON_COOLDOWN = 12;
-export const RECON_SPEED = 220;
-export const RECON_DURATION = 18;
-export const RECON_HEALTH = 24;
-export const RECON_REVEAL_RADIUS = 220;
+// Tuned cheap and re-deployable — Recon is the always-affordable scout that
+// players should reach for whenever the map is dark.
+export const RECON_COST = 40;
+export const RECON_COOLDOWN = 11;
+export const RECON_SPEED = 230;
+export const RECON_DURATION = 20;
+export const RECON_HEALTH = 26;
+export const RECON_REVEAL_RADIUS = 230;
 export const RECON_INTERACTION_RADIUS = 28;
 
-// Engineer — accelerates capture, repairs, recovers caches faster.
+// Engineer — accelerates capture, repairs, recovers caches faster. The bump
+// to 28s duration gives the player a longer field-deploy window for Sector 6
+// expansions; capture multiplier stays at 2.2 so paired tower fire still
+// matters more than bare-engineer captures.
 export const ENGINEER_COST = 70;
 export const ENGINEER_COOLDOWN = 22;
-export const ENGINEER_SPEED = 130;
-export const ENGINEER_DURATION = 26;
-export const ENGINEER_HEALTH = 50;
+export const ENGINEER_SPEED = 135;
+export const ENGINEER_DURATION = 28;
+export const ENGINEER_HEALTH = 55;
 export const ENGINEER_REVEAL_RADIUS = 110;
-export const ENGINEER_INTERACTION_RADIUS = 56;
+export const ENGINEER_INTERACTION_RADIUS = 60;
 export const ENGINEER_CAPTURE_MULTIPLIER = 2.2;
 export const ENGINEER_REPAIR_RATE = 6;
 
 // Strike — combat squad for emergency suppression / hostile structures.
+// Slightly bumped duration + lower attack cooldown so a Strike Squad alone
+// can credibly chip a rift anchor when paired with tower fire.
 export const STRIKE_COST = 110;
 export const STRIKE_COOLDOWN = 32;
 export const STRIKE_SPEED = 150;
-export const STRIKE_DURATION = 22;
-export const STRIKE_HEALTH = 70;
+export const STRIKE_DURATION = 24;
+export const STRIKE_HEALTH = 75;
 export const STRIKE_REVEAL_RADIUS = 130;
 export const STRIKE_INTERACTION_RADIUS = 200;
-export const STRIKE_DAMAGE = 9;
-export const STRIKE_ATTACK_COOLDOWN = 0.55;
-export const STRIKE_STRUCTURE_DAMAGE_MUL = 1.6;
+export const STRIKE_DAMAGE = 10;
+export const STRIKE_ATTACK_COOLDOWN = 0.50;
+export const STRIKE_STRUCTURE_DAMAGE_MUL = 1.7;
 
 // Shield / Support — projects a temporary shielding field around an area.
 export const SHIELD_COST = 130;
@@ -182,3 +189,42 @@ export const SHIELD_REVEAL_RADIUS = 90;
 export const SHIELD_INTERACTION_RADIUS = 168;
 export const SHIELD_DAMAGE_REDUCTION = 0.4;
 export const SHIELD_SLOW_AMOUNT = 0.35;
+/** Hard cap on how much damage reduction Shield Harmonics can push into. */
+export const SHIELD_DAMAGE_REDUCTION_MAX = 0.65;
+
+// ──────────────────────────────────────────────────────────
+// Squad counterplay & enemy targeting
+// Squads aren't full RTS units, so enemies don't fully retarget them — but
+// nearby enemies chip them on contact, certain types are extra dangerous, and
+// hostile structures (jammers/rifts) materially change squad effectiveness.
+// ──────────────────────────────────────────────────────────
+/** Pixel radius around a squad center where an enemy contributes contact damage. */
+export const SQUAD_CONTACT_DAMAGE_RADIUS = 28;
+/** Base contact damage per second from an adjacent enemy. */
+export const SQUAD_CONTACT_DAMAGE_PER_SEC = 8;
+/** Multiplier on contact damage when the attacker is a Saboteur (anti-squad spike). */
+export const SQUAD_SABOTEUR_DAMAGE_MUL = 2.4;
+/** Multiplier on contact damage when the attacker is a Sprinter (fast contact). */
+export const SQUAD_SPRINTER_DAMAGE_MUL = 1.5;
+/** Multiplier on contact damage when the attacker is a Boss (aura pressure on shields). */
+export const SQUAD_BOSS_DAMAGE_MUL = 0.5;
+/** Pixel radius around a Jammer enemy where squad effectiveness drops. */
+export const SQUAD_JAMMER_ENEMY_RADIUS = 80;
+/** Multiplier on Jammer-enemy contact damage. */
+export const SQUAD_JAMMER_DAMAGE_MUL = 1.2;
+/** Pixel radius from a hostile Phantom inside which it acts as a soft "anti-drone" threat. */
+export const SQUAD_PHANTOM_RADIUS = 36;
+
+/** While inside a jammer field, squad action speed is multiplied by this (< 1 = slower). */
+export const SQUAD_JAMMER_ACTION_PENALTY = 0.5;
+/** While inside a jammer field, squad reveal radius is multiplied by this. */
+export const SQUAD_JAMMER_REVEAL_PENALTY = 0.5;
+/** While inside a rift anchor aura, the squad takes this much HP/s as instability damage. */
+export const SQUAD_RIFT_AURA_DPS = 4;
+
+/** Speed multiplier applied while a squad is evacuating (it sprints home). */
+export const SQUAD_EVAC_SPEED_MUL = 1.6;
+/** How close (px) an evacuating squad must get to a friendly cluster before despawning. */
+export const SQUAD_EVAC_ARRIVAL_RADIUS = 36;
+/** Fraction of base cooldown returned when a squad evacuates safely. */
+export const SQUAD_EVAC_REFUND = 0.5;

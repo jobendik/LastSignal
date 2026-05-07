@@ -735,6 +735,109 @@
   color: #80d8ff;
 }
 
+/* ===== Active squad roster (HUD) ===== */
+.ls-squad-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.ls-squad-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-top: 1px dashed rgba(102, 252, 241, 0.18);
+  border-bottom: 1px dashed rgba(102, 252, 241, 0.18);
+  padding: 4px 0;
+}
+.ls-squad-active {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid rgba(102, 252, 241, 0.18);
+  border-left: 3px solid #66fcf1;
+  padding: 3px 6px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.ls-squad-active:hover { background: rgba(102, 252, 241, 0.07); }
+.ls-squad-active.selected {
+  background: rgba(102, 252, 241, 0.12);
+  border-color: rgba(102, 252, 241, 0.6);
+  box-shadow: 0 0 6px rgba(102, 252, 241, 0.3);
+}
+.ls-squad-active.evac { opacity: 0.85; }
+.ls-squad-active.jammed { background: rgba(239, 108, 0, 0.08); }
+.ls-squad-active-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+.ls-squad-active-name { color: #ffffff; font-weight: bold; }
+.ls-squad-active-state { color: #80d8ff; }
+.ls-squad-active.jammed .ls-squad-active-state { color: #ef6c00; }
+.ls-squad-active.evac .ls-squad-active-state { color: #ffd180; }
+.ls-squad-active-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ls-squad-active-bar {
+  height: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.ls-squad-active-bar-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.12s ease;
+}
+.ls-squad-active-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+.ls-squad-mini-btn {
+  flex: 1;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid rgba(102, 252, 241, 0.3);
+  color: #c5c6c7;
+  font-family: inherit;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  padding: 2px 4px;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+.ls-squad-mini-btn:hover:not(:disabled) {
+  background: rgba(102, 252, 241, 0.18);
+  color: #ffffff;
+}
+.ls-squad-mini-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ls-squad-mini-btn.active {
+  background: rgba(102, 252, 241, 0.25);
+  color: #ffffff;
+  box-shadow: 0 0 6px rgba(102, 252, 241, 0.4);
+}
+.ls-squad-mini-btn.evac-all {
+  border-color: rgba(255, 209, 128, 0.45);
+  color: #ffd180;
+}
+.ls-squad-mini-btn.evac-all:hover:not(:disabled) {
+  background: rgba(255, 209, 128, 0.18);
+  color: #ffffff;
+}
+.ls-squad-roster-footer {
+  display: flex;
+  gap: 4px;
+}
+
 /* ===== Right-side sidebar (HUD) — holds OBJECTIVES + COMMAND DIRECTIVES ===== */
 .ls-hud-right-sidebar {
   position: absolute;

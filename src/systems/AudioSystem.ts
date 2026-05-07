@@ -593,6 +593,232 @@ export class AudioSystem {
     this.sfxDeath(pitch, position);
   }
 
+  // ──────────────────────────────────────────────────────────
+  // Squad cues (Part 4 of the squad polish pass)
+  //
+  // Each squad type gets a distinct procedural fingerprint so the player can
+  // identify what's happening on the battlefield without watching the unit:
+  //   - Recon  : bright digital ping / sonar sweep
+  //   - Engineer: soft mechanical chirp / repair pulse
+  //   - Strike : sharp pulse / laser tick
+  //   - Shield : low stabilizing hum / chord
+  //   - Evac   : ascending radio blip
+  //   - Lost   : short distorted failure tone
+  // All sounds are subtle, voice-limited, and reuse our existing categories
+  // so they sit in the SFX bus rather than overpowering combat audio.
+  // ──────────────────────────────────────────────────────────
+
+  /** Squad command armed (player pressed a squad button). */
+  sfxSquadArm(volume = 1): void {
+    if (!this.ready() || !this.beginVoice("ui", 0.18)) return;
+    const now = this.ctx!.currentTime;
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(660, now);
+    osc.frequency.linearRampToValueAtTime(880, now + 0.08);
+    gain.gain.setValueAtTime(0.10 * volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    osc.connect(gain);
+    gain.connect(this.uiGain!);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  /** Squad selected (HUD click or world-space click). */
+  sfxSquadSelect(): void {
+    if (!this.ready() || !this.beginVoice("ui", 0.16)) return;
+    const now = this.ctx!.currentTime;
+    [780, 1040].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + i * 0.04);
+      gain.gain.setValueAtTime(0.07, now + i * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.04 + 0.13);
+      osc.connect(gain);
+      gain.connect(this.uiGain!);
+      osc.start(now + i * 0.04);
+      osc.stop(now + i * 0.04 + 0.15);
+    });
+  }
+
+  /** Squad deployed in the world. Distinct per type. */
+  sfxSquadDeploy(type: "recon" | "engineer" | "strike" | "shield", position?: AudioPosition): void {
+    this.emitSubtitle(`${type.toUpperCase()} DEPLOYED`, "reward", 1.5, 0.6, 1);
+    if (!this.ready() || !this.beginVoice("reward", 0.4)) return;
+    const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("reward", position, 0.4);
+    const profile: { type: OscillatorType; from: number; to: number; vol: number } =
+      type === "recon"
+        ? { type: "sine", from: 880, to: 1320, vol: 0.16 }
+        : type === "engineer"
+        ? { type: "triangle", from: 440, to: 660, vol: 0.18 }
+        : type === "strike"
+        ? { type: "square", from: 220, to: 440, vol: 0.16 }
+        : { type: "triangle", from: 196, to: 261, vol: 0.20 };
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = profile.type;
+    osc.frequency.setValueAtTime(profile.from, now);
+    osc.frequency.linearRampToValueAtTime(profile.to, now + 0.18);
+    gain.gain.setValueAtTime(profile.vol, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+    osc.connect(gain);
+    gain.connect(out);
+    osc.start(now);
+    osc.stop(now + 0.34);
+  }
+
+  /** Recon scan pulse on arrival. Fast bright sonar ping. */
+  sfxSquadScan(position?: AudioPosition): void {
+    if (!this.ready() || !this.beginVoice("world", 0.36)) return;
+    const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("world", position, 0.36);
+    [1320, 1760].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + i * 0.05);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.5, now + i * 0.05 + 0.30);
+      gain.gain.setValueAtTime(0.09, now + i * 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.05 + 0.30);
+      osc.connect(gain);
+      gain.connect(out);
+      osc.start(now + i * 0.05);
+      osc.stop(now + i * 0.05 + 0.32);
+    });
+  }
+
+  /** Engineer per-tick channel chirp. */
+  sfxSquadEngineer(position?: AudioPosition): void {
+    if (!this.ready() || !this.beginVoice("world", 0.16)) return;
+    const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("world", position, 0.16);
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(523, now);
+    osc.frequency.linearRampToValueAtTime(659, now + 0.07);
+    gain.gain.setValueAtTime(0.07, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+    osc.connect(gain);
+    gain.connect(out);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  }
+
+  /** Strike laser tick (per shot) — short sharp tap so volleys read clearly. */
+  sfxSquadStrike(position?: AudioPosition): void {
+    if (!this.ready() || !this.beginVoice("bullet", 0.10)) return;
+    const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("bullet", position, 0.10);
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(1480, now);
+    osc.frequency.exponentialRampToValueAtTime(420, now + 0.05);
+    gain.gain.setValueAtTime(0.07, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    osc.connect(gain);
+    gain.connect(out);
+    osc.start(now);
+    osc.stop(now + 0.10);
+  }
+
+  /** Shield hum / stabilizing chord — rare cadence to avoid noise. */
+  sfxSquadShield(position?: AudioPosition): void {
+    if (!this.ready() || !this.beginVoice("world", 0.55)) return;
+    const now = this.ctx!.currentTime;
+    const out = this.spatialOutput("world", position, 0.55);
+    [196, 261, 329].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0.04, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5 + i * 0.02);
+      osc.connect(gain);
+      gain.connect(out);
+      osc.start(now);
+      osc.stop(now + 0.55 + i * 0.02);
+    });
+  }
+
+  /** Squad evac ordered — ascending radio blip. */
+  sfxSquadEvac(): void {
+    this.emitSubtitle("EVAC ORDERED", "alert", 1.4, 0.6, 1);
+    if (!this.ready() || !this.beginVoice("ui", 0.32)) return;
+    const now = this.ctx!.currentTime;
+    [440, 587, 784].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, now + i * 0.05);
+      gain.gain.setValueAtTime(0.09, now + i * 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.05 + 0.18);
+      osc.connect(gain);
+      gain.connect(this.uiGain!);
+      osc.start(now + i * 0.05);
+      osc.stop(now + i * 0.05 + 0.20);
+    });
+  }
+
+  /** Squad recalled (evac complete). Descending warm chord. */
+  sfxSquadRecall(): void {
+    this.emitSubtitle("SQUAD RECALLED", "reward", 1.2, 0.6, 1);
+    if (!this.ready() || !this.beginVoice("reward", 0.4)) return;
+    const now = this.ctx!.currentTime;
+    [784, 587, 440].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, now + i * 0.06);
+      gain.gain.setValueAtTime(0.10, now + i * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.06 + 0.22);
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(now + i * 0.06);
+      osc.stop(now + i * 0.06 + 0.24);
+    });
+  }
+
+  /** Squad lost — short distorted failure tone. */
+  sfxSquadLost(): void {
+    this.emitSubtitle("SQUAD LOST", "alert", 1.6, 0.7, 2);
+    if (!this.ready() || !this.beginVoice("alert", 0.45)) return;
+    const now = this.ctx!.currentTime;
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(280, now);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 0.4);
+    gain.gain.setValueAtTime(0.20, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+    osc.connect(gain);
+    gain.connect(this.sfxGain!);
+    osc.start(now);
+    osc.stop(now + 0.45);
+  }
+
+  /** Squad retasked — quick affirmative blip with type-flavored pitch. */
+  sfxSquadRetask(type: "recon" | "engineer" | "strike" | "shield"): void {
+    if (!this.ready() || !this.beginVoice("ui", 0.18)) return;
+    const now = this.ctx!.currentTime;
+    const pitch = type === "recon" ? 1100 : type === "engineer" ? 660 : type === "strike" ? 880 : 440;
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(pitch, now);
+    osc.frequency.linearRampToValueAtTime(pitch * 1.25, now + 0.06);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    osc.connect(gain);
+    gain.connect(this.uiGain!);
+    osc.start(now);
+    osc.stop(now + 0.20);
+  }
+
   private ready(): boolean {
     return Boolean(this.initialized && this.ctx && this.sfxGain && this.uiGain);
   }
