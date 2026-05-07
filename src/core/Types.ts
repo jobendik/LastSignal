@@ -224,6 +224,65 @@ export interface SectorDefinition {
    * Set to false to suppress hazards that don't fit the sector theme.
    */
   hazards?: SectorHazardConfig;
+  /**
+   * Optional strategic map points (capture objectives + hostile structures).
+   * Sectors that omit this array behave exactly as before.
+   */
+  strategicPoints?: StrategicPointDefinition[];
+}
+
+// ---------- Strategic map points ----------
+/**
+ * Strategic map points are neutral or hostile objects placed on the grid that
+ * give the large maps tactical depth beyond crystal economy:
+ *  - SIGNAL_NODE      → capture for local signal/build coverage
+ *  - RADAR_DISH       → capture for global reveal + wave intel
+ *  - DATA_CACHE       → one-time credits + research reward
+ *  - ABANDONED_TURRET → captures into an allied static gun
+ *  - RIFT_ANCHOR      → hostile structure that empowers enemies until destroyed
+ *  - JAMMER           → hostile structure that suppresses signal/towers in radius
+ */
+export type StrategicPointType =
+  | "signal_node"
+  | "radar_dish"
+  | "data_cache"
+  | "abandoned_turret"
+  | "rift_anchor"
+  | "jammer";
+
+export type StrategicPointState =
+  /** Neutral and ready to be captured. */
+  | "neutral"
+  /** Hostile enemy structure, intact. */
+  | "enemy"
+  /** Captured by the player (friendly active). */
+  | "captured"
+  /** One-shot point already collected (data cache after pickup). */
+  | "depleted"
+  /** Destroyed enemy structure (no longer affecting play). */
+  | "destroyed";
+
+/** Authoring-time definition (sectors.ts). Runtime adds progress/state. */
+export interface StrategicPointDefinition {
+  /** Stable per-sector identifier. Used for objective targeting and saves. */
+  id: string;
+  type: StrategicPointType;
+  /** Cell-space position. The point occupies a single tile. */
+  c: number;
+  r: number;
+  /** Optional override for capture time (seconds). */
+  captureSeconds?: number;
+  /** Optional override for hostile structure HP. */
+  health?: number;
+  /** Optional override for influence radius (cells). */
+  radiusCells?: number;
+  /** Optional override for one-time reward (credits/research). */
+  rewardCredits?: number;
+  rewardResearch?: number;
+  /** Friendly display name (defaults derived from type when omitted). */
+  name?: string;
+  /** Short flavor description shown on hover. */
+  description?: string;
 }
 
 export interface SectorHazardConfig {

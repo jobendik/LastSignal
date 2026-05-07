@@ -1,4 +1,9 @@
-import type { SectorDefinition, WaveDefinition, EnemyType } from "../core/Types";
+import type {
+  SectorDefinition,
+  WaveDefinition,
+  EnemyType,
+  StrategicPointDefinition,
+} from "../core/Types";
 import { defaultWaves, sector2Waves, sector3Waves, sector4Waves } from "./waves";
 import { COLS, ROWS } from "../core/Config";
 import { mulberry32 } from "../core/Random";
@@ -261,6 +266,36 @@ function buildExpanseLayout(): string[] {
   set(60, 3, "."); set(3, 40, ".");
   return rows.map(r => r.join(""));
 }
+
+/**
+ * Sector 6 strategic map points.
+ *
+ * Positions are chosen to sit on empty tiles outside the rock-cluster
+ * footprints. They form a ring of objectives that the player must roll relays
+ * out to reach:
+ *   - 2 SIGNAL_NODE  : reachable shortly after the first relay (N/S of core).
+ *   - 1 RADAR_DISH   : sits near a mid-ring choke; clears wave intel for darkness.
+ *   - 2 DATA_CACHE   : on the diagonals; pure exploration reward.
+ *   - 2 RIFT_ANCHOR  : near opposite spawners; suppress to weaken pressure.
+ *   - 1 JAMMER       : on the side opposite the radar; punishes turtling.
+ */
+const expanseStrategicPoints: StrategicPointDefinition[] = [
+  // Friendly signal repeaters — reachable from the first relay.
+  { id: "s6_signal_north", type: "signal_node", c: 32, r: 12, name: "North Repeater" },
+  { id: "s6_signal_south", type: "signal_node", c: 32, r: 32, name: "South Repeater" },
+  // Big sensor dish — captures unlock radar reveal.
+  { id: "s6_radar_west", type: "radar_dish", c: 12, r: 22, name: "Western Radar Dish" },
+  // One-time research/credit caches in the corners (exploration reward).
+  { id: "s6_cache_ne", type: "data_cache", c: 52, r: 11, name: "NE Data Cache",
+    rewardCredits: 110, rewardResearch: 1 },
+  { id: "s6_cache_sw", type: "data_cache", c: 12, r: 33, name: "SW Data Cache",
+    rewardCredits: 110, rewardResearch: 1 },
+  // Hostile rift anchors near opposite gates — destroying them weakens waves.
+  { id: "s6_rift_east", type: "rift_anchor", c: 56, r: 14, name: "East Rift Anchor" },
+  { id: "s6_rift_south", type: "rift_anchor", c: 28, r: 39, name: "South Rift Anchor" },
+  // One jammer punishes pure turtle play; suppresses signal until cleared.
+  { id: "s6_jammer_east", type: "jammer", c: 50, r: 28, name: "East Jammer" },
+];
 
 const expanseSpawners = [
   { id: "north",     label: "North Gate",     c: 32, r: 0  },

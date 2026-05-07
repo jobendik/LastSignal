@@ -1,5 +1,5 @@
 import type { Game } from "../core/Game";
-import type { EnemyType, TowerType } from "../core/Types";
+import type { EnemyType, StrategicPointType, TowerType } from "../core/Types";
 import type { ObjectiveDefinition, SectorObjectives } from "../data/objectives";
 import { sectorObjectives } from "../data/objectives";
 
@@ -19,6 +19,9 @@ export interface ObjectiveSnapshot {
   scannerAlive: boolean;
   /** Total enemy kills across all types. */
   enemiesKilledTotal: number;
+  /** Strategic point counts captured / destroyed this run. */
+  strategicCapturedByType: Partial<Record<StrategicPointType, number>>;
+  strategicDestroyedByType: Partial<Record<StrategicPointType, number>>;
 }
 
 export interface ObjectiveEvalResult {
@@ -91,6 +94,7 @@ export class ObjectivesSystem {
     const corePct = c.coreMax > 0 ? c.coreIntegrity / c.coreMax : 0;
     const scannerTowers: TowerType[] = ["amplifier", "tesla"]; // Tesla acts as detection-capable
     const scannerAlive = this.game.towers.list.some((t) => scannerTowers.includes(t.type));
+    const sps = this.game.strategicPoints;
     return {
       enemiesKilledByType: this.kills,
       enemiesLeakedByType: this.leaks,
@@ -105,6 +109,8 @@ export class ObjectivesSystem {
       durationSec: Math.max(0, Math.round((Date.now() - c.stats.startedAt) / 1000)),
       scannerAlive,
       enemiesKilledTotal: c.stats.enemiesKilled,
+      strategicCapturedByType: sps?.capturedCounts ?? {},
+      strategicDestroyedByType: sps?.destroyedCounts ?? {},
     };
   }
 
@@ -219,6 +225,26 @@ export class ObjectivesSystem {
         const cap = def.value ?? 999;
         out.completed = runWon && snap.durationSec <= cap;
         out.progressText = `${snap.durationSec}s/${cap}s`;
+        break;
+      }
+      case "capture_n_strategic": {
+        const need = def.value ?? 1;
+        const t = def.strategicType;
+        const have = t ? (snap.strategicCapturedByType[t] ?? 0) : 0;
+        // Capture-based objectives complete as soon as the count is met,
+        // matching kill_n_type semantics (don't gate on win).
+        out.completed = have >= need;
+        out.progressText = `${have}/${need}`;
+        out.progress = Math.min(1, have / Math.max(1, need));
+        break;
+      }
+      case "destroy_n_strategic": {
+        const need = def.value ?? 1;
+        const t = def.strategicType;
+        const have = t ? (snap.strategicDestroyedByType[t] ?? 0) : 0;
+        out.completed = have >= need;
+        out.progressText = `${have}/${need}`;
+        out.progress = Math.min(1, have / Math.max(1, need));
         break;
       }
     }

@@ -485,6 +485,38 @@ export class HUD {
       this.directiveRow(reserveOk, reserveOk ? "Emergency reserve secured (30+ credits)." : "Hold 30 credits for repair/EMP safety.")
     );
     this.commandPanel.append(this.relayDirectiveRow());
+    // Strategic-intel summary appears only when the active sector defines points.
+    const intelRow = this.strategicDirectiveRow();
+    if (intelRow) this.commandPanel.append(intelRow);
+  }
+
+  /**
+   * One-line summary of strategic-map progress: how many points the player
+   * controls and how many enemy structures remain. Returns null if the active
+   * sector has no strategic points so existing sectors stay clean.
+   */
+  private strategicDirectiveRow(): HTMLElement | null {
+    const sps = this.game.strategicPoints;
+    if (!sps || sps.list.length === 0) return null;
+    let captured = 0;
+    let neutralLeft = 0;
+    let hostilesLeft = 0;
+    for (const p of sps.list) {
+      if (p.state === "captured" || p.state === "depleted") captured++;
+      else if (p.state === "neutral") neutralLeft++;
+      else if (p.state === "enemy") hostilesLeft++;
+    }
+    let text: string;
+    let ok = false;
+    if (hostilesLeft > 0) {
+      text = `Strategic: ${captured} held · ${hostilesLeft} hostile structure${hostilesLeft === 1 ? "" : "s"} active.`;
+    } else if (neutralLeft > 0) {
+      text = `Strategic: ${captured} held · ${neutralLeft} neutral point${neutralLeft === 1 ? "" : "s"} to capture.`;
+    } else {
+      text = `Strategic: ${captured} secured · sector pacified.`;
+      ok = true;
+    }
+    return el("div", { class: `ls-command-row ${ok ? "ok" : "warn"}`, text: `◆ ${text}` });
   }
 
   /**

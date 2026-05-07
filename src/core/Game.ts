@@ -52,6 +52,7 @@ import { MetaSystem } from "../systems/MetaSystem";
 import { AchievementSystem } from "../systems/AchievementSystem";
 import { EndlessSystem } from "../systems/EndlessSystem";
 import { ObjectivesSystem } from "../systems/ObjectivesSystem";
+import { StrategicPointSystem } from "../systems/StrategicPointSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
@@ -88,6 +89,7 @@ export class Game {
   achievements!: AchievementSystem;
   endless!: EndlessSystem;
   objectives!: ObjectivesSystem;
+  strategicPoints!: StrategicPointSystem;
   render!: RenderSystem;
   input!: InputSystem;
   ui!: UIManager;
@@ -173,6 +175,7 @@ export class Game {
     this.achievements = new AchievementSystem(this);
     this.endless = new EndlessSystem(this);
     this.objectives = new ObjectivesSystem(this);
+    this.strategicPoints = new StrategicPointSystem(this);
     this.render = new RenderSystem(this);
     this.input = new InputSystem(this);
     this.ui = new UIManager(this);
@@ -277,6 +280,7 @@ export class Game {
 
     this.grid.loadSector(sector);
     this.applyCommandTierToGrid();
+    this.strategicPoints.loadSector(sector);
     this.camera.init(this.grid.worldW, this.grid.worldH, this.grid.corePos.x, this.grid.corePos.y);
     this.camera.snap();
     this.render.invalidateTerrainCache();
@@ -335,6 +339,7 @@ export class Game {
     if (this.particles) this.particles.reset();
     if (this.drones) this.drones.reset();
     if (this.waves) this.waves.reset();
+    if (this.strategicPoints) this.strategicPoints.reset();
     // Clear the grid so darkness/tile-state from the old sector doesn't render.
     if (this.grid) this.grid.reset();
     if (this.render) this.render.invalidateTerrainCache();
@@ -588,8 +593,11 @@ export class Game {
     this.grid.relaySignalRadiusCells = base + relayBonus;
     this.grid.relayDeployRadiusCells = baseDeploy + deployBonus;
     // Apply the new radius to existing relay clusters so they actually grow.
+    // Synthetic clusters (e.g. captured signal nodes — cells.length === 0)
+    // keep their authored radius so they don't bloat into full-size relays.
     for (const cluster of this.grid.coreClusters) {
       if (cluster.isPrimary) continue;
+      if (cluster.cells.length === 0) continue;
       cluster.signalRadiusCells = this.grid.relaySignalRadiusCells;
     }
   }
@@ -746,6 +754,7 @@ export class Game {
         this.projectiles.update(dt);
         this.drones.update(dt);
         this.economy.update(dt);
+        this.strategicPoints.update(dt);
       }
 
       // Wave completion check (only when simulation is running).
@@ -759,6 +768,9 @@ export class Game {
       this.drones.update(dt * 0.5);
       this.particles.update(dt);
       this.waves.updatePlanningCountdown(dt);
+      // Capture progress should advance during planning so the player can
+      // claim points without starting the wave first.
+      this.strategicPoints.update(dt);
       this.saveRunSnapshot();
     } else if (this.state === "PAUSED") {
       // Freeze simulation; particles continue for ambient visual only.

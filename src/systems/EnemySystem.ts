@@ -179,8 +179,12 @@ export class EnemySystem {
         if (e.ability === "artillery") this.updateHarbingerArtillery(e, dt);
       }
 
-      // Movement.
-      const spd = e.currentSpeed;
+      // Movement. Rift Anchor aura accelerates non-boss enemies passing through.
+      let spd = e.currentSpeed;
+      if (!e.isBoss) {
+        const auraMul = this.game.strategicPoints?.riftAuraMultiplier(e.pos.x, e.pos.y) ?? 1;
+        if (auraMul !== 1) spd *= auraMul;
+      }
       if (spd > 0) {
         let dir = this.game.grid.getVector(e.pos.x, e.pos.y);
         // Flanking scouts: add a lateral perpendicular component so they diverge from the main lane.
