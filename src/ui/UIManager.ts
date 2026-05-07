@@ -17,6 +17,7 @@ import { KillFeed } from "./KillFeed";
 import { SubtitleOverlay } from "./SubtitleOverlay";
 import { TutorialOverlay } from "./TutorialOverlay";
 import { SectorBriefingOverlay } from "./SectorBriefingOverlay";
+import { GuidanceOverlay } from "./GuidanceOverlay";
 
 /**
  * Orchestrates all UI panels. Each panel is a small DOM component that
@@ -42,6 +43,7 @@ export class UIManager {
   subtitles: SubtitleOverlay;
   tutorial: TutorialOverlay;
   sectorBriefing: SectorBriefingOverlay;
+  guidanceOverlay: GuidanceOverlay;
 
   constructor(private readonly game: Game) {
     this.root = game.uiRoot;
@@ -64,6 +66,7 @@ export class UIManager {
     this.subtitles = new SubtitleOverlay(game);
     this.tutorial = new TutorialOverlay(game);
     this.sectorBriefing = new SectorBriefingOverlay(game);
+    this.guidanceOverlay = new GuidanceOverlay(game);
   }
 
   attach(): void {
@@ -85,7 +88,8 @@ export class UIManager {
       this.achievementToast.el,
       this.subtitles.el,
       this.tutorial.el,
-      this.sectorBriefing.el
+      this.sectorBriefing.el,
+      this.guidanceOverlay.el
     );
     this.root.addEventListener("pointerover", (e) => {
       const target = e.target as Element | null;
@@ -166,6 +170,19 @@ export class UIManager {
     this.game.audio.sfxPanel(false);
   }
   openCodex(): void {
+    // Cancel any in-flight build / squad / relay mode so the overlay can't
+    // accidentally inherit a click-to-build state when it closes.
+    if (this.game.input) {
+      this.game.input.selectedTowerType = null;
+      this.game.input.showPlacementPreview = false;
+    }
+    if (this.game.core) {
+      this.game.core.coreDeployMode = false;
+      this.game.core.killZoneMode = false;
+    }
+    if (this.game.squads) {
+      this.game.squads.cancelCommand();
+    }
     this.codexPanel.el.classList.add("visible");
     this.codexPanel.refresh();
     this.game.audio.sfxPanel(true);

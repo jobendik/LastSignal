@@ -57,6 +57,14 @@ export class BuildMenu {
         ]),
         el("div", { class: "ls-tower-role", text: role }),
       );
+      // Rich tooltip: full description + cost/range/dmg/cooldown so hovering
+      // a tower button reads like the in-codex entry.
+      btn.title =
+        `${def.name} — ${def.role}\n${def.description}\n` +
+        `Cost: ${cost} CR · Range: ${def.range} · DMG: ${def.damage} · CD: ${def.cooldown}s` +
+        (def.hotkey ? `\nHotkey: ${def.hotkey}` : "") +
+        (!tierUnlocked ? `\nLocked until wave ${this.game.towers.unlockWave(type)}` : "") +
+        (limitReached ? `\nLimit reached: ${limit}` : "");
       btn.onmouseenter = () => this.game.input.setHoverBuildTool(type);
       btn.onmouseleave = () => this.game.input.setHoverBuildTool(null);
       btn.onclick = () => this.game.input.setBuildTool(type);
@@ -81,6 +89,7 @@ export class BuildMenu {
         ]),
         el("div", { class: "ls-tower-role", text: def.role }),
       );
+      btn.title = `${def.name} — ${def.role}\n${def.description}\nCost: ${cost} CR`;
       btn.onclick = () => this.game.drones.buy(type);
       droneList.append(btn);
     }

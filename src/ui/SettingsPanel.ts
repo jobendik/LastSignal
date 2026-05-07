@@ -57,6 +57,39 @@ export class SettingsPanel {
       this.checkboxRow("Random Flicker", "vfxFlicker", s.vfxFlicker),
       this.particleDensityRow(s.vfxParticleDensity),
     );
+    form.append(el("div", { class: "ls-form-section", text: "GUIDANCE" }));
+    const profile = this.game.core.profile;
+    form.append(
+      this.profileBoolRow(
+        "Tutorial Cards & Banners",
+        profile.tutorialHintsEnabled !== false,
+        (next) => {
+          profile.tutorialHintsEnabled = next;
+          this.game.persistence.saveProfile(profile);
+        }
+      ),
+      this.profileBoolRow(
+        "Contextual Hints",
+        profile.contextualHintsEnabled !== false,
+        (next) => {
+          profile.contextualHintsEnabled = next;
+          this.game.persistence.saveProfile(profile);
+        }
+      )
+    );
+    const replayRow = el("div", { class: "ls-form-row" });
+    replayRow.append(el("span", { class: "ls-form-label", text: "Replay Tutorials" }));
+    const replayBtn = el("button", { class: "ls-btn ls-keybind-btn", text: "RESET" });
+    replayBtn.title =
+      "Forget seen tutorials and mechanic banners so they show again next sector.";
+    replayBtn.onclick = () => {
+      this.game.guidance.resetAllPersistedGuidance();
+      replayBtn.textContent = "RESET ✓";
+      window.setTimeout(() => (replayBtn.textContent = "RESET"), 1400);
+    };
+    replayRow.append(replayBtn);
+    form.append(replayRow);
+
     form.append(el("div", { class: "ls-form-section", text: "HOTKEYS" }));
     for (const [action, code] of Object.entries(s.keyBindings)) {
       form.append(this.keybindRow(action, code));
@@ -94,6 +127,21 @@ export class SettingsPanel {
       // Rebuild so the Graphics Preset dropdown can reflect the new "custom".
       if (String(key).startsWith("vfx")) this.build();
     };
+    row.append(input);
+    return row;
+  }
+
+  /** Checkbox row for a value stored on PersistedProfile (not GameSettings). */
+  private profileBoolRow(
+    label: string,
+    value: boolean,
+    onChange: (next: boolean) => void
+  ): HTMLElement {
+    const row = el("label", { class: "ls-form-row" });
+    row.append(el("span", { class: "ls-form-label", text: label }));
+    const input = el("input", { attrs: { type: "checkbox" } }) as HTMLInputElement;
+    input.checked = value;
+    input.onchange = () => onChange(input.checked);
     row.append(input);
     return row;
   }

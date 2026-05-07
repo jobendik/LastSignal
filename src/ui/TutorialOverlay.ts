@@ -35,21 +35,27 @@ export class TutorialOverlay {
     const counters = wave?.recommendedCounters?.slice(0, 3).join(" • ") ?? "Pulse • Stasis • Mortar";
     this.el.append(
       el("div", { class: "ls-overlay-title", text: "COMMAND BRIEFING" }),
-      el("div", { class: "ls-overlay-subtitle", text: "Welcome to LAST SIGNAL. Stabilize lanes, then trigger the wave when ready." }),
+      el("div", { class: "ls-overlay-subtitle", text: "Welcome to LAST SIGNAL. Stabilize lanes, then trigger the wave when ready. Press H any time for the field manual." }),
       el("div", { class: "ls-briefing-list", html:
         `<div>1) Build a front line near active lanes.</div>
          <div>2) Mix <b>damage + control</b> towers.</div>
          <div>3) Keep <b>30 credits</b> in reserve for repairs.</div>
          <div>4) Use <b>Space</b> to start a wave early for bonus credits.</div>
+         <div>5) Press <b>H</b> or <b>?</b> for the field manual / codex.</div>
          <div class="ls-briefing-counters">Recommended counters: <b>${counters}</b></div>` }),
     );
 
     const row = el("div", { class: "ls-overlay-actions" });
     const ok = el("button", { class: "ls-btn ls-btn-primary", text: "Deploy" });
     ok.onclick = () => this.close(true);
+    const codexBtn = el("button", { class: "ls-btn", text: "Open Codex" });
+    codexBtn.onclick = () => {
+      this.close(true);
+      this.game.ui.openCodex();
+    };
     const remind = el("button", { class: "ls-btn", text: "Show Again Next Run" });
     remind.onclick = () => this.close(false);
-    row.append(ok, remind);
+    row.append(ok, codexBtn, remind);
     this.el.append(row);
   }
 

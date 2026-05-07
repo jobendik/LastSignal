@@ -54,6 +54,7 @@ import { EndlessSystem } from "../systems/EndlessSystem";
 import { ObjectivesSystem } from "../systems/ObjectivesSystem";
 import { StrategicPointSystem } from "../systems/StrategicPointSystem";
 import { MobileSquadSystem } from "../systems/MobileSquadSystem";
+import { GuidanceSystem } from "../systems/GuidanceSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
@@ -92,6 +93,7 @@ export class Game {
   objectives!: ObjectivesSystem;
   strategicPoints!: StrategicPointSystem;
   squads!: MobileSquadSystem;
+  guidance!: GuidanceSystem;
   render!: RenderSystem;
   input!: InputSystem;
   ui!: UIManager;
@@ -179,6 +181,7 @@ export class Game {
     this.objectives = new ObjectivesSystem(this);
     this.strategicPoints = new StrategicPointSystem(this);
     this.squads = new MobileSquadSystem(this);
+    this.guidance = new GuidanceSystem(this);
     this.render = new RenderSystem(this);
     this.input = new InputSystem(this);
     this.ui = new UIManager(this);
@@ -188,6 +191,7 @@ export class Game {
     this.audio.applySettings(this.core.settings);
     this.input.attach();
     this.ui.attach();
+    this.guidance.attach();
     this.settings.applyVisualSettings();
     this.setState("MAIN_MENU");
     this.running = true;
@@ -295,6 +299,7 @@ export class Game {
     this.squads.reset();
     this.waves.reset();
     this.codex.reset();
+    this.guidance.reset();
     this.endless.reset();
     if (opts.endless) this.endless.enable();
 
@@ -839,6 +844,9 @@ export class Game {
 
     this.camera.update(dt);
     this.input.update(dt);
+    // Guidance ticks regardless of state so tutorials persist on pause and
+    // hints can wind down naturally. Uses raw dt so pause freezes the timers.
+    if (this.guidance) this.guidance.update(this.time.dt);
   }
 
   private saveRunSnapshot(): void {
