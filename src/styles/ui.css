@@ -864,6 +864,10 @@
   gap: 2px;
   font-size: 10px;
   box-sizing: border-box;
+  /* Cap the panel so the 15-stage training list (and any future verbose
+   * sector) scrolls inside the sidebar instead of overflowing it. */
+  max-height: 38vh;
+  overflow-y: auto;
 }
 .ls-objectives-panel.visible { display: flex; }
 .ls-obj-title {
@@ -2230,6 +2234,95 @@
   letter-spacing: 1px;
 }
 
+/* ===== Training Simulation card (Sector Select) ===== */
+.ls-training-card {
+  width: min(860px, calc(100vw - 32px));
+  margin: 0 auto 14px;
+  padding: 12px 16px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 235, 59, 0.08),
+    rgba(255, 179, 0, 0.04) 60%,
+    rgba(102, 252, 241, 0.05)
+  );
+  border: 1px solid rgba(255, 235, 59, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  text-align: left;
+  box-shadow: 0 0 12px rgba(255, 235, 59, 0.15);
+}
+.ls-training-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ls-training-tag {
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: #ffeb3b;
+  align-self: flex-start;
+  border: 1px solid rgba(255, 235, 59, 0.5);
+  padding: 1px 6px;
+}
+.ls-training-name {
+  font-size: 18px;
+  letter-spacing: 2px;
+  color: #ffe082;
+  text-shadow: 0 0 8px rgba(255, 224, 130, 0.3);
+}
+.ls-training-desc {
+  font-size: 12px;
+  color: #c5c6c7;
+  line-height: 1.45;
+}
+.ls-training-status {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #8a9099;
+  margin-top: 2px;
+}
+.ls-training-status.complete {
+  color: #9be7a7;
+  border-left: 2px solid #9be7a7;
+  padding-left: 6px;
+}
+.ls-training-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ===== Training completion screen (training-specific Victory) ===== */
+.ls-training-complete .ls-training-complete-eyebrow {
+  font-size: 11px;
+  letter-spacing: 5px;
+  color: #ffeb3b;
+  margin-bottom: -8px;
+  text-shadow: 0 0 10px rgba(255, 235, 59, 0.45);
+}
+.ls-training-complete .ls-overlay-title {
+  color: #ffe082;
+  text-shadow:
+    0 0 18px rgba(255, 224, 130, 0.6),
+    0 0 36px rgba(255, 179, 0, 0.35);
+}
+.ls-training-complete .ls-stats {
+  text-align: left;
+  background: rgba(8, 12, 18, 0.78);
+  border-color: rgba(255, 235, 59, 0.28);
+  max-width: 520px;
+}
+.ls-training-complete .ls-victory-unlock {
+  color: #80deea;
+  border: 1px dashed rgba(128, 222, 234, 0.35);
+  padding: 6px 10px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+}
+
 /* ===== Mobile / responsive overrides for guidance and codex ===== */
 @media (max-width: 760px), (orientation: portrait) {
   .ls-codex {
@@ -2259,5 +2352,13 @@
     right: 8px;
     width: calc(100vw - 18px);
     max-width: 320px;
+  }
+  .ls-training-card {
+    width: calc(100vw - 24px);
+    padding: 10px 12px;
+  }
+  .ls-training-name {
+    font-size: 15px;
+    letter-spacing: 1.5px;
   }
 }

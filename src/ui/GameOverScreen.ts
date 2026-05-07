@@ -172,17 +172,29 @@ export class GameOverScreen {
   }
   refresh(): void {
     clear(this.el);
+    const isTraining = this.game.core.sector?.isTraining === true;
     const content = () => {
+      const title = isTraining ? "DRILL FAILED" : "CORE OFFLINE";
+      const subtitle = isTraining
+        ? "Don't worry — training is meant to be retried. Hit Replay Training to try again."
+        : "The signal has been lost.";
       this.el.append(
-        el("div", { class: "ls-overlay-title ls-gameover-title", text: "CORE OFFLINE" }),
-        el("div", { class: "ls-overlay-subtitle", text: "The signal has been lost." }),
-        el("div", { class: "ls-run-grade", text: `GRADE ${runGrade(this.game)}` }),
-        el("div", { class: "ls-stats", html: statsSummary(this.game) }),
+        el("div", { class: "ls-overlay-title ls-gameover-title", text: title }),
+        el("div", { class: "ls-overlay-subtitle", text: subtitle }),
       );
+      // Training run skips the run grade — it doesn't reward "performance",
+      // only completion of the drills.
+      if (!isTraining) {
+        this.el.append(el("div", { class: "ls-run-grade", text: `GRADE ${runGrade(this.game)}` }));
+      }
+      this.el.append(el("div", { class: "ls-stats", html: statsSummary(this.game) }));
       const objs = objectivesSummary(this.game, false);
       if (objs) this.el.append(objs);
       const row = el("div", { class: "ls-overlay-actions" });
-      const retry = el("button", { class: "ls-btn ls-btn-primary", text: "Retry Sector" });
+      const retry = el("button", {
+        class: "ls-btn ls-btn-primary",
+        text: isTraining ? "Replay Training" : "Retry Sector",
+      });
       retry.onclick = () => {
         const s = this.game.core.sector;
         if (s) this.game.beginSector(s);
@@ -193,7 +205,9 @@ export class GameOverScreen {
       this.el.append(row);
     };
 
-    if (this.game.core.settings.reducedMotion) {
+    if (this.game.core.settings.reducedMotion || isTraining) {
+      // Skip the destructive disintegration FX in training so a failed drill
+      // feels like a coachable moment, not a Game Over cinematic.
       content();
       return;
     }
@@ -215,6 +229,13 @@ export class VictoryScreen {
   }
   refresh(): void {
     clear(this.el);
+
+    // Training run shows a different completion screen — friendlier copy,
+    // a "Training Complete" badge, and a stage-by-stage breakdown.
+    if (this.game.core.sector?.isTraining) {
+      this.renderTrainingComplete();
+      return;
+    }
 
     // Ripple rings element (CSS-animated).
     if (!this.game.core.settings.reducedMotion) {
@@ -259,6 +280,83 @@ export class VictoryScreen {
     const menu = el("button", { class: "ls-btn", text: "Main Menu" });
     menu.onclick = () => this.game.returnToMenu();
     row.append(again, menu);
+    content.append(row);
+    this.el.append(content);
+  }
+
+  private renderTrainingComplete(): void {
+    const g = this.game;
+    const obj = g.objectives.currentSectorObjectives;
+    const snap = g.objectives.snapshot();
+    const secs = obj
+      ? obj.secondary.map((s) => g.objectives.evaluate(s, snap, true))
+      : [];
+    const cleared = secs.filter((s) => s.completed).length;
+    const total = secs.length;
+
+    const content = el("div", { class: "ls-victory-content ls-training-complete" });
+    content.append(
+      el("div", { class: "ls-training-complete-eyebrow", text: "TRAINING COMPLETE" }),
+      el("div", { class: "ls-overlay-title", text: "Operator Certified" }),
+      el("div", {
+        class: "ls-overlay-subtitle",
+        text:
+          "Drills cleared. You now have the basics for tower placement, relay expansion, capture, command squads, repair, and hostile-structure suppression.",
+      })
+    );
+
+    // Stages cleared block.
+    const stageBlock = el("div", { class: "ls-stats" });
+    stageBlock.append(
+      el("div", { class: "ls-obj-title", text: `STAGES CLEARED · ${cleared} / ${total}` })
+    );
+    for (const s of secs) {
+      const row = el("div", { class: `ls-obj-row secondary ${s.completed ? "ok" : "fail"}` });
+      row.append(
+        el("span", { class: "ls-obj-marker", text: s.completed ? "✓" : "○" }),
+        el("span", { class: "ls-obj-text", text: s.def.label })
+      );
+      if (s.progressText) {
+        row.append(el("span", { class: "ls-obj-progress", text: s.progressText }));
+      }
+      stageBlock.append(row);
+    }
+    content.append(stageBlock);
+
+    // Run-level summary stats — mirror the campaign one but smaller.
+    const trainingStats = el("div", { class: "ls-stats" });
+    const stats = g.core.stats;
+    const towersBuilt = Object.values(snap.towersBuiltByType).reduce((s, v) => s + (v ?? 0), 0);
+    const squadsDeployed = Object.values(snap.squadDeployedByType).reduce((s, v) => s + (v ?? 0), 0);
+    trainingStats.innerHTML =
+      `<div>Towers built: <b>${towersBuilt}</b></div>` +
+      `<div>Relays deployed: <b>${snap.relaysDeployed}</b></div>` +
+      `<div>Strategic points captured: <b>${Object.values(snap.strategicCapturedByType).reduce((s, v) => s + (v ?? 0), 0)}</b></div>` +
+      `<div>Hostile structures destroyed: <b>${Object.values(snap.strategicDestroyedByType).reduce((s, v) => s + (v ?? 0), 0)}</b></div>` +
+      `<div>Squads deployed: <b>${squadsDeployed}</b></div>` +
+      `<div>Towers repaired: <b>${snap.towersRepairedThisRun}</b></div>` +
+      `<div>Enemies destroyed: <b>${stats.enemiesKilled}</b></div>` +
+      `<div>Final wave: <b>${snap.waveReached}</b></div>`;
+    content.append(trainingStats);
+
+    // Encouragement / next-step callout.
+    const next = el("div", {
+      class: "ls-victory-unlock",
+      text: "You're ready for Sector 1. Open the Field Manual (H) any time for reference.",
+    });
+    content.append(next);
+
+    const row = el("div", { class: "ls-overlay-actions" });
+    const again = el("button", { class: "ls-btn ls-btn-primary", text: "Start Sector 1" });
+    again.onclick = () => g.setState("SECTOR_SELECT");
+    const replay = el("button", { class: "ls-btn", text: "Replay Training" });
+    replay.onclick = () => {
+      const s = g.core.sector;
+      if (s) g.beginSector(s);
+    };
+    const menu = el("button", { class: "ls-btn", text: "Main Menu" });
+    menu.onclick = () => g.returnToMenu();
+    row.append(again, replay, menu);
     content.append(row);
     this.el.append(content);
   }

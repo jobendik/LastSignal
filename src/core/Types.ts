@@ -229,6 +229,17 @@ export interface SectorDefinition {
    * Sectors that omit this array behave exactly as before.
    */
   strategicPoints?: StrategicPointDefinition[];
+  /**
+   * Marks this sector as the optional Operator Training simulation. Training
+   * sectors:
+   *  - skip random run modifiers,
+   *  - never update bestSectorCleared (so completing training does NOT
+   *    unlock campaign sectors),
+   *  - get a longer planning countdown and gentler tuning,
+   *  - render with a distinct "TRAINING" tag in Sector Select and are
+   *    always available regardless of campaign progress.
+   */
+  isTraining?: boolean;
 }
 
 // ---------- Strategic map points ----------
@@ -626,6 +637,10 @@ export interface PersistedProfile {
   tutorialHintsEnabled: boolean;
   /** Player toggle: show contextual gameplay hints. Defaults true. */
   contextualHintsEnabled: boolean;
+  /** True after the player has completed the optional Operator Training run. */
+  trainingCompleted: boolean;
+  /** Number of training-stage objectives reached (for the summary screen). */
+  trainingStagesCompleted: number;
 }
 
 // ---------- Difficulty ----------

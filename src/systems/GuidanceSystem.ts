@@ -79,6 +79,8 @@ export class GuidanceSystem {
   private contextTickAccum = 0;
   /** Lazy hint queue throttle. */
   private readonly HINT_DEFAULT_COOLDOWN_SEC = 22;
+  /** Time accumulator for training-stage stuck checks. */
+  private trainingStuckAccum = 0;
 
   constructor(private readonly game: Game) {}
 
@@ -96,6 +98,9 @@ export class GuidanceSystem {
     bus.on("tower:disabled", () => this.onTowerDisabled());
     bus.on("command:tierUp", () => this.dismissHint("command_tier_available"));
     bus.on("build:tool", (type: unknown) => this.onBuildToolChange(type));
+    // Training-specific stage cards fire on wave-complete so the player gets
+    // a beat to read between drills.
+    bus.on("wave:complete", () => this.onWaveCompleteTraining());
   }
 
   reset(): void {
@@ -113,6 +118,12 @@ export class GuidanceSystem {
     this.deployedSquadTypes.clear();
     this.discoveredStrategicTypes.clear();
     this.contextTickAccum = 0;
+    this.trainingStuckAccum = 0;
+  }
+
+  /** True while the active sector is the optional Operator Training run. */
+  private isTrainingActive(): boolean {
+    return this.game.core.sector?.isTraining === true;
   }
 
   // ────────────────────────────────────────────────────────────────────────
@@ -169,6 +180,84 @@ export class GuidanceSystem {
     if (this.contextTickAccum < 0.4) return;
     this.contextTickAccum = 0;
     this.checkContextualTriggers();
+    if (this.isTrainingActive()) this.checkTrainingStuckHints(dt);
+  }
+
+  /**
+   * Training-only safety rails: detect common "what do I do" states and surface
+   * a one-line hint. Each id is on its own cooldown so we never hammer the
+   * player. Only runs in the training sector.
+   */
+  private checkTrainingStuckHints(dt: number): void {
+    this.trainingStuckAccum += dt;
+    if (this.trainingStuckAccum < 1.0) return;
+    this.trainingStuckAccum = 0;
+    const game = this.game;
+    if (game.state !== "PLANNING" && game.state !== "WAVE_ACTIVE") return;
+
+    // No towers built yet, planning has been open a while → "build a tower".
+    if (game.state === "PLANNING" && game.towers.list.length === 0 && game.waves.planningCountdown < game.waves.planningDuration - 8) {
+      this.queueHint({
+        id: "hint_training_no_towers",
+        title: "Build a tower",
+        body: "Click 1 to pick Pulse Cannon, then click an empty cell inside the cyan Signal Coverage circle.",
+        kind: "hint",
+        priority: 50,
+        ttl: 6,
+      });
+      return;
+    }
+
+    // Wave 2+ and no relay built → "consider relay".
+    if (
+      game.core.waveIndex >= 2 &&
+      game.core.coreNodesBuilt === 0 &&
+      game.canDeployRelayCore()
+    ) {
+      this.queueHint({
+        id: "hint_training_relay",
+        title: "Try a Relay Core",
+        body: "Press R to enter relay deploy mode. Place inside the cyan deploy radius around your home core.",
+        kind: "hint",
+        priority: 45,
+        ttl: 6,
+      });
+      return;
+    }
+
+    // Wave 5+ and no engineer / repair drone deployed → "engineer repairs".
+    if (
+      game.core.waveIndex >= 4 &&
+      !this.deployedSquadTypes.has("engineer") &&
+      game.core.commandTier >= 2
+    ) {
+      this.queueHint({
+        id: "hint_training_engineer",
+        title: "Engineer fixes towers",
+        body: "Drop F2 Engineer near a damaged tower to repair. Engineers also accelerate strategic capture.",
+        kind: "hint",
+        priority: 35,
+        ttl: 6,
+      });
+      return;
+    }
+
+    // Final waves and no Strike deployed → suggest Strike on the rift.
+    if (
+      game.core.waveIndex >= 5 &&
+      !this.deployedSquadTypes.has("strike") &&
+      game.core.commandTier >= 3
+    ) {
+      this.queueHint({
+        id: "hint_training_strike",
+        title: "Strike the Rift Anchor",
+        body: "F3 deploys a Strike Squad. Drop one near the eastern anchor to crack it open.",
+        kind: "hint",
+        priority: 35,
+        ttl: 6,
+      });
+      return;
+    }
   }
 
   // ────────────────────────────────────────────────────────────────────────
@@ -191,9 +280,32 @@ export class GuidanceSystem {
     this.banner = null;
     this.hint = null;
 
-    // Banner for sector-introduced mechanics (Sector 3 / 6 / 7).
+    // Banner for sector-introduced mechanics (Sector 3 / 6 / 7) or the
+    // Training simulation entry banner.
     const sector = this.game.core.sector;
     if (!sector) return;
+    if (sector.isTraining) {
+      this.queueBanner({
+        id: "banner_training_intro",
+        title: "OPERATOR TRAINING",
+        body: "Eight short drills. Build, expand, capture, command squads, repair, and suppress hostile structures. You can dismiss tutorial cards any time.",
+        kind: "banner",
+        codexTab: "basics",
+        ttl: 18,
+      });
+      // The very first tutorial card welcomes the player and pins to the
+      // bottom-centre. Subsequent cards trigger off events / waves.
+      this.queueTutorial({
+        id: "tut_training_welcome",
+        title: "Welcome, Operator",
+        body: "This simulation teaches Last Signal's command-defense systems. Each drill highlights one mechanic. Build 2 towers inside Signal Coverage, then START WAVE.",
+        kind: "tutorial",
+        hint: "1: Pulse · 2: Blaster",
+        codexTab: "basics",
+      });
+      this.game.bus.emit("guidance:changed");
+      return;
+    }
     if (sector.id === "sector_03_deep_space_wreckage") {
       this.queueBanner({
         id: "banner_sector3",
@@ -425,6 +537,89 @@ export class GuidanceSystem {
     });
   }
 
+  /**
+   * Training-only: fires after every drill completes. Drops a short stage
+   * card that previews the next mechanic. Stage cards live in their own id
+   * namespace ("tut_training_stageN") so they're independent of the campaign
+   * tutorials and bypass persistedSeen via isTrainingActive().
+   */
+  private onWaveCompleteTraining(): void {
+    if (!this.isTrainingActive()) return;
+    const idx = this.game.core.waveIndex; // 0-based AFTER increment in WaveSystem
+    // Cards align with the wave the player is about to start next.
+    switch (idx) {
+      case 1:
+        this.queueTutorial({
+          id: "tut_training_stage2",
+          title: "Stage 2 — Expand the Network",
+          body: "Drill 2 opens a second lane. Press R to deploy a Relay Core for an extended Signal Coverage and a forward repair point.",
+          kind: "tutorial",
+          hint: "R: relay deploy",
+          codexTab: "signal",
+        });
+        break;
+      case 2:
+        this.queueTutorial({
+          id: "tut_training_stage3",
+          title: "Stage 3 — Capture Drill",
+          body: "The North Repeater is inside coverage. Stand a friendly on it and capture progress fills. Engineer (F2) speeds it up.",
+          kind: "tutorial",
+          hint: "F2: Engineer",
+          codexTab: "strategic",
+        });
+        break;
+      case 3:
+        this.queueTutorial({
+          id: "tut_training_stage4",
+          title: "Stage 4 — Visibility",
+          body: "Push west and capture the Damaged Radar Dish. Recon Squad (F1) scouts dark areas and exposes hostile structures.",
+          kind: "tutorial",
+          hint: "F1: Recon",
+          codexTab: "strategic",
+        });
+        break;
+      case 4:
+        this.queueTutorial({
+          id: "tut_training_stage5",
+          title: "Stage 5 — Saboteurs",
+          body: "Drill 5 sends a Saboteur. Towers take real HP damage. Engineer (F2) repairs damaged or disabled towers in the field.",
+          kind: "tutorial",
+          hint: "F2 to repair",
+          codexTab: "durability",
+        });
+        break;
+      case 5:
+        this.queueTutorial({
+          id: "tut_training_stage6",
+          title: "Stage 6 — Suppression",
+          body: "The eastern Rift Anchor pulses while alive; the Jammer slows fire. Strike (F3) cracks structures, Shield (F4) absorbs pulses.",
+          kind: "tutorial",
+          hint: "F3 / F4",
+          codexTab: "hostile",
+        });
+        break;
+      case 6:
+        this.queueTutorial({
+          id: "tut_training_stage7",
+          title: "Stage 7 — Combined Exercise",
+          body: "Use everything together. Captured turret + towers + active squads make the south lane easy.",
+          kind: "tutorial",
+          codexTab: "squads",
+        });
+        break;
+      case 7:
+        this.queueTutorial({
+          id: "tut_training_stage8",
+          title: "Stage 8 — Certification",
+          body: "Final drill. EVAC any damaged squad with Q to save them — that completes Stage 8 and your training.",
+          kind: "tutorial",
+          hint: "Q: EVAC",
+          codexTab: "squads",
+        });
+        break;
+    }
+  }
+
   // ────────────────────────────────────────────────────────────────────────
   // Contextual hints
   // ────────────────────────────────────────────────────────────────────────
@@ -562,7 +757,10 @@ export class GuidanceSystem {
   private queueTutorial(card: GuidanceCard): void {
     if (!this.tutorialEnabled()) return;
     if (this.runSeen.has(card.id)) return;
-    if (this.persistedSeen(card.id)) {
+    // Training sector ignores persisted seen flags so a returning player
+    // can run the simulation again and still see every stage card. Run-level
+    // dedup still applies so a single drill can't spam the same card.
+    if (!this.isTrainingActive() && this.persistedSeen(card.id)) {
       this.runSeen.add(card.id);
       return;
     }
@@ -583,7 +781,7 @@ export class GuidanceSystem {
   private queueBanner(card: GuidanceCard): void {
     if (!this.tutorialEnabled()) return;
     if (this.runSeen.has(card.id)) return;
-    if (this.persistedSeen(card.id)) {
+    if (!this.isTrainingActive() && this.persistedSeen(card.id)) {
       this.runSeen.add(card.id);
       return;
     }

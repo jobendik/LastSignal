@@ -103,6 +103,14 @@ export const helpCategories: HelpCategory[] = [
           "Mix damage and control towers, capture points to expand, and don't ignore squad commands when they unlock.",
         ],
       },
+      {
+        title: "Operator Training (optional)",
+        body: [
+          "New to Last Signal? Run the optional Operator Training simulation from Sector Select. Eight short drills walk you through every major system in a low-pressure environment.",
+          "Training never blocks the campaign and never updates progression — it's pure practice.",
+        ],
+        tip: "Sector Select → top card. Start Training. Replayable any time.",
+      },
     ],
   },
 
@@ -590,6 +598,14 @@ export const helpCategories: HelpCategory[] = [
     subtitle: "What each kind of mission asks of you.",
     color: "#ffb300",
     entries: [
+      {
+        title: "Sector 0 — Operator Training (optional)",
+        body: [
+          "Optional simulation. Eight short drills introduce towers, signal expansion, capture, mobile squads, repair, and hostile-structure suppression.",
+          "Always available, replayable, never required for campaign progression. Recommended for first-time players.",
+        ],
+        tip: "Launch from Sector Select. The card sits above the campaign grid.",
+      },
       {
         title: "Early Sectors (1–4)",
         body: [

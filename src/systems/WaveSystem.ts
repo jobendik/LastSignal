@@ -56,7 +56,14 @@ export class WaveSystem {
 
   /** Planning-phase countdown (seconds) until auto-start. 0 disables auto-start. */
   planningCountdown = 0;
-  readonly planningDuration = 20;
+  /**
+   * Auto-start countdown duration. The training simulation extends planning
+   * to 35 seconds so a new player has more time to read tutorial cards
+   * between drills; campaign sectors keep the brisk 20-second default.
+   */
+  get planningDuration(): number {
+    return this.game.core.sector?.isTraining ? 35 : 20;
+  }
 
   get currentWaveDef(): WaveDefinition | null {
     const sector = this.game.core.sector;
