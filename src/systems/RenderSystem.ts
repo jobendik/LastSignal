@@ -947,7 +947,7 @@ export class RenderSystem {
       return;
     }
 
-    const disabled = this.game.towers["disabled"].has(t);
+    const disabled = this.game.towers["disabled"].has(t) || t.disabled;
     // Check jammer aura — covers both jammer enemies AND strategic-point jammer
     // fields so both show the same orange interference halo.
     const jammedByEnemy = this.game.enemies.list.some(
@@ -955,7 +955,15 @@ export class RenderSystem {
     );
     const jammedByStructure = this.game.strategicPoints?.isWorldPointJammed(t.pos.x, t.pos.y) ?? false;
     const jammed = !disabled && (jammedByEnemy || jammedByStructure);
-    ctx.globalAlpha = disabled ? 0.4 : jammed ? 0.78 : 1;
+    const ds = t.durabilityState;
+    // Damaged towers darken slightly even when not disabled so the player can
+    // read state at a glance. Critical pushes further; disabled pushes hardest.
+    let alphaMul = 1;
+    if (disabled) alphaMul = 0.45;
+    else if (ds === "critical") alphaMul = 0.85;
+    else if (ds === "damaged") alphaMul = 0.95;
+    if (jammed) alphaMul = Math.min(alphaMul, 0.78);
+    ctx.globalAlpha = alphaMul;
 
     // Base plate.
     ctx.fillStyle = "#141a22";
@@ -1354,8 +1362,161 @@ export class RenderSystem {
       ctx.restore();
     }
 
+    // Durability overlays — draw after rotation reset so they sit on the body.
+    this.drawTowerDurability(ctx, t, ds, disabled);
+
     ctx.restore();
     void stats;
+  }
+
+  /**
+   * Visual feedback for tower durability:
+   *  - damaged: small flickering sparks
+   *  - critical: stronger flicker + warning border
+   *  - disabled: dimmed body with broken icon
+   *  - underRepair: green pulse halo
+   *  - shielded: cyan outline ring
+   *  - damageFlashTimer > 0: brief red flash on hit
+   *  - HP bar above the tower when not full HP
+   */
+  private drawTowerDurability(
+    ctx: CanvasRenderingContext2D,
+    t: Tower,
+    ds: "operational" | "damaged" | "critical" | "disabled" | "destroyed",
+    disabled: boolean,
+  ): void {
+    const elapsed = this.game.time.elapsed;
+
+    // Recent damage flash — short red overlay punch.
+    if (t.damageFlashTimer > 0) {
+      const k = Math.min(1, t.damageFlashTimer / 0.45);
+      ctx.save();
+      ctx.globalAlpha = 0.5 * k;
+      ctx.fillStyle = "#ff5252";
+      ctx.fillRect(-12, -12, 24, 24);
+      ctx.restore();
+    }
+
+    // Damaged: occasional spark from a random offset around the body.
+    if (ds === "damaged" && !disabled) {
+      const flicker = Math.sin(elapsed * 13 + t.c * 0.7 + t.r * 0.3);
+      if (flicker > 0.85) {
+        ctx.save();
+        ctx.fillStyle = "#ffd54f";
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = "#ffd54f";
+        const ox = Math.cos(elapsed * 11) * 7;
+        const oy = Math.sin(elapsed * 9) * 7;
+        ctx.fillRect(ox - 1, oy - 1, 2, 2);
+        ctx.restore();
+      }
+    }
+
+    // Critical: stronger flicker + warning ring.
+    if (ds === "critical" && !disabled) {
+      ctx.save();
+      ctx.globalAlpha = 0.55 + Math.sin(elapsed * 18) * 0.25;
+      ctx.strokeStyle = "#ff8a65";
+      ctx.lineWidth = 1.4;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "#ff5252";
+      ctx.beginPath();
+      ctx.arc(0, 0, 17, 0, Math.PI * 2);
+      ctx.stroke();
+      // Spark spray — 2 sparks per frame at random offsets.
+      ctx.fillStyle = "#ffeb3b";
+      ctx.shadowColor = "#ffeb3b";
+      for (let i = 0; i < 2; i++) {
+        const a = elapsed * 7 + i * 2.1 + t.c;
+        const ox = Math.cos(a) * 9;
+        const oy = Math.sin(a) * 9;
+        ctx.fillRect(ox - 1, oy - 1, 2, 2);
+      }
+      ctx.restore();
+    }
+
+    // Disabled: dim cross + offline icon.
+    if (disabled) {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = "#ff5252";
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "#ff5252";
+      ctx.beginPath();
+      ctx.moveTo(-9, -9);
+      ctx.lineTo(9, 9);
+      ctx.moveTo(9, -9);
+      ctx.lineTo(-9, 9);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#ff5252";
+      ctx.font = "bold 7px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("OFFLINE", 0, -22);
+      ctx.restore();
+    }
+
+    // Under-repair halo: bright green pulse.
+    if (t.underRepair && !disabled) {
+      ctx.save();
+      const pulse = 0.4 + Math.sin(elapsed * 8) * 0.25;
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = "#9be7a7";
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#9be7a7";
+      ctx.beginPath();
+      ctx.arc(0, 0, 21 + Math.sin(elapsed * 6) * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (t.underRepair && disabled) {
+      // Restoration pulse: rising rings telegraph the revival.
+      ctx.save();
+      const ph = (elapsed % 1.0) / 1.0;
+      ctx.globalAlpha = 0.45 * (1 - ph);
+      ctx.strokeStyle = "#9be7a7";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, 18 + ph * 18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Shield outline.
+    if (t.shielded && !disabled) {
+      ctx.save();
+      ctx.globalAlpha = 0.55 + Math.sin(elapsed * 4) * 0.15;
+      ctx.strokeStyle = "#80deea";
+      ctx.lineWidth = 1.2;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "#80deea";
+      ctx.beginPath();
+      ctx.arc(0, 0, 22, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // HP bar — only render when not full so the field stays clean.
+    if (t.hp < t.maxHp && t.maxHp > 0) {
+      ctx.save();
+      const barW = 22;
+      const barH = 3;
+      const yOff = -16;
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      ctx.fillRect(-barW / 2 - 1, yOff - 1, barW + 2, barH + 2);
+      const pct = Math.max(0, Math.min(1, t.hpPct));
+      const color =
+        pct > 0.65 ? "#9be7a7" :
+        pct > 0.30 ? "#ffd54f" :
+        pct > 0    ? "#ff8a65" :
+                     "#ff5252";
+      ctx.fillStyle = color;
+      ctx.fillRect(-barW / 2, yOff, Math.max(0, barW * pct), barH);
+      ctx.restore();
+    }
   }
 
   private drawCooldownArc(ctx: CanvasRenderingContext2D, t: Tower): void {
@@ -3887,12 +4048,36 @@ export class RenderSystem {
       ctx.fill();
     }
 
-    // Tower positions — colored dots.
+    // Tower positions — colored dots. Disabled towers get a flashing red ring
+    // overlay so the player can locate damaged infrastructure at a glance.
+    const blink = Math.sin(this.game.time.elapsed * 8) > 0;
     for (const t of this.game.towers.list) {
       ctx.fillStyle = t.def.color;
       const tc = Math.floor(t.pos.x / TILE_SIZE);
       const tr = Math.floor(t.pos.y / TILE_SIZE);
-      ctx.fillRect(mx + tc * tileW, my + tr * tileH, Math.ceil(tileW), Math.ceil(tileH));
+      const tx = mx + tc * tileW;
+      const ty = my + tr * tileH;
+      ctx.fillRect(tx, ty, Math.ceil(tileW), Math.ceil(tileH));
+      if (t.disabled && blink) {
+        ctx.save();
+        ctx.strokeStyle = "#ff5252";
+        ctx.lineWidth = 1.2;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = "#ff5252";
+        ctx.beginPath();
+        ctx.arc(tx + tileW / 2, ty + tileH / 2, 3.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      } else if (t.hpPct < 0.3 && !t.disabled && blink) {
+        // Critical-state ping (subtler than full disabled).
+        ctx.save();
+        ctx.strokeStyle = "#ff8a65";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(tx + tileW / 2, ty + tileH / 2, 2.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // Enemy positions — red dots.
@@ -4208,8 +4393,10 @@ function drawMinimapStrategicMarker(
     ctx.arc(0, 0, 1.4, 0, Math.PI * 2);
     ctx.fill();
   } else if (p.state === "captured") {
-    // Filled diamond — stable / friendly.
-    ctx.fillStyle = tint;
+    // Filled diamond — stable / friendly. Disabled abandoned turret pulses red.
+    const turretBroken = p.type === "abandoned_turret" && p.disabled;
+    ctx.fillStyle = turretBroken ? "#ff5252" : tint;
+    if (turretBroken) ctx.globalAlpha = 0.4 + pulse * 0.5;
     ctx.beginPath();
     ctx.moveTo(0, -4);
     ctx.lineTo(4, 0);
@@ -4217,6 +4404,17 @@ function drawMinimapStrategicMarker(
     ctx.lineTo(-4, 0);
     ctx.closePath();
     ctx.fill();
+    if (turretBroken) {
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = "#ff5252";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-3, -3);
+      ctx.lineTo(3, 3);
+      ctx.moveTo(-3, 3);
+      ctx.lineTo(3, -3);
+      ctx.stroke();
+    }
   } else if (p.state === "neutral") {
     // Hollow square — capturable.
     ctx.strokeStyle = tint;

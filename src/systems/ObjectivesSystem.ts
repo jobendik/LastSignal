@@ -26,6 +26,10 @@ export interface ObjectiveSnapshot {
   squadDeployedByType: Partial<Record<SquadType, number>>;
   /** Per-strategic-type kills credited to squad damage this run. */
   squadDestroyedStrategicByType: Partial<Record<StrategicPointType, number>>;
+  /** Total times an Engineer restored a disabled tower or fully repaired one this run. */
+  towersRepairedThisRun: number;
+  /** Number of player towers currently in the disabled state. */
+  towersDisabledNow: number;
 }
 
 export interface ObjectiveEvalResult {
@@ -58,6 +62,8 @@ export class ObjectivesSystem {
   private squadDeployedByType: Partial<Record<SquadType, number>> = {};
   /** Per-strategic-type kills credited to squad damage this run. */
   private squadDestroyedStrategicByType: Partial<Record<StrategicPointType, number>> = {};
+  /** Tower-restored / repaired-from-disabled events this run. */
+  private towersRepaired = 0;
 
   constructor(private readonly game: Game) {
     const bus = game.bus;
@@ -90,6 +96,8 @@ export class ObjectivesSystem {
       const t = ev.structureType;
       this.squadDestroyedStrategicByType[t] = (this.squadDestroyedStrategicByType[t] ?? 0) + 1;
     });
+    // Tower restored from disabled / fully repaired counts toward repair-based objectives.
+    bus.on("tower:restored", () => { this.towersRepaired++; });
   }
 
   reset(): void {
@@ -102,6 +110,7 @@ export class ObjectivesSystem {
     this.builtAnyByType.clear();
     this.squadDeployedByType = {};
     this.squadDestroyedStrategicByType = {};
+    this.towersRepaired = 0;
   }
 
   get currentSectorObjectives(): SectorObjectives | null {
@@ -116,6 +125,10 @@ export class ObjectivesSystem {
     const scannerTowers: TowerType[] = ["amplifier", "tesla"]; // Tesla acts as detection-capable
     const scannerAlive = this.game.towers.list.some((t) => scannerTowers.includes(t.type));
     const sps = this.game.strategicPoints;
+    let towersDisabledNow = 0;
+    for (const t of this.game.towers.list) {
+      if (t.disabled) towersDisabledNow++;
+    }
     return {
       enemiesKilledByType: this.kills,
       enemiesLeakedByType: this.leaks,
@@ -134,6 +147,8 @@ export class ObjectivesSystem {
       strategicDestroyedByType: sps?.destroyedCounts ?? {},
       squadDeployedByType: this.squadDeployedByType,
       squadDestroyedStrategicByType: this.squadDestroyedStrategicByType,
+      towersRepairedThisRun: this.towersRepaired,
+      towersDisabledNow,
     };
   }
 
@@ -309,6 +324,20 @@ export class ObjectivesSystem {
         out.completed = have >= need;
         out.progressText = `${have}/${need}`;
         out.progress = Math.min(1, have / Math.max(1, need));
+        break;
+      }
+      case "tower_repairs_at_least": {
+        const need = def.value ?? 1;
+        const have = snap.towersRepairedThisRun;
+        out.completed = have >= need;
+        out.progressText = `${have}/${need}`;
+        out.progress = Math.min(1, have / Math.max(1, need));
+        break;
+      }
+      case "no_disabled_towers_at_end": {
+        out.completed = runWon && snap.towersDisabledNow === 0;
+        out.progressText = snap.towersDisabledNow === 0 ? "✓" : `${snap.towersDisabledNow} offline`;
+        out.progress = snap.towersDisabledNow === 0 ? 1 : 0;
         break;
       }
     }

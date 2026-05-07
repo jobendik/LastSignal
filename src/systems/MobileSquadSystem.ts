@@ -290,18 +290,24 @@ export class MobileSquadSystem {
       order = "scout";
       scanReset = true;
     } else if (s.type === "engineer") {
-      // Engineer prefers neutral capturable, then disabled tower, then point hold.
+      // Engineer prefers neutral capturable, then disabled/damaged tower, then point hold.
+      const towerNeedsRepair =
+        towerTarget &&
+        (towerTarget.disabled ||
+          this.game.towers.disabled.has(towerTarget) ||
+          towerTarget.buildProgress < 1 ||
+          towerTarget.hp < towerTarget.maxHp);
       if (pointTarget && pointTarget.state === "neutral") {
         s.targetPoint = pointTarget;
         acceptedX = pointTarget.pos.x;
         acceptedY = pointTarget.pos.y;
         acceptedLabel = "ENGINEER → CAPTURE";
         order = "capture";
-      } else if (towerTarget && (this.game.towers.disabled.has(towerTarget) || towerTarget.buildProgress < 1)) {
+      } else if (towerTarget && towerNeedsRepair) {
         s.targetTower = towerTarget;
         acceptedX = towerTarget.pos.x;
         acceptedY = towerTarget.pos.y;
-        acceptedLabel = "ENGINEER → REPAIR";
+        acceptedLabel = towerTarget.disabled ? "ENGINEER → RESTORE" : "ENGINEER → REPAIR";
         order = "repair";
       } else if (pointTarget && pointTarget.state === "captured" && pointTarget.type === "abandoned_turret") {
         s.targetPoint = pointTarget;
@@ -390,6 +396,30 @@ export class MobileSquadSystem {
     const origin = this.game.grid.getNearestCoreCenter(targetX, targetY);
     const target = new Vector2(targetX, targetY);
     const squad = new Squad(type, origin.x, origin.y, target);
+    // Engineer-repair convenience: if the player clicked on or very near a
+    // damaged/disabled tower, auto-anchor the engineer to that tower so it
+    // arrives in repair contact instead of milling around the ground.
+    if (type === "engineer") {
+      let nearTower: Tower | null = null;
+      let bestSq = 28 * 28;
+      for (const t of this.game.towers.list) {
+        const wantsRepair =
+          t.disabled ||
+          this.game.towers.disabled.has(t) ||
+          t.buildProgress < 1 ||
+          t.hp < t.maxHp;
+        if (!wantsRepair) continue;
+        const dx = t.pos.x - targetX;
+        const dy = t.pos.y - targetY;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestSq) { bestSq = d2; nearTower = t; }
+      }
+      if (nearTower) {
+        squad.targetTower = nearTower;
+        squad.target.set(nearTower.pos.x, nearTower.pos.y);
+        squad.order = "repair";
+      }
+    }
     this.list.push(squad);
     this.cooldowns[type] = this.effectiveCooldown(def);
     this.pendingCommand = null;
@@ -693,6 +723,12 @@ export class MobileSquadSystem {
     if (s.targetTower && !this.game.towers.list.includes(s.targetTower)) {
       s.targetTower = null;
     }
+    // Also drop the target if the tower is now fully repaired and not disabled
+    // — let the engineer scout for the next damaged tower instead of standing
+    // idle on a healthy one.
+    if (s.targetTower && !s.targetTower.disabled && s.targetTower.hp >= s.targetTower.maxHp) {
+      s.targetTower = null;
+    }
 
     const point = s.targetPoint ?? this.findNearbyCapturablePoint(s);
     const tower = s.targetTower ?? this.findNearbyDisabledTower(s);
@@ -741,12 +777,22 @@ export class MobileSquadSystem {
           }
           this.drawWorkBeam(s.pos, point.pos, s.def.color);
         } else if (point.state === "captured" && point.type === "abandoned_turret") {
-          // Engineer keeps a friendly turret firing faster by trimming its cooldown.
-          point.effectTimer = Math.max(0, point.effectTimer - dt * 0.5 * actionSpd);
+          // Engineer repairs damaged turret HP and trims its firing cooldown.
+          // Repair is HP-based now; cooldown trim still happens for healthy turrets.
+          const sps = this.game.strategicPoints!;
+          const repairResult = sps.repairTurret(point, dt * actionSpd, s.jammed);
+          if (point.health >= point.maxHealth && !point.disabled) {
+            point.effectTimer = Math.max(0, point.effectTimer - dt * 0.5 * actionSpd);
+          }
           s.effectTimer -= dt;
           if (s.effectTimer <= 0) {
             s.effectTimer = 1.3;
-            this.game.particles.spawnFloatingText(point.pos.x, point.pos.y - 30, "TURRET BOOST", s.def.color, 0.7, 10);
+            const tag = point.disabled
+              ? "RESTORING TURRET"
+              : repairResult.healed > 0
+                ? "REPAIRING TURRET"
+                : "REINFORCING";
+            this.game.particles.spawnFloatingText(point.pos.x, point.pos.y - 30, tag, s.def.color, 0.7, 10);
           }
           this.drawWorkBeam(s.pos, point.pos, s.def.color);
         }
@@ -761,9 +807,22 @@ export class MobileSquadSystem {
       const dist = this.moveToward(s, tower.pos, dt);
       if (dist < s.def.interactionRadius) {
         s.state = "repairing";
-        // Drain remaining disabled timer faster — equivalent of "repairing
-        // a damaged tower" since towers don't have HP. Also speeds up
-        // mid-construction tower build progress.
+        // Real HP-based repair. Towers track their own HP; the system handles
+        // shield/ jammer / stacking penalties and emits the restore event when
+        // a fully disabled tower comes back online.
+        if (tower.buildProgress < 1) {
+          tower.buildProgress = Math.min(1, tower.buildProgress + dt * 1.6 * actionSpd);
+        }
+        // Mark tower as under-repair for renderer (used by drawTower halo).
+        tower.underRepair = true;
+
+        // Pass raw dt; the TowerSystem applies the jammer penalty internally,
+        // and we let actionSpeed (jammed action throttle) apply once via dt.
+        const tickResult = this.game.towers.engineerRepairTick(tower, dt * actionSpd, s.jammed);
+
+        // Some legacy abilities (Mirror reflection, etc.) still set the
+        // disabled-timer map. Drain it as well so a Mirror-stunned tower
+        // can be rescued mid-channel.
         const disabledMap = this.game.towers.disabled;
         const remaining = disabledMap.get(tower);
         if (remaining != null && remaining > 0) {
@@ -771,21 +830,30 @@ export class MobileSquadSystem {
           if (next <= 0) disabledMap.delete(tower);
           else disabledMap.set(tower, next);
         }
-        if (tower.buildProgress < 1) {
-          tower.buildProgress = Math.min(1, tower.buildProgress + dt * 1.6 * actionSpd);
-        }
         s.effectTimer -= dt;
         if (s.effectTimer <= 0) {
           s.effectTimer = 1.2;
+          const label = tower.disabled
+            ? "RESTORING DISABLED"
+            : tower.buildProgress < 1
+              ? "BUILDING"
+              : "REPAIRING";
           this.game.particles.spawnFloatingText(
             tower.pos.x,
             tower.pos.y - 30,
-            "REPAIRING",
+            label,
             s.def.color,
             0.7,
             10
           );
           this.game.audio.sfxSquadEngineer(s.pos);
+        }
+        if (tickResult.healed > 0 || tickResult.restored) {
+          // Subtle "+HP" floater every 2s so the player sees concrete progress.
+          if (Math.floor(this.game.time.elapsed * 0.5) !== Math.floor((this.game.time.elapsed - dt) * 0.5)) {
+            const tag = tickResult.restored ? "ONLINE" : `+${Math.round(tickResult.healed)}HP`;
+            this.game.particles.spawnFloatingText(tower.pos.x, tower.pos.y - 16, tag, "#9be7a7", 0.6, 10);
+          }
         }
         this.drawWorkBeam(s.pos, tower.pos, s.def.color);
         return;
@@ -844,17 +912,24 @@ export class MobileSquadSystem {
   private findNearbyDisabledTower(s: Squad): Tower | null {
     const towers = this.game.towers.list;
     let best: Tower | null = null;
-    let bestSq = 220 * 220;
+    let bestScore = Infinity;
     for (const t of towers) {
-      const isDisabled = this.game.towers.disabled.has(t) || t.buildProgress < 1;
-      if (!isDisabled) continue;
+      const wantsRepair =
+        t.disabled ||
+        this.game.towers.disabled.has(t) ||
+        t.buildProgress < 1 ||
+        t.hp < t.maxHp;
+      if (!wantsRepair) continue;
       const dx = t.pos.x - s.target.x;
       const dy = t.pos.y - s.target.y;
       const d2 = dx * dx + dy * dy;
-      if (d2 < bestSq) {
-        bestSq = d2;
-        best = t;
-      }
+      if (d2 > 220 * 220) continue;
+      // Score: disabled / damaged towers ranked higher than topped-off ones,
+      // and closer towers preferred. Prefer nothing > nothing if we're full HP.
+      let score = d2;
+      if (t.disabled) score -= 80 * 80;
+      else if (t.hpPct < 0.5) score -= 40 * 40;
+      if (score < bestScore) { bestScore = score; best = t; }
     }
     return best;
   }

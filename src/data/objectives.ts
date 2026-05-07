@@ -46,7 +46,11 @@ export type ObjectiveKind =
   /** Deploy at least N squads of the named type during the run. */
   | "deploy_n_squad"
   /** Strike-squad damage destroyed at least N hostile structures of a given type. */
-  | "squad_destroy_n_strategic";
+  | "squad_destroy_n_strategic"
+  /** Engineer/Engineer-driven repair completed at least N times this run. */
+  | "tower_repairs_at_least"
+  /** Finish the run with no towers in disabled state at the end. */
+  | "no_disabled_towers_at_end";
 
 export interface ObjectiveDefinition {
   id: string;
@@ -235,9 +239,14 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
 
   sector_04_hostile_core: {
     briefing:
-      "The hostile core itself. Sabotage, artillery, multi-boss pressure. Spread your towers, defend in depth, expect the unexpected.",
-    counterplay: ["Spread placement (anti-artillery)", "Snare/EMP for Saboteurs", "Railgun + Reflector for boss damage"],
-    hazards: "Harbinger artillery and Saboteur sabotage punish dense clusters. Spacing matters.",
+      "The hostile core itself. Sabotage, artillery, multi-boss pressure. Saboteurs damage and disable real tower HP — keep an Engineer Squad available for repairs and don't cluster expensive towers.",
+    counterplay: [
+      "Spread placement (anti-artillery)",
+      "Snare/EMP for Saboteurs",
+      "Engineer Squad to repair / restore towers",
+      "Railgun + Reflector for boss damage",
+    ],
+    hazards: "Harbinger artillery and Saboteur HP-damage punish dense clusters. Engineer recovery is now meaningful.",
     primary: {
       id: "s4_primary",
       label: "Defeat the Leviathan.",
@@ -316,14 +325,15 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
 
   sector_06_fractured_expanse: {
     briefing:
-      "Lost relays, hostile rifts, and dead-air zones stretch past the dish. Push your signal network outward — deploy Recon to scout dark corridors, Engineer to accelerate captures, and survive the multi-front swarm.",
+      "Lost relays, hostile rifts, and dead-air zones stretch past the dish. Push your signal network outward — deploy Recon to scout dark corridors, Engineer to capture and repair forward towers, and survive the multi-front swarm.",
     counterplay: [
       "Roll relays toward signal nodes",
       "Capture the radar dish for wave intel",
       "Bring towers within range of rift anchors",
       "Deploy Recon squads to scout the eastern frontier",
+      "Engineer Squad repairs forward towers and the wreckage turret",
     ],
-    hazards: "Hostile rift anchors and a jammer dim the map until destroyed.",
+    hazards: "Hostile rift anchors and a jammer dim the map until destroyed. Saboteurs damage exposed forward towers — keep an Engineer ready.",
     primary: {
       id: "s6_primary",
       label: "Survive every wave of the Fractured Expanse.",
@@ -499,6 +509,14 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
         kind: "deploy_n_squad",
         value: 3,
         rewardResearch: 2,
+      },
+      {
+        id: "s7_keep_infrastructure_online",
+        label: "Finish the assault with no towers offline.",
+        detail: "Engineer recovery is critical — every disabled gun is a hole in the line.",
+        kind: "no_disabled_towers_at_end",
+        rewardResearch: 3,
+        rewardCredits: 80,
       },
     ],
   },

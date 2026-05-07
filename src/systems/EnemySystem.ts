@@ -5,7 +5,14 @@ import type { EnemyType } from "../core/Types";
 import { Vector2 } from "../core/Vector2";
 import { rnd } from "../core/Random";
 import { enemyDefinitions } from "../data/enemies";
-import { TILE_SIZE } from "../core/Config";
+import {
+  BOSS_TOWER_DAMAGE,
+  BOSS_TOWER_DAMAGE_MULTIPLIER,
+  SABOTEUR_TOWER_COOLDOWN,
+  SABOTEUR_TOWER_DAMAGE,
+  SABOTEUR_TOWER_RADIUS,
+  TILE_SIZE,
+} from "../core/Config";
 
 /** Enemy update, damage routing, boss phases, heal/phase/spawn behavior. */
 export class EnemySystem {
@@ -435,18 +442,31 @@ export class EnemySystem {
   }
 
   private updateSaboteur(e: Enemy): void {
-    const RANGE = 38;
     let nearest = null;
     let best = Infinity;
     for (const t of this.game.towers.list) {
+      if (!t.active || t.disabled) continue;
+      // Buildings still under construction shouldn't be sabotaged — they look
+      // like "scaffolding" to the saboteur and the player has no counterplay
+      // window otherwise.
+      if (t.buildProgress < 1) continue;
       const d = t.pos.dist(e.pos);
-      if (d < RANGE && d < best) { best = d; nearest = t; }
+      if (d < SABOTEUR_TOWER_RADIUS && d < best) { best = d; nearest = t; }
     }
     if (!nearest) return;
-    this.game.towers.disableTower(nearest, 3);
-    e.saboteurCooldown = 8;
+    // Apply HP damage. The TowerSystem is responsible for shield reduction,
+    // disable transitions, and audio throttling.
+    const result = this.game.towers.damageTower(nearest, SABOTEUR_TOWER_DAMAGE, "saboteur");
+    e.saboteurCooldown = SABOTEUR_TOWER_COOLDOWN;
+    // Spark beam from saboteur to tower.
+    this.game.particles.spawnBeam(e.pos.x, e.pos.y, nearest.pos.x, nearest.pos.y, "#ff6f00", 0.16, { width: 2 });
     this.game.particles.spawnBurst(nearest.pos.x, nearest.pos.y, "#ff6f00", 10, { speed: 65, life: 0.4, size: 2 });
-    this.game.particles.spawnFloatingText(nearest.pos.x, nearest.pos.y - 16, "DISABLED", "#ff6f00", 1.0, 11);
+    this.game.particles.spawnRing(nearest.pos.x, nearest.pos.y, 22, "#ff6f00", 0.32);
+    // SABOTAGED text the first time we hit a fresh tower, otherwise just damage.
+    const label = result.nowDisabled ? "OFFLINE" : "SABOTAGED";
+    this.game.particles.spawnFloatingText(nearest.pos.x, nearest.pos.y - 18, label, "#ff6f00", 1.0, 11);
+    this.game.audio.sfxSabotagePulse?.(nearest.pos);
+    this.game.bus.emit("tower:sabotaged", { tower: nearest, hp: nearest.hp, maxHp: nearest.maxHp });
   }
 
   private doHeal(weaver: Enemy): void {
@@ -712,11 +732,18 @@ export class EnemySystem {
     // Apply effect after a short delay (using particle systems is simplest;
     // we'll just apply it immediately with a strong visual telegraph since the
     // damage value is small — the disable is the meaningful effect).
+    // Major bosses (Leviathan/Harbinger) hit infrastructure harder than
+    // mid-tier elites. The multiplier is applied unconditionally inside
+    // corruption pulse since it's a boss-only attack.
+    const bossDmg = BOSS_TOWER_DAMAGE * BOSS_TOWER_DAMAGE_MULTIPLIER;
     for (const t of this.game.towers.list) {
       if (!t.buildProgress) continue;
       if (t.pos.dist(boss.pos) < radius) {
         // Brief disable; harvester aura / repair-faster will reduce this.
         this.game.towers.disableTower(t, 1.6);
+        // HP damage so the corruption pulse leaves marks even after the
+        // disable timer expires, making rebuild/repair decisions matter.
+        this.game.towers.damageTower(t, bossDmg, "boss");
       }
     }
     // Final ring + chip core damage (1 always — this used to be the only effect).

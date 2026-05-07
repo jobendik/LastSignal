@@ -58,6 +58,15 @@ export interface UpgradeAggregate {
   squadStrikeDamageMul: number;
   squadShieldStrengthMul: number;
   squadJammerResistance: number;
+  // ---------- TOWER DURABILITY (Part 15) ----------
+  engineerRepairMul: number;
+  towerHpAdd: number;
+  towerHpMul: number;
+  saboteurDisableReduction: number;
+  saboteurTowerDamageMul: number;
+  emergencyNanitesPct: number;
+  shieldTowerStrengthMul: number;
+  abandonedTurretHpMul: number;
 }
 
 export function createEmptyUpgradeAggregate(): UpgradeAggregate {
@@ -112,6 +121,14 @@ export function createEmptyUpgradeAggregate(): UpgradeAggregate {
     squadStrikeDamageMul: 1,
     squadShieldStrengthMul: 1,
     squadJammerResistance: 0,
+    engineerRepairMul: 1,
+    towerHpAdd: 0,
+    towerHpMul: 1,
+    saboteurDisableReduction: 0,
+    saboteurTowerDamageMul: 1,
+    emergencyNanitesPct: 0,
+    shieldTowerStrengthMul: 1,
+    abandonedTurretHpMul: 1,
   };
 }
 
@@ -327,4 +344,14 @@ export function applyUpgradeEffect(
   if (effect.squadJammerResistance != null) {
     agg.squadJammerResistance = Math.min(0.9, agg.squadJammerResistance + effect.squadJammerResistance);
   }
+  if (effect.engineerRepairMul != null) agg.engineerRepairMul *= effect.engineerRepairMul;
+  if (effect.towerHpAdd != null) agg.towerHpAdd += effect.towerHpAdd;
+  if (effect.towerHpMul != null) agg.towerHpMul *= effect.towerHpMul;
+  if (effect.saboteurDisableReduction != null) {
+    agg.saboteurDisableReduction = Math.min(0.9, agg.saboteurDisableReduction + effect.saboteurDisableReduction);
+  }
+  if (effect.saboteurTowerDamageMul != null) agg.saboteurTowerDamageMul *= effect.saboteurTowerDamageMul;
+  if (effect.emergencyNanitesPct != null) agg.emergencyNanitesPct = Math.max(agg.emergencyNanitesPct, effect.emergencyNanitesPct);
+  if (effect.shieldTowerStrengthMul != null) agg.shieldTowerStrengthMul *= effect.shieldTowerStrengthMul;
+  if (effect.abandonedTurretHpMul != null) agg.abandonedTurretHpMul *= effect.abandonedTurretHpMul;
 }

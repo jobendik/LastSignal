@@ -377,6 +377,23 @@ export interface UpgradeEffect {
   squadShieldStrengthMul?: number;
   /** Reduce jammer/rift suppression effect on squads (0..1, fraction subtracted from penalty). */
   squadJammerResistance?: number;
+  // ---------- TOWER DURABILITY (Part 15) ----------
+  /** Multiplier on Engineer repair-per-second on towers and abandoned turrets. */
+  engineerRepairMul?: number;
+  /** Flat HP added to every player tower's max HP (also raises armor pool). */
+  towerHpAdd?: number;
+  /** Multiplier on tower max HP. */
+  towerHpMul?: number;
+  /** Reduces Saboteur-applied tower disable duration (0..1 fraction subtracted). */
+  saboteurDisableReduction?: number;
+  /** Multiplier on damage that towers take from Saboteurs (< 1 = tower hardened). */
+  saboteurTowerDamageMul?: number;
+  /** Each wave end: first disabled tower auto-recovers to this fraction of HP. */
+  emergencyNanitesPct?: number;
+  /** Shield Squad damage reduction is multiplied by this when applied to towers. */
+  shieldTowerStrengthMul?: number;
+  /** Abandoned turret HP multiplier (Auto-Gun Plating upgrade). */
+  abandonedTurretHpMul?: number;
   /** Economy: harvester also shields adjacent towers (reduces incoming disable durations). */
   harvesterShieldAdjacent?: boolean;
   /** Economy: bonus credits per non-harvester tower adjacent to harvester. */

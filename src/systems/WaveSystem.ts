@@ -215,6 +215,14 @@ export class WaveSystem {
     if (up.waveCompleteCredits > 0) {
       this.game.addCredits(up.waveCompleteCredits);
     }
+    // Field repairs: damaged towers inside coverage heal a small amount; the
+    // first disabled tower per wave can auto-recover with the Emergency
+    // Nanites upgrade. Disabled towers otherwise stay disabled until the
+    // player engineer-restores them.
+    this.game.towers.applyWaveEndRecovery();
+    if (this.game.strategicPoints) {
+      this.game.strategicPoints.applyWaveEndRecovery();
+    }
     this.game.economy.onWaveComplete();
     this.checkMilestones();
     this.game.setState("WAVE_COMPLETE");
