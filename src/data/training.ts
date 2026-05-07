@@ -33,6 +33,12 @@ import { summarize } from "./waves";
 // 25 cols × 18 rows source layout. Default expand pads to 32×22.
 //                   col: 0123456789012345678901234
 //                                  1111111111222222
+// IMPORTANT: the home core (X cells) MUST have at least one walkable
+// neighbour or the BFS in GridSystem.rebuildFlow can't escape the core,
+// every spawner ends up at distance Infinity, and canPlaceTower fails
+// the "all spawners reachable" check for every tile (reported as
+// "Invalid location" everywhere). Rows 7 and 10 are intentionally clear
+// directly above/below the core so the network is connected.
 export const trainingLayout: string[] = [
   ".........................", // 0
   ".........................", // 1
@@ -41,10 +47,10 @@ export const trainingLayout: string[] = [
   "......####.....####......", // 4  rock walls hint west/east lanes
   ".........................", // 5
   ".....................C...", // 6
-  "...........####..........", // 7  upper core wall
-  "...........#XX#..........", // 8  HOME CORE  (12,8)-(13,9)
-  "N..........#XX#.........E", // 9  N spawner col=0 row=9, E spawner col=24 row=9
-  "...........####..........", // 10 lower core wall
+  ".........................", // 7  open — corridor above the core
+  "...........#XX#..........", // 8  HOME CORE row 1
+  "N..........#XX#.........E", // 9  HOME CORE row 2 (N+E spawners flank)
+  ".........................", // 10 open — corridor below the core
   ".........................", // 11
   "...C.....................", // 12
   ".........................", // 13
