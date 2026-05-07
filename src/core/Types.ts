@@ -616,6 +616,16 @@ export interface PersistedProfile {
   dailyBestDate: string;
   /** True after the player has dismissed the in-game commander briefing. */
   commanderBriefingSeen: boolean;
+  /**
+   * Set of guidance ids the player has already seen + dismissed (cross-run).
+   * Tutorial cards and "new mechanic" banners check this so a returning
+   * commander never gets the same first-time popup twice.
+   */
+  guidanceSeen: string[];
+  /** Player toggle: show first-time tutorial cards. Defaults true. */
+  tutorialHintsEnabled: boolean;
+  /** Player toggle: show contextual gameplay hints. Defaults true. */
+  contextualHintsEnabled: boolean;
 }
 
 // ---------- Difficulty ----------

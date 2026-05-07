@@ -119,7 +119,9 @@ export class MainMenu {
     startBtn.onclick = () => this.game.setState("SECTOR_SELECT");
     actions.append(startBtn);
 
-    const codexBtn = el("button", { class: "ls-btn", text: "CODEX" });
+    const codexBtn = el("button", { class: "ls-btn", text: "FIELD MANUAL" });
+    codexBtn.title =
+      "Open the field manual / codex. Reference for every system, control, and threat. (H or ?)";
     codexBtn.onclick = () => this.game.ui.openCodex();
     actions.append(codexBtn);
 
@@ -138,7 +140,7 @@ export class MainMenu {
     this.el.append(actions);
 
     this.el.append(el("div", { class: "ls-hint", html:
-      "Hotkeys: <span>1-6</span> build, <span>U</span> upgrade, <span>S</span> sell, <span>D</span> drone, <span>R</span> relay deploy, <span>Y</span> command tier, <span>K</span> kill zone, <span>T</span> tactical pause, <span>Space</span> start wave / confirm, <span>Tab</span> wave preview, <span>P</span> pause, <span>+/-</span> speed, <span>F1</span> debug." }));
+      "Hotkeys: <span>1-6</span> build, <span>U</span> upgrade, <span>S</span> sell, <span>R</span> relay deploy, <span>Y</span> command tier, <span>F1-F4</span> squads, <span>E</span> retask, <span>Q</span> evac, <span>Space</span> start wave, <span>Tab</span> wave preview, <span>P</span> pause, <span>+/-</span> speed, <span>H/?</span> codex." }));
 
     // Play glitch animation on title (skip if reduce motion is on).
     if (!this.game.core.settings.reducedMotion) {

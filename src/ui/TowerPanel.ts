@@ -174,9 +174,11 @@ export class TowerPanel {
 
     const actions = el("div", { class: "ls-tp-actions" });
     const upg = el("button", { class: "ls-btn", text: `UPGRADE (${t.upgradeCost}CR)` });
+    upg.title = `Upgrade to level ${t.level + 1}. Improves damage, range, and cooldown. (U)`;
     upg.onclick = () => this.game.towers.upgrade(t);
     if (this.game.core.credits < t.upgradeCost) upg.classList.add("disabled");
     const sell = el("button", { class: "ls-btn ls-btn-ghost", text: `SELL (${Math.floor(t.totalInvested * this.game.core.upgrades.sellRefundMul)}CR)` });
+    sell.title = "Sell this tower for a partial refund. (S)";
     sell.onclick = () => this.game.towers.sell(t);
     actions.append(upg, sell);
     this.el.append(actions);
