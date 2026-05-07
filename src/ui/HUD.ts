@@ -32,6 +32,9 @@ export class HUD {
   private waveIntel = el("div", { class: "ls-wave-intel" });
   private waveTimeline = el("div", { class: "ls-wave-timeline" });
   private commandPanel = el("div", { class: "ls-command-panel" });
+  private squadPanel = el("div", { class: "ls-squad-panel" });
+  /** Cached signature so we only rebuild the squad panel when state changes. */
+  private squadPanelLastSig = "";
   private objectivesPanel = el("div", { class: "ls-objectives-panel" });
   /** Right-side sidebar that holds the OBJECTIVES + COMMAND DIRECTIVES panels.
    *  Positioned absolutely so it doesn't make the HUD bar tall and doesn't
@@ -152,9 +155,9 @@ export class HUD {
     this.countdownBar.append(this.countdownFill);
     this.countdownEl.append(this.countdownLabel, this.countdownValue, this.countdownBar);
 
-    // Right sidebar holds the OBJECTIVES + COMMAND DIRECTIVES panels in a
-    // dedicated vertical column on the right side of the screen.
-    this.rightSidebar.append(this.objectivesPanel, this.commandPanel);
+    // Right sidebar holds the OBJECTIVES, SQUAD COMMAND, and COMMAND
+    // DIRECTIVES panels in a dedicated vertical column on the right side.
+    this.rightSidebar.append(this.objectivesPanel, this.squadPanel, this.commandPanel);
 
     this.el.append(
       left,
@@ -184,6 +187,7 @@ export class HUD {
       this.updateWaveIntel();
       this.updateCoreActions();
       this.updateCommandPanel();
+      this.updateSquadPanel();
       this.updateObjectivesPanel();
       this.updateRightSidebarVisibility();
       this.updateRiftWarning();
@@ -625,6 +629,91 @@ export class HUD {
 
   private directiveRow(ok: boolean, text: string): HTMLElement {
     return el("div", { class: `ls-command-row ${ok ? "ok" : "warn"}`, text: `${ok ? "✓" : "•"} ${text}` });
+  }
+
+  /**
+   * Mobile command squad panel. Rebuilds whenever squad state changes
+   * (cooldown ticks, active count, pending command, command tier) so the
+   * player can see availability at a glance. Buttons gracefully show
+   * locked/cap/cooldown reasons instead of being disabled silently.
+   */
+  private updateSquadPanel(): void {
+    const sys = this.game.squads;
+    const show =
+      !!sys &&
+      (this.game.state === "PLANNING" || this.game.state === "WAVE_ACTIVE");
+    if (!show || !sys) {
+      this.squadPanel.classList.remove("visible");
+      this.squadPanelLastSig = "";
+      return;
+    }
+    this.squadPanel.classList.add("visible");
+
+    const statuses = sys.statuses();
+    const cap = sys.globalCap();
+    // Build a compact signature of all relevant state so we only re-render
+    // the panel when something actually changed.
+    const sigParts: string[] = [
+      `tier:${this.game.core.commandTier}`,
+      `cap:${sys.list.length}/${cap}`,
+      `pending:${sys.pendingCommand ?? "_"}`,
+    ];
+    for (const s of statuses) {
+      sigParts.push(
+        `${s.type}:${s.unlocked ? 1 : 0}:${Math.ceil(s.cooldownRemaining)}:${s.active}:${s.affordable ? 1 : 0}:${s.reason ?? ""}`
+      );
+    }
+    const sig = sigParts.join("|");
+    if (sig === this.squadPanelLastSig) return;
+    this.squadPanelLastSig = sig;
+
+    clear(this.squadPanel);
+    this.squadPanel.append(
+      el("div", { class: "ls-command-title", text: "SQUAD COMMAND" }),
+      el("div", { class: "ls-squad-cap", text: `Slots ${sys.list.length}/${cap}` })
+    );
+    const grid = el("div", { class: "ls-squad-grid" });
+    for (const status of statuses) {
+      const def = status.def;
+      const isPending = sys.pendingCommand === status.type;
+      const cls = [
+        "ls-squad-btn",
+        isPending ? "active" : "",
+        !status.unlocked ? "locked" : "",
+        status.unlocked && status.reason ? "disabled" : "",
+        status.unlocked && !status.reason ? "ready" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const btn = el("button", { class: cls });
+      btn.style.borderColor = def.color;
+      const header = el("div", { class: "ls-squad-row" });
+      header.append(
+        el("span", { class: "ls-squad-name", text: def.name }),
+        el("span", { class: "ls-squad-cost", text: `${def.cost}CR` })
+      );
+      const meta = el("div", { class: "ls-squad-meta" });
+      const cdLabel =
+        status.cooldownRemaining > 0 ? `CD ${Math.ceil(status.cooldownRemaining)}s` : `CD ${def.cooldown}s`;
+      meta.append(
+        el("span", { class: "ls-squad-role", text: def.role }),
+        el("span", { class: "ls-squad-cd", text: cdLabel })
+      );
+      const detail = el("div", {
+        class: "ls-squad-detail",
+        text: status.reason
+          ? status.reason
+          : `${status.active}/${status.capPerType} active · T${def.tierRequired}+`,
+      });
+      btn.append(header, meta, detail);
+      btn.title = `${def.name}\n${def.description}\nUnlock: Command Tier ${def.tierRequired}\nCost: ${def.cost} CR · Cooldown: ${def.cooldown}s`;
+      btn.onclick = () => {
+        if (!status.unlocked) return;
+        sys.armCommand(status.type);
+      };
+      grid.append(btn);
+    }
+    this.squadPanel.append(grid);
   }
 
   private hasRecommendedTower(counters: string[]): boolean {

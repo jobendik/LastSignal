@@ -126,3 +126,59 @@ export const COLOR = {
   core: "#66fcf1",
   text: "#c5c6c7",
 };
+
+// ──────────────────────────────────────────────────────────
+// Mobile command squads
+// Specialized mobile drone squads deployed as command abilities. They give
+// the player active map agency without turning the game into a classic RTS:
+// no drag-select, no control groups, no production queues — just timed
+// tactical beacons that move, reveal, repair, attack, or shield.
+// ──────────────────────────────────────────────────────────
+
+/** Base squad cap that applies regardless of tier (across ALL types together). */
+export const SQUAD_CAP_BASE = 2;
+/** Extra global squad slots gained at each command tier above 1. */
+export const SQUAD_CAP_TIER_BONUS = 1;
+
+// Recon — fast, fragile, reveals darkness and exposes hidden strategic points.
+export const RECON_COST = 45;
+export const RECON_COOLDOWN = 12;
+export const RECON_SPEED = 220;
+export const RECON_DURATION = 18;
+export const RECON_HEALTH = 24;
+export const RECON_REVEAL_RADIUS = 220;
+export const RECON_INTERACTION_RADIUS = 28;
+
+// Engineer — accelerates capture, repairs, recovers caches faster.
+export const ENGINEER_COST = 70;
+export const ENGINEER_COOLDOWN = 22;
+export const ENGINEER_SPEED = 130;
+export const ENGINEER_DURATION = 26;
+export const ENGINEER_HEALTH = 50;
+export const ENGINEER_REVEAL_RADIUS = 110;
+export const ENGINEER_INTERACTION_RADIUS = 56;
+export const ENGINEER_CAPTURE_MULTIPLIER = 2.2;
+export const ENGINEER_REPAIR_RATE = 6;
+
+// Strike — combat squad for emergency suppression / hostile structures.
+export const STRIKE_COST = 110;
+export const STRIKE_COOLDOWN = 32;
+export const STRIKE_SPEED = 150;
+export const STRIKE_DURATION = 22;
+export const STRIKE_HEALTH = 70;
+export const STRIKE_REVEAL_RADIUS = 130;
+export const STRIKE_INTERACTION_RADIUS = 200;
+export const STRIKE_DAMAGE = 9;
+export const STRIKE_ATTACK_COOLDOWN = 0.55;
+export const STRIKE_STRUCTURE_DAMAGE_MUL = 1.6;
+
+// Shield / Support — projects a temporary shielding field around an area.
+export const SHIELD_COST = 130;
+export const SHIELD_COOLDOWN = 45;
+export const SHIELD_SPEED = 110;
+export const SHIELD_DURATION = 16;
+export const SHIELD_HEALTH = 90;
+export const SHIELD_REVEAL_RADIUS = 90;
+export const SHIELD_INTERACTION_RADIUS = 168;
+export const SHIELD_DAMAGE_REDUCTION = 0.4;
+export const SHIELD_SLOW_AMOUNT = 0.35;

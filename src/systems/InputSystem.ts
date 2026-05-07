@@ -197,6 +197,12 @@ export class InputSystem {
     if (!this.isBuildingState()) return;
     const cell = this.cellFromEvent(e);
 
+    // Squad command deployment: when armed, the next click drops the squad.
+    if (this.game.squads && this.game.squads.pendingCommand) {
+      this.game.squads.deployAt(this.mouseX, this.mouseY);
+      return;
+    }
+
     // Salvage collection: click within 22px of a pickup to collect it.
     if (this.game.core.salvagePickups.length > 0) {
       const mx = this.mouseX, my = this.mouseY;
@@ -247,6 +253,12 @@ export class InputSystem {
   }
 
   private handleSecondaryAction(e: MouseEvent): void {
+    // Right-click cancels an armed squad command before any other handling
+    // so the player always has a quick out from targeting mode.
+    if (this.game.squads && this.game.squads.pendingCommand) {
+      this.game.squads.cancelCommand();
+      return;
+    }
     if (this.isBuildingState()) {
       const cell = this.cellFromEvent(e);
       const tower = this.game.towers.findTowerAt(cell.c, cell.r);
@@ -286,6 +298,9 @@ export class InputSystem {
       this.selectedTowerType = type;
     }
     this.showPlacementPreview = Boolean(this.selectedTowerType);
+    if (this.selectedTowerType && this.game.squads) {
+      this.game.squads.cancelCommand();
+    }
     this.updatePlacementFeedback(true);
     if (this.selectedTowerType && !this.placementGuideSeen.has(this.selectedTowerType)) {
       this.placementGuideSeen.add(this.selectedTowerType);
@@ -387,6 +402,7 @@ export class InputSystem {
         this.clearSelection();
         this.game.core.coreDeployMode = false;
         this.game.core.killZoneMode = false;
+        if (this.game.squads) this.game.squads.cancelCommand();
         this.game.bus.emit("ui:esc");
         break;
       case bindings.wavePreview:

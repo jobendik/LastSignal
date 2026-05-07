@@ -4,6 +4,7 @@ import type { Enemy } from "../entities/Enemy";
 import { Tower } from "../entities/Tower";
 import type { Drone } from "../entities/Drone";
 import type { Projectile } from "../entities/Projectile";
+import type { Squad } from "../entities/Squad";
 import { ABANDONED_TURRET_RANGE, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
 import { towerDefinitions } from "../data/towers";
 import type { TowerType, StrategicPointState, StrategicPointType } from "../core/Types";
@@ -166,6 +167,7 @@ export class RenderSystem {
     this.drawSilenceOverlay(ctx);
     this.drawEnemies(ctx);
     this.drawDrones(ctx);
+    this.drawSquads(ctx);
     this.drawProjectiles(ctx);
     this.drawBeams(ctx);
     this.drawLightning(ctx);
@@ -177,6 +179,7 @@ export class RenderSystem {
     this.drawBuildSynergyHighlights(ctx);
     this.drawPlacementPreview(ctx);
     this.drawRelayPlacementPreview(ctx);
+    this.drawSquadDeployPreview(ctx);
     this.drawSelectionHighlights(ctx);
     if (this.game.core.debug.show) this.drawDebugOverlay(ctx);
 
@@ -395,6 +398,15 @@ export class RenderSystem {
         } else if (p.discovered && (p.state === "enemy" || p.state === "neutral")) {
           reveal(p.pos.x, p.pos.y, 64);
         }
+      }
+    }
+    // Mobile squads contribute their own reveal pool — Recon is the brightest,
+    // engineer/strike/shield reveal modest areas around them.
+    if (this.game.squads) {
+      for (const s of this.game.squads.list) {
+        if (!s.active) continue;
+        const r = s.def.revealRadius;
+        if (r > 0) reveal(s.pos.x, s.pos.y, r);
       }
     }
     ctx.restore();
@@ -2062,6 +2074,190 @@ export class RenderSystem {
     for (const d of this.game.drones.list) this.drawDrone(ctx, d);
   }
 
+  /** Mobile squad render: center beacon + cosmetic sub-drone formation. */
+  private drawSquads(ctx: CanvasRenderingContext2D): void {
+    if (!this.game.squads) return;
+    for (const s of this.game.squads.list) {
+      if (!s.active) continue;
+      this.drawSquad(ctx, s);
+    }
+  }
+
+  private drawSquad(ctx: CanvasRenderingContext2D, s: Squad): void {
+    const t = this.game.time.elapsed;
+    const spawnPct = 1 - s.spawnTimer / 0.4;
+    const alpha = spawnPct < 1 ? Math.max(0.2, spawnPct) : 1;
+
+    // Optional path/destination marker for moving squads.
+    if (s.state === "moving" || s.state === "spawning") {
+      ctx.save();
+      ctx.globalAlpha = 0.35 + Math.sin(t * 5) * 0.1;
+      ctx.strokeStyle = s.def.color;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(s.pos.x, s.pos.y);
+      ctx.lineTo(s.target.x, s.target.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(s.target.x, s.target.y, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Behavior-specific field rings.
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (s.type === "shield" && s.state === "shielding") {
+      const radius = s.def.interactionRadius;
+      const grad = ctx.createRadialGradient(s.pos.x, s.pos.y, radius * 0.55, s.pos.x, s.pos.y, radius);
+      grad.addColorStop(0, "rgba(128, 222, 234, 0.0)");
+      grad.addColorStop(0.7, "rgba(128, 222, 234, 0.10)");
+      grad.addColorStop(1, "rgba(128, 222, 234, 0.0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(s.pos.x, s.pos.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(128, 222, 234, 0.55)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(s.pos.x, s.pos.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (s.type === "recon") {
+      // Soft scan halo so darkness sectors visually attribute reveal to recon.
+      ctx.strokeStyle = "rgba(128, 216, 255, 0.18)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(s.pos.x, s.pos.y, s.def.revealRadius * (0.6 + 0.4 * Math.sin(t * 2)), 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (s.type === "strike" && s.state === "attacking") {
+      ctx.strokeStyle = "rgba(255, 138, 101, 0.25)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(s.pos.x, s.pos.y, s.def.interactionRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Center beacon — diamond + glow tinted by squad color.
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(s.pos.x, s.pos.y);
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = s.def.color;
+    ctx.fillStyle = s.def.color;
+    const size = 6;
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(size, 0);
+    ctx.lineTo(0, size);
+    ctx.lineTo(-size, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Cosmetic sub-drones orbiting around the center.
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    for (let i = 0; i < s.satellites.length; i++) {
+      const sat = s.satellites[i]!;
+      const ang = sat.angle + t * 1.6 + (i / s.satellites.length) * Math.PI * 2;
+      const ox = s.pos.x + Math.cos(ang) * sat.orbit;
+      const oy = s.pos.y + Math.sin(ang) * sat.orbit;
+      ctx.fillStyle = s.def.color;
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = s.def.color;
+      ctx.beginPath();
+      ctx.arc(ox, oy, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Health + duration ring — small arc above the squad center.
+    const hpPct = Math.max(0, s.health / s.maxHealth);
+    const durPct = Math.max(0, s.duration / s.maxDuration);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    // Background arc
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.55)";
+    ctx.beginPath();
+    ctx.arc(s.pos.x, s.pos.y - 14, 10, Math.PI, 2 * Math.PI);
+    ctx.stroke();
+    // HP arc
+    ctx.strokeStyle = hpPct > 0.5 ? "#9be7a7" : hpPct > 0.25 ? "#ffd180" : "#ff5252";
+    ctx.beginPath();
+    ctx.arc(s.pos.x, s.pos.y - 14, 10, Math.PI, Math.PI + Math.PI * hpPct);
+    ctx.stroke();
+    // Duration arc (slimmer, below)
+    ctx.strokeStyle = "rgba(102, 252, 241, 0.7)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(s.pos.x, s.pos.y + 13, 8, Math.PI, Math.PI + Math.PI * durPct);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Targeting preview when a squad command is armed. */
+  private drawSquadDeployPreview(ctx: CanvasRenderingContext2D): void {
+    if (!this.game.squads) return;
+    const pending = this.game.squads.pendingCommand;
+    if (!pending) return;
+    const cursor = this.game.input.hoverWorld;
+    if (!cursor) return;
+    const def = this.game.squads.statuses().find((s) => s.type === pending)?.def;
+    if (!def) return;
+    const t = this.game.time.elapsed;
+
+    ctx.save();
+    // Origin → cursor line from the nearest core/relay so the player sees the
+    // deployment route. Origin is the same the system uses on actual deploy.
+    const origin = this.game.grid.getNearestCoreCenter(cursor.x, cursor.y);
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = def.color;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([6, 6]);
+    ctx.lineDashOffset = -((t * 24) % 12);
+    ctx.beginPath();
+    ctx.moveTo(origin.x, origin.y);
+    ctx.lineTo(cursor.x, cursor.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Target ring with squad-specific radius hint (interaction radius for
+    // capture/strike/shield, reveal radius for recon).
+    const radius = pending === "recon" ? def.revealRadius * 0.85 : def.interactionRadius;
+    ctx.globalAlpha = 0.45 + Math.sin(t * 5) * 0.1;
+    ctx.strokeStyle = def.color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cursor.x, cursor.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    // Crosshair
+    ctx.beginPath();
+    ctx.moveTo(cursor.x - 12, cursor.y);
+    ctx.lineTo(cursor.x + 12, cursor.y);
+    ctx.moveTo(cursor.x, cursor.y - 12);
+    ctx.lineTo(cursor.x, cursor.y + 12);
+    ctx.stroke();
+    // Squad name above the cursor.
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = def.color;
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = "#000000";
+    ctx.font = "bold 11px Courier New";
+    ctx.textAlign = "center";
+    ctx.fillText(`${def.name.toUpperCase()} → CLICK TO DEPLOY`, cursor.x, cursor.y - radius - 14);
+    ctx.restore();
+  }
+
   private drawDrone(ctx: CanvasRenderingContext2D, d: Drone): void {
     ctx.save();
     const bob = Math.sin(this.game.time.elapsed * 4.2 + d.bobPhase) * 3;
@@ -2750,10 +2946,36 @@ export class RenderSystem {
 
       // Hover tooltip.
       if (p === hoverPoint) {
-        drawStrategicTooltip(ctx, p, baseColor);
+        const squadStatus = this.squadStatusForPoint(p);
+        drawStrategicTooltip(ctx, p, baseColor, squadStatus);
       }
     }
     ctx.restore();
+  }
+
+  /**
+   * Inspect active squads and return a short tooltip line describing whether
+   * any are currently engaging this point. Returns null if nothing relevant.
+   */
+  private squadStatusForPoint(p: StrategicPoint): { text: string; color: string } | null {
+    if (!this.game.squads) return null;
+    for (const s of this.game.squads.list) {
+      if (!s.active) continue;
+      if (s.type === "engineer" && s.targetPoint === p && s.state === "capturing") {
+        return { text: "Engineer boosting capture", color: "#9be7a7" };
+      }
+      if (s.type === "engineer" && s.targetPoint === p && s.state === "moving") {
+        return { text: "Engineer en route", color: "#9be7a7" };
+      }
+      if (s.type === "strike" && p.state === "enemy") {
+        const dx = s.pos.x - p.pos.x;
+        const dy = s.pos.y - p.pos.y;
+        if (dx * dx + dy * dy <= s.def.interactionRadius * s.def.interactionRadius) {
+          return { text: "Under strike squad fire", color: "#ff8a65" };
+        }
+      }
+    }
+    return null;
   }
 
   /**
@@ -3907,11 +4129,13 @@ interface TooltipLine {
 function drawStrategicTooltip(
   ctx: CanvasRenderingContext2D,
   p: StrategicPoint,
-  color: string
+  color: string,
+  squadStatus: { text: string; color: string } | null = null
 ): void {
   const lines: TooltipLine[] = [];
   lines.push({ text: p.name.toUpperCase(), color });
   lines.push({ text: typeAndStateLabel(p), color: "#ffffff" });
+  if (squadStatus) lines.push({ text: squadStatus.text, color: squadStatus.color });
 
   if (p.state === "neutral") {
     const pct = Math.round(p.captureProgress * 100);

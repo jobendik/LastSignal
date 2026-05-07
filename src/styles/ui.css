@@ -652,6 +652,89 @@
 .ls-command-row.ok { color: #9be7a7; }
 .ls-command-row.warn { color: #ffd180; }
 
+/* ===== Squad command panel (HUD) ===== */
+.ls-squad-panel {
+  display: none;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(102, 252, 241, 0.2);
+  background: rgba(5, 8, 14, 0.62);
+  gap: 4px;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+.ls-squad-panel.visible { display: flex; }
+.ls-squad-cap {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #8a9099;
+}
+.ls-squad-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.ls-squad-btn {
+  background: rgba(8, 12, 18, 0.92);
+  border: 1px solid #3a4049;
+  color: #c5c6c7;
+  font-family: inherit;
+  font-size: 10px;
+  text-align: left;
+  padding: 5px 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  letter-spacing: 0.3px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+}
+.ls-squad-btn:hover { transform: translateY(-1px); }
+.ls-squad-btn.ready:hover {
+  box-shadow: 0 0 8px rgba(102, 252, 241, 0.25);
+}
+.ls-squad-btn.active {
+  background: rgba(102, 252, 241, 0.10);
+  box-shadow: 0 0 12px rgba(102, 252, 241, 0.35);
+  color: #ffffff;
+}
+.ls-squad-btn.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ls-squad-btn.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ls-squad-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+.ls-squad-name {
+  color: inherit;
+  font-weight: bold;
+}
+.ls-squad-cost { color: #ffd54f; }
+.ls-squad-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 9px;
+  color: #8a9099;
+}
+.ls-squad-role { color: #66fcf1; }
+.ls-squad-cd { color: #9be7a7; }
+.ls-squad-btn.disabled .ls-squad-cd,
+.ls-squad-btn.locked .ls-squad-cd { color: #ffd180; }
+.ls-squad-detail {
+  font-size: 9px;
+  color: #8a9099;
+}
+.ls-squad-btn.active .ls-squad-detail {
+  color: #80d8ff;
+}
+
 /* ===== Right-side sidebar (HUD) — holds OBJECTIVES + COMMAND DIRECTIVES ===== */
 .ls-hud-right-sidebar {
   position: absolute;
@@ -1578,6 +1661,7 @@
   .ls-wave-intel,
   .ls-wave-timeline,
   .ls-command-panel,
+  .ls-squad-panel,
   .ls-objectives-panel {
     margin-left: 0;
     width: 100%;
