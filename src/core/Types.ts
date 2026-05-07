@@ -406,6 +406,73 @@ export interface DroneDefinition {
   role: string;
 }
 
+// ---------- Mobile command squads ----------
+/**
+ * Specialized mobile drone squads deployed as command abilities. They are
+ * NOT individual unit micro — they act like timed command beacons that move,
+ * scout, repair, attack, or shield. Each squad type has a focused purpose.
+ */
+export type SquadType = "recon" | "engineer" | "strike" | "shield";
+
+/** Lifecycle state for a deployed squad. */
+export type SquadState =
+  | "spawning"
+  | "moving"
+  | "scouting"
+  | "capturing"
+  | "repairing"
+  | "attacking"
+  | "shielding"
+  | "returning"
+  | "expired"
+  | "destroyed";
+
+/**
+ * Authoring-time definition for a squad type. Numbers live in /src/core/Config
+ * via the squadDefinitions builder so balance constants stay in one place.
+ */
+export interface SquadDefinition {
+  id: SquadType;
+  name: string;
+  /** One-line role tag for the HUD button. */
+  role: string;
+  /** Long-form tooltip describing best use case. */
+  description: string;
+  /** Credit cost to deploy. */
+  cost: number;
+  /** Cooldown (seconds) between deployments of this squad type. */
+  cooldown: number;
+  /** Command Tier required to unlock this squad. 1 = available from start. */
+  tierRequired: 1 | 2 | 3;
+  /** Color used for HUD button accent and squad rendering. */
+  color: string;
+  /** Maximum simultaneous active squads of this type. */
+  capPerType: number;
+  /** Movement speed in pixels/second. */
+  speed: number;
+  /** Maximum hit points. */
+  maxHealth: number;
+  /** Total active duration in seconds. */
+  duration: number;
+  /** Reveal radius (pixels) — used by Recon and partially by all squads. */
+  revealRadius: number;
+  /** Interaction radius (pixels) — capture/repair/attack range from squad center. */
+  interactionRadius: number;
+  /** Optional combat stats. */
+  damage?: number;
+  attackCooldown?: number;
+  /** Damage multiplier vs hostile structures. */
+  structureDamageMul?: number;
+  /** Engineer: capture progress multiplier when channeling on a strategic point. */
+  captureMultiplier?: number;
+  /** Engineer: HP repaired per second on damaged towers / cores. */
+  repairPerSecond?: number;
+  /** Shield: damage reduction (0..1) applied to nearby cores/towers. */
+  shieldDamageReduction?: number;
+  /** Shield: enemy slow strength in shield field. */
+  shieldSlowAmount?: number;
+}
+
 // ---------- Codex ----------
 export interface CodexEntry {
   enemyId: EnemyType;

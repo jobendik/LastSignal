@@ -53,6 +53,7 @@ import { AchievementSystem } from "../systems/AchievementSystem";
 import { EndlessSystem } from "../systems/EndlessSystem";
 import { ObjectivesSystem } from "../systems/ObjectivesSystem";
 import { StrategicPointSystem } from "../systems/StrategicPointSystem";
+import { MobileSquadSystem } from "../systems/MobileSquadSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
@@ -90,6 +91,7 @@ export class Game {
   endless!: EndlessSystem;
   objectives!: ObjectivesSystem;
   strategicPoints!: StrategicPointSystem;
+  squads!: MobileSquadSystem;
   render!: RenderSystem;
   input!: InputSystem;
   ui!: UIManager;
@@ -176,6 +178,7 @@ export class Game {
     this.endless = new EndlessSystem(this);
     this.objectives = new ObjectivesSystem(this);
     this.strategicPoints = new StrategicPointSystem(this);
+    this.squads = new MobileSquadSystem(this);
     this.render = new RenderSystem(this);
     this.input = new InputSystem(this);
     this.ui = new UIManager(this);
@@ -289,6 +292,7 @@ export class Game {
     this.projectiles.reset();
     this.particles.reset();
     this.drones.reset();
+    this.squads.reset();
     this.waves.reset();
     this.codex.reset();
     this.endless.reset();
@@ -338,6 +342,7 @@ export class Game {
     if (this.projectiles) this.projectiles.reset();
     if (this.particles) this.particles.reset();
     if (this.drones) this.drones.reset();
+    if (this.squads) this.squads.reset();
     if (this.waves) this.waves.reset();
     if (this.strategicPoints) this.strategicPoints.reset();
     // Clear the grid so darkness/tile-state from the old sector doesn't render.
@@ -419,6 +424,20 @@ export class Game {
     const impact = fromX != null && fromY != null
       ? this.grid.getNearestCoreCenter(fromX, fromY)
       : this.grid.getPrimaryCoreCenter();
+    // Shield squads near the impact reduce incoming damage. Reduction stacks
+    // multiplicatively when multiple shield fields overlap.
+    if (amount > 0 && this.squads) {
+      const mul = this.squads.shieldDamageMul(impact.x, impact.y);
+      if (mul < 1) {
+        const before = amount;
+        amount = amount * mul;
+        const absorbed = before - amount;
+        if (absorbed > 0.01) {
+          this.particles.spawnRing(impact.x, impact.y, 70, "#80deea", 0.45);
+          this.particles.spawnFloatingText(impact.x, impact.y - 32, "SHIELDED", "#80deea", 0.7, 11);
+        }
+      }
+    }
     if (amount > 0 && this.hasCoreDeflector()) {
       amount = Math.max(0, amount - 1);
       this.particles.spawnRing(impact.x, impact.y, 78, "#80d8ff");
@@ -774,6 +793,7 @@ export class Game {
         this.enemies.update(dt);
         this.projectiles.update(dt);
         this.drones.update(dt);
+        this.squads.update(dt);
         this.economy.update(dt);
         this.strategicPoints.update(dt);
       }
@@ -787,6 +807,7 @@ export class Game {
       // Tower visuals og bygging skal oppdateres i PLANNING-fasen.
       this.towers.update(dt); // <- fikser at byggede tårn blir synlige
       this.drones.update(dt * 0.5);
+      this.squads.update(dt);
       this.particles.update(dt);
       this.waves.updatePlanningCountdown(dt);
       // Capture progress should advance during planning so the player can
