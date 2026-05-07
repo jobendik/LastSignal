@@ -518,9 +518,30 @@ export class Game {
     return this.core.credits >= this.relayCoreCost();
   }
 
+  /**
+   * Combined relay placement validity — wraps the grid check with a
+   * strategic-point overlap test so the 2x2 relay footprint can't bury an
+   * active capturable / hostile structure.
+   */
+  canPlaceRelayAt(c: number, r: number): { ok: boolean; reason?: string } {
+    const placement = this.grid.canPlaceCoreCluster(c, r);
+    if (!placement.ok) return placement;
+    if (this.strategicPoints) {
+      for (let dr = 0; dr < 2; dr++) {
+        for (let dc = 0; dc < 2; dc++) {
+          const sp = this.strategicPoints.pointAtCell(c + dc, r + dr);
+          if (sp && sp.state !== "destroyed" && sp.state !== "depleted") {
+            return { ok: false, reason: "Strategic point" };
+          }
+        }
+      }
+    }
+    return { ok: true };
+  }
+
   deployRelayCore(c: number, r: number): boolean {
     if (!this.canDeployRelayCore()) return false;
-    const placement = this.grid.canPlaceCoreCluster(c, r);
+    const placement = this.canPlaceRelayAt(c, r);
     if (!placement.ok) {
       // Surface the reason at the player's cursor so they can react.
       const px = (c + 1) * TILE_SIZE;

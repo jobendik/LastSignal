@@ -136,9 +136,8 @@ export class StrategicPointSystem {
     return out;
   }
 
-  /** Combined "this point is contested" check. */
-  private contested(point: StrategicPoint): boolean {
-    if (this.isWorldPointJammed(point.pos.x, point.pos.y)) return true;
+  /** True if any active enemy is inside the capture-contest radius of this point. */
+  private hasEnemyContest(point: StrategicPoint): boolean {
     const r2 = CAPTURE_CONTEST_RADIUS * CAPTURE_CONTEST_RADIUS;
     for (const e of this.game.enemies.list) {
       if (!e.active) continue;
@@ -152,6 +151,16 @@ export class StrategicPointSystem {
   update(dt: number): void {
     if (this.list.length === 0) return;
     for (const p of this.list) {
+      // Maintain shared "live status" flags so renderer / tooltip / HUD all
+      // read the same view of contest/jam state without recomputing.
+      p.inCoverage = this.game.grid.isCellInSignalCoverage(p.c, p.r);
+      p.jammed = this.isWorldPointJammed(p.pos.x, p.pos.y);
+      // Contested only matters for capturable / friendly turret points.
+      if (p.state === "neutral") {
+        p.contested = p.inCoverage && (p.jammed || this.hasEnemyContest(p));
+      } else {
+        p.contested = false;
+      }
       switch (p.state) {
         case "neutral":
           this.updateNeutral(p, dt);
@@ -168,17 +177,17 @@ export class StrategicPointSystem {
   }
 
   // ──────────────────────────────────────────────────────────
-  // Capture flow
+  // Capture flow — the per-tick `inCoverage`/`jammed`/`contested` flags are
+  // already set by update() before dispatching here.
   // ──────────────────────────────────────────────────────────
   private updateNeutral(p: StrategicPoint, dt: number): void {
-    const inCoverage = this.game.grid.isCellInSignalCoverage(p.c, p.r);
-    if (!inCoverage) {
+    if (!p.inCoverage) {
       // Slowly bleed off any phantom progress so disconnects don't trickle in.
       if (p.captureProgress > 0) p.captureProgress = Math.max(0, p.captureProgress - dt * 0.15);
       return;
     }
     p.discovered = true;
-    if (this.contested(p)) {
+    if (p.contested) {
       // Reverse capture under enemy / jammer contest.
       p.captureProgress = Math.max(0, p.captureProgress - dt * CAPTURE_DECAY_PER_SECOND);
       return;
@@ -200,9 +209,15 @@ export class StrategicPointSystem {
     p.captureProgress = 1;
     p.state = "captured";
     p.flashTimer = 0.6;
+    p.contested = false;
     this.capturedCounts[p.type] = (this.capturedCounts[p.type] ?? 0) + 1;
     const x = p.pos.x;
     const y = p.pos.y;
+
+    // Universal capture-complete pulse so every type gets a satisfying beat.
+    this.game.particles.spawnRing(x, y, 28, "#ffffff", 0.4);
+    this.game.particles.spawnRing(x, y, 60, "#66fcf1", 0.55);
+    this.game.particles.spawnBurst(x, y, "#66fcf1", 12, { speed: 160, life: 0.55, size: 2.2 });
 
     switch (p.type) {
       case "signal_node": {
@@ -218,7 +233,10 @@ export class StrategicPointSystem {
       case "radar_dish": {
         this.radarBonusCells += RADAR_REVEAL_BONUS_CELLS;
         this.hasRadar = true;
+        // A fast scan-sweep effect: three rings at increasing radii.
         this.game.particles.spawnRing(x, y, 80, "#80d8ff", 0.6);
+        this.game.particles.spawnRing(x, y, 160, "#80d8ff", 0.45);
+        this.game.particles.spawnRing(x, y, RADAR_REVEAL_BONUS_CELLS * TILE_SIZE, "#80d8ff", 0.35);
         this.game.particles.spawnFloatingText(x, y - 28, "RADAR ONLINE", "#80d8ff", 1.4, 12);
         break;
       }
@@ -229,6 +247,7 @@ export class StrategicPointSystem {
         if (research > 0 && this.game.meta) this.game.meta.addResearchPoints(research);
         this.game.particles.spawnFloatingText(x, y - 28, `+${credits}CR / +${research} RES`, "#ffd54f", 1.6, 13);
         this.game.particles.spawnBurst(x, y, "#ffd54f", 18, { speed: 140, life: 0.6, size: 2.5 });
+        this.game.particles.spawnBurst(x, y, "#ffffff", 8, { speed: 70, life: 0.5, size: 1.6 });
         // One-shot reward — deplete so it can't be farmed.
         p.state = "depleted";
         break;
@@ -238,6 +257,9 @@ export class StrategicPointSystem {
         p.effectTimer = 0.3;
         this.game.particles.spawnFloatingText(x, y - 28, "TURRET ACTIVATED", "#ffeb3b", 1.4, 12);
         this.game.particles.spawnRing(x, y, 36, "#ffeb3b", 0.5);
+        // Big yellow activation flash so the foothold is unmistakable.
+        this.game.particles.spawnRing(x, y, 90, "#ffeb3b", 0.4);
+        this.game.particles.spawnBurst(x, y, "#ffeb3b", 16, { speed: 180, life: 0.55, size: 2 });
         break;
       }
       default:
@@ -270,9 +292,14 @@ export class StrategicPointSystem {
   // Hostile structure tick + damage
   // ──────────────────────────────────────────────────────────
   private updateHostile(p: StrategicPoint, dt: number): void {
+    // Initialize the pulse interval on first tick so the renderer's countdown
+    // ring has a sensible duration even before the structure has pulsed once.
+    if (p.pulseInterval <= 0) p.pulseInterval = RIFT_ANCHOR_PULSE_INTERVAL;
     p.effectTimer -= dt;
     if (p.effectTimer <= 0) {
-      p.effectTimer = RIFT_ANCHOR_PULSE_INTERVAL + Math.random() * 2;
+      const next = RIFT_ANCHOR_PULSE_INTERVAL + Math.random() * 2;
+      p.effectTimer = next;
+      p.pulseInterval = next;
       if (p.type === "rift_anchor") this.pulseRiftAnchor(p);
       else if (p.type === "jammer") this.pulseJammer(p);
     }
@@ -288,8 +315,16 @@ export class StrategicPointSystem {
   }
 
   private pulseRiftAnchor(p: StrategicPoint): void {
-    // Buff visual: emit a corruption ring so the player sees the tick.
+    // Big telegraphed ring + screen-friendly text. Particles already animate;
+    // the rendered countdown ring above the anchor handles the pre-warning.
     this.game.particles.spawnRing(p.pos.x, p.pos.y, RIFT_ANCHOR_AURA_RADIUS, "#ff5252", 0.6);
+    this.game.particles.spawnRing(p.pos.x, p.pos.y, RIFT_ANCHOR_AURA_RADIUS * 0.55, "#ffeb3b", 0.45);
+    if (p.discovered) {
+      this.game.particles.spawnFloatingText(
+        p.pos.x, p.pos.y - 36, "RIFT PULSE", "#ff5252", 1.2, 13
+      );
+    }
+    this.game.bus.emit("strategic:pulse", { id: p.id, type: p.type });
     if (this.game.state !== "WAVE_ACTIVE") return;
     // Spawn a single weak scout near the anchor (only during waves; capped).
     const enemyCount = this.game.enemies.list.length;
@@ -307,6 +342,7 @@ export class StrategicPointSystem {
   private pulseJammer(p: StrategicPoint): void {
     // Visual-only: orange dish ripple that telegraphs the jamming field.
     this.game.particles.spawnRing(p.pos.x, p.pos.y, p.radiusCells * TILE_SIZE, "#ef6c00", 0.45);
+    this.game.bus.emit("strategic:pulse", { id: p.id, type: p.type });
   }
 
   /** Apply damage to a hostile structure (called from tower/drone routes). */

@@ -29,11 +29,29 @@ export class SectorSelect {
     sectorDefinitions.forEach((s, i) => {
       const sectorIndex = i + 1; // 1-based
       const isVoid = s.id === "sector_void";
-      // Sector N requires sector N-1 cleared. Void requires the campaign be cleared
-      // (best >= 4) AND the Endless research unlock — campaign-only otherwise.
-      const isLocked = isVoid
-        ? bestCleared < 4 || !hasEndless
-        : sectorIndex > 1 && bestCleared < sectorIndex - 1;
+      const isExpanse = s.id === "sector_06_fractured_expanse";
+      const isBlackout = s.id === "sector_07_blackout_array";
+      // Custom unlock chains so that Sector 6/7 don't accidentally require
+      // the (post-game) Void to be cleared first. Sector 6 unlocks once the
+      // main campaign is done (best >= 4); Sector 7 needs Sector 6 cleared.
+      let isLocked: boolean;
+      let lockReason = "";
+      if (isVoid) {
+        isLocked = bestCleared < 4 || !hasEndless;
+        lockReason = "Locked — clear Sector 4 and unlock Endless research.";
+      } else if (isExpanse) {
+        isLocked = bestCleared < 4;
+        lockReason = "Locked — clear Sector 4 first.";
+      } else if (isBlackout) {
+        // Sector 7 requires Sector 6 cleared. Clearing Sector 6 sets the
+        // bestSectorCleared to its sector index (6), so we test against that.
+        const sector6Index = sectorDefinitions.findIndex((d) => d.id === "sector_06_fractured_expanse") + 1;
+        isLocked = bestCleared < sector6Index;
+        lockReason = "Locked — clear Sector 6 first.";
+      } else {
+        isLocked = sectorIndex > 1 && bestCleared < sectorIndex - 1;
+        lockReason = `Locked — clear Sector ${sectorIndex - 1} first.`;
+      }
       const isCleared = sectorIndex <= bestCleared;
       const card = el("button", { class: "ls-sector-card" });
       if (isLocked) card.classList.add("ls-sector-locked");
@@ -41,9 +59,7 @@ export class SectorSelect {
       card.style.borderColor = isLocked ? "#3a3a3a" : s.accentColor;
       const preview = this.buildMapPreview(s);
       const statusText = isLocked
-        ? isVoid
-          ? "Locked — clear Sector 4 and unlock Endless research."
-          : `Locked — clear Sector ${sectorIndex - 1} first.`
+        ? lockReason
         : isCleared
         ? "Cleared"
         : "Available";

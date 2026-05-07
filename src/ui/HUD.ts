@@ -82,6 +82,7 @@ export class HUD {
     bus.on("sector:started", () => {
       this.objectivesLastSig = "";
       this.objectivesLastBuild = 0;
+      this.objectiveLastCompleted.clear();
       this.refresh();
     });
   }
@@ -194,6 +195,8 @@ export class HUD {
 
   private objectivesLastBuild = 0;
   private objectivesLastSig = "";
+  /** Map of objective id → previously-completed flag, for one-shot ✓ feedback. */
+  private objectiveLastCompleted = new Map<string, boolean>();
   private updateObjectivesPanel(): void {
     const show = this.game.state === "PLANNING" || this.game.state === "WAVE_ACTIVE" || this.game.state === "WAVE_COMPLETE";
     const obj = this.game.objectives.currentSectorObjectives;
@@ -221,6 +224,30 @@ export class HUD {
     if (sig === this.objectivesLastSig) return;
     this.objectivesLastSig = sig;
 
+    // Check for newly-completed objectives so we can flash the row + spawn
+    // a small celebratory floating text near the home core. We use only the
+    // hard `ev.completed` flag — progress >= 1 isn't reliable here because
+    // some kinds (e.g. core_above_pct) gate completion on runWon and would
+    // otherwise toast every time the player crosses the threshold mid-run.
+    const justCompleted = new Set<string>();
+    for (let i = 0; i < secEvals.length; i++) {
+      const ev = secEvals[i]!;
+      const sec = obj.secondary[i]!;
+      const isDone = ev.completed;
+      const wasDone = this.objectiveLastCompleted.get(sec.id) ?? false;
+      if (isDone && !wasDone) {
+        justCompleted.add(sec.id);
+        // Floating text near the home core so the player notices the moment.
+        const corePos = this.game.grid.corePos;
+        this.game.particles.spawnFloatingText(
+          corePos.x, corePos.y - 60, "OBJECTIVE COMPLETE", "#9be7a7", 1.6, 13
+        );
+        this.game.particles.spawnRing(corePos.x, corePos.y, 70, "#9be7a7", 0.45);
+        this.game.audio.sfxReward();
+      }
+      this.objectiveLastCompleted.set(sec.id, isDone);
+    }
+
     clear(this.objectivesPanel);
     this.objectivesPanel.append(el("div", { class: "ls-obj-title", text: "OBJECTIVES" }));
     const primRow = el("div", { class: "ls-obj-row primary" });
@@ -236,7 +263,10 @@ export class HUD {
       const sec = obj.secondary[i]!;
       const ev = secEvals[i]!;
       const ok = ev.completed || (ev.progress != null && ev.progress >= 1);
-      const row = el("div", { class: `ls-obj-row secondary${ok ? " ok" : ""}` });
+      const flash = justCompleted.has(sec.id);
+      const row = el("div", {
+        class: `ls-obj-row secondary${ok ? " ok" : ""}${flash ? " just-completed" : ""}`,
+      });
       row.append(
         el("span", { class: "ls-obj-marker", text: ok ? "✓" : "+" }),
         el("span", { class: "ls-obj-text", text: sec.label })
