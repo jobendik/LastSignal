@@ -454,6 +454,31 @@
   gap: 4px;
   z-index: 60;
 }
+/* Global "RIFT PULSE IMMINENT" line. Sits just below the boss bar position
+ * but is independently toggled. Uses pulsing red so it reads as a warning
+ * across the entire screen, not just where the player is currently looking. */
+.ls-rift-warning {
+  position: absolute;
+  left: 50%;
+  top: 96px;
+  transform: translateX(-50%);
+  display: none;
+  padding: 4px 12px;
+  background: rgba(120, 0, 0, 0.7);
+  border: 1px solid #ff5252;
+  color: #ffd2cc;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  z-index: 60;
+  animation: ls-rift-warning-pulse 0.6s ease-in-out infinite;
+  pointer-events: none;
+}
+.ls-rift-warning.visible { display: block; }
+@keyframes ls-rift-warning-pulse {
+  0%, 100% { background: rgba(120, 0, 0, 0.7);  box-shadow: 0 0 6px rgba(255, 82, 82, 0.6); }
+  50%      { background: rgba(180, 30, 30, 0.85); box-shadow: 0 0 14px rgba(255, 82, 82, 0.95); }
+}
 .ls-boss-bar.visible { display: flex; }
 .ls-boss-label { font-size: 11px; color: #ff5252; letter-spacing: 3px; text-align: center; }
 .ls-boss-track {

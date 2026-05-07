@@ -1,7 +1,8 @@
 import type { WaveDefinition } from "../core/Types";
 
-/** Build a rough enemy summary for UI purposes. */
-function summarize(w: Omit<WaveDefinition, "enemySummary">): WaveDefinition {
+/** Build a rough enemy summary for UI purposes. Exported so authored sector
+ *  wave lists can reuse the same summary helper. */
+export function summarize(w: Omit<WaveDefinition, "enemySummary">): WaveDefinition {
   const map = new Map<string, number>();
   for (const lane of w.lanes) {
     for (const g of lane.enemies) {
