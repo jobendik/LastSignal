@@ -3,7 +3,9 @@ import { StrategicPoint, isHostile } from "../entities/StrategicPoint";
 import {
   ABANDONED_TURRET_COOLDOWN,
   ABANDONED_TURRET_DAMAGE,
+  ABANDONED_TURRET_HP,
   ABANDONED_TURRET_RANGE,
+  ABANDONED_TURRET_REPAIR_RATE,
   CAPTURE_CONTEST_RADIUS,
   CAPTURE_DECAY_PER_SECOND,
   CAPTURE_TIME_SECONDS,
@@ -16,6 +18,7 @@ import {
   RIFT_ANCHOR_DESTROY_REWARD,
   RIFT_ANCHOR_HEALTH,
   RIFT_ANCHOR_PULSE_INTERVAL,
+  SABOTEUR_TOWER_DAMAGE,
   SIGNAL_NODE_RADIUS_CELLS,
   TILE_SIZE,
 } from "../core/Config";
@@ -255,6 +258,18 @@ export class StrategicPointSystem {
       case "abandoned_turret": {
         // Initial cooldown lets the player see the activation animation.
         p.effectTimer = 0.3;
+        // Treat capture as "fresh build": full HP, scaled by Auto-Gun Plating.
+        const hpMul = this.game.core.upgrades.abandonedTurretHpMul ?? 1;
+        const targetMax = Math.max(1, Math.round(ABANDONED_TURRET_HP * hpMul));
+        // maxHealth on StrategicPoint is readonly so we can't reassign — but we
+        // can set health to the scaled cap via a direct property write since
+        // the runtime instance permits it. We keep maxHealth at the def value
+        // and let captured turrets benefit by topping up to scaled HP without
+        // exceeding maxHealth-as-display. To keep accounting consistent we
+        // refresh both via a controlled reflect-style assignment.
+        (p as { maxHealth: number }).maxHealth = targetMax;
+        p.health = targetMax;
+        p.disabled = false;
         this.game.particles.spawnFloatingText(x, y - 28, "TURRET ACTIVATED", "#ffeb3b", 1.4, 12);
         this.game.particles.spawnRing(x, y, 36, "#ffeb3b", 0.5);
         // Big yellow activation flash so the foothold is unmistakable.
@@ -402,7 +417,20 @@ export class StrategicPointSystem {
   // Captured behavior
   // ──────────────────────────────────────────────────────────
   private updateCaptured(p: StrategicPoint, dt: number): void {
+    if (p.damageFlashTimer > 0) p.damageFlashTimer = Math.max(0, p.damageFlashTimer - dt);
+    // Engineer-set flag: only stays true while a squad is channeling. Cleared
+    // every tick so when the engineer leaves the visual halo fades.
+    p.underRepair = false;
     if (p.type !== "abandoned_turret") return;
+    // Disabled turrets do not fire and pulse a soft warning glow.
+    if (p.disabled) {
+      p.effectTimer = 0;
+      return;
+    }
+    // Saboteurs that wander into a captured turret's tile chip its HP. Same
+    // rule as towers: only one sabotage per saboteur cooldown.
+    this.applySaboteurDamageToTurret(p);
+
     p.effectTimer -= dt;
     if (p.effectTimer > 0) return;
 
@@ -437,6 +465,83 @@ export class StrategicPointSystem {
     this.game.projectiles.spawn(proj);
     this.game.particles.spawnMuzzleFlash(p.pos.x, p.pos.y,
       Math.atan2(target.pos.y - p.pos.y, target.pos.x - p.pos.x), "#ffeb3b");
+  }
+
+  /**
+   * Damage a captured abandoned turret. Returns true if the turret was just
+   * disabled by this hit. Engineer can later repair it.
+   */
+  damageTurret(p: StrategicPoint, amount: number): { dealt: number; nowDisabled: boolean } {
+    if (p.state !== "captured" || p.type !== "abandoned_turret" || amount <= 0) {
+      return { dealt: 0, nowDisabled: false };
+    }
+    if (p.disabled) return { dealt: 0, nowDisabled: false };
+    const prev = p.health;
+    p.health = Math.max(0, p.health - amount);
+    p.damageFlashTimer = 0.45;
+    p.lastDamagedAt = this.game.time.elapsed;
+    let nowDisabled = false;
+    if (p.health <= 0 && !p.disabled) {
+      p.disabled = true;
+      this.game.particles.spawnRing(p.pos.x, p.pos.y, 30, "#ff5252", 0.45);
+      this.game.particles.spawnFloatingText(p.pos.x, p.pos.y - 22, "TURRET OFFLINE", "#ff5252", 1.2, 12);
+      this.game.audio.sfxTowerDisabled?.(p.pos);
+      this.game.bus.emit("turret:disabled", { id: p.id });
+      nowDisabled = true;
+    } else {
+      this.game.particles.spawnBurst(p.pos.x, p.pos.y, "#ff6f00", 6, { speed: 70, life: 0.3, size: 2 });
+    }
+    return { dealt: prev - p.health, nowDisabled };
+  }
+
+  /** Engineer-targeted repair tick on a captured abandoned turret. */
+  repairTurret(p: StrategicPoint, dt: number, jammed: boolean): { healed: number; restored: boolean } {
+    if (p.state !== "captured" || p.type !== "abandoned_turret") {
+      return { healed: 0, restored: false };
+    }
+    p.underRepair = true;
+    if (p.health >= p.maxHealth && !p.disabled) return { healed: 0, restored: false };
+    const up = this.game.core.upgrades;
+    const baseRate = ABANDONED_TURRET_REPAIR_RATE * (up.engineerRepairMul ?? 1);
+    const jammerMul = jammed ? 0.5 : 1;
+    const heal = baseRate * jammerMul * dt;
+    const prev = p.health;
+    p.health = Math.min(p.maxHealth, p.health + heal);
+    const restorePrev = p.disabled;
+    if (p.disabled && p.health > 0) {
+      p.disabled = false;
+      this.game.particles.spawnRing(p.pos.x, p.pos.y, 28, "#00e676", 0.45);
+      this.game.particles.spawnFloatingText(p.pos.x, p.pos.y - 22, "TURRET ONLINE", "#00e676", 1.2, 12);
+      this.game.audio.sfxTowerRestored?.(p.pos);
+      this.game.bus.emit("turret:restored", { id: p.id });
+    }
+    return { healed: p.health - prev, restored: restorePrev && !p.disabled };
+  }
+
+  /** Wave-end passive recovery for captured turrets. Mirrors TowerSystem. */
+  applyWaveEndRecovery(): void {
+    for (const p of this.list) {
+      if (p.state !== "captured" || p.type !== "abandoned_turret") continue;
+      if (p.disabled) continue;
+      if (p.health >= p.maxHealth) continue;
+      const heal = Math.max(2, Math.round(p.maxHealth * 0.12));
+      p.health = Math.min(p.maxHealth, p.health + heal);
+    }
+  }
+
+  private applySaboteurDamageToTurret(p: StrategicPoint): void {
+    const damageMul = this.game.core.upgrades.saboteurTowerDamageMul ?? 1;
+    for (const e of this.game.enemies.list) {
+      if (!e.active || e.type !== "saboteur") continue;
+      if (e.saboteurCooldown > 0) continue;
+      if (e.pos.dist(p.pos) > 38) continue;
+      const result = this.damageTurret(p, SABOTEUR_TOWER_DAMAGE * damageMul);
+      if (result.dealt <= 0) continue;
+      e.saboteurCooldown = 5;
+      this.game.particles.spawnBeam(e.pos.x, e.pos.y, p.pos.x, p.pos.y, "#ff6f00", 0.16, { width: 2 });
+      this.game.particles.spawnFloatingText(p.pos.x, p.pos.y - 18, "TURRET HIT", "#ff6f00", 0.9, 11);
+      break; // one sabotage per tick max
+    }
   }
 
   /**

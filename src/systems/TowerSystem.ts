@@ -5,7 +5,24 @@ import type { TowerType } from "../core/Types";
 import { towerDefinitions } from "../data/towers";
 import { Projectile } from "../entities/Projectile";
 import { Vector2 } from "../core/Vector2";
-import { STRUCTURE_TARGET_PRIORITY } from "../core/Config";
+import {
+  ENGINEER_DISABLED_REPAIR_BONUS,
+  ENGINEER_REPAIR_STACK_CAP,
+  ENGINEER_REPAIR_STACK_FACTOR,
+  ENGINEER_TOWER_REPAIR_RATE,
+  JAMMER_REPAIR_PENALTY,
+  SABOTEUR_DISABLE_DURATION,
+  SHIELD_TOWER_DAMAGE_REDUCTION,
+  STRUCTURE_TARGET_PRIORITY,
+  TOWER_BASE_HP,
+  TOWER_CRITICAL_DAMAGE_MUL,
+  TOWER_CRITICAL_FIRE_RATE_MUL,
+  TOWER_CRITICAL_RANGE_MUL,
+  TOWER_DAMAGED_FIRE_RATE_MUL,
+  TOWER_HP_BY_TYPE,
+  TOWER_HP_PER_LEVEL_MUL,
+  WAVE_END_PASSIVE_HEAL_PCT,
+} from "../core/Config";
 
 /** Handles tower behavior: targeting, firing, specialization effects, upgrades, economy ticks. */
 export class TowerSystem {
@@ -75,6 +92,7 @@ export class TowerSystem {
     if (!this.game.spendCredits(cost)) return null;
     const def = towerDefinitions[type];
     const t = new Tower(type, c, r, cost);
+    this.applyDurabilityAggregate(t);
     this.list.push(t);
     this.game.grid.placeTower(c, r, type, Boolean(def.isEco));
     this.game.audio.sfxBuild(t.pos);
@@ -87,12 +105,208 @@ export class TowerSystem {
     return t;
   }
 
+  /** Apply current upgrade aggregate values to a tower's durability. */
+  applyDurabilityAggregate(t: Tower): void {
+    const up = this.game.core.upgrades;
+    const baseType = TOWER_HP_BY_TYPE[t.type] ?? TOWER_BASE_HP;
+    const bonus = (up.towerHpAdd ?? 0);
+    const baseAfterBonus = (baseType + bonus) * (up.towerHpMul ?? 1);
+    const next = Math.max(1, Math.round(baseAfterBonus * Math.pow(TOWER_HP_PER_LEVEL_MUL, t.level - 1)));
+    const pct = t.maxHp > 0 ? t.hp / t.maxHp : 1;
+    t.hpBonus = bonus;
+    t.maxHp = next;
+    t.hp = Math.max(0, Math.min(next, Math.round(next * pct)));
+  }
+
+  /**
+   * Apply HP damage to a tower from any structural threat (saboteur, boss,
+   * rift). Returns true if the tower transitioned into the disabled state on
+   * this hit. Damage above maxHp triggers a soft-disable timer.
+   */
+  damageTower(
+    t: Tower,
+    rawAmount: number,
+    source: "saboteur" | "boss" | "rift" | "jammer" | "other",
+  ): { dealt: number; nowDisabled: boolean } {
+    if (rawAmount <= 0 || t.disabled || !t.active) return { dealt: 0, nowDisabled: false };
+    let amt = rawAmount;
+    // Shield squads materially reduce structural damage to towers within field.
+    if (t.shielded) {
+      const up = this.game.core.upgrades;
+      const reduction = Math.min(0.85, SHIELD_TOWER_DAMAGE_REDUCTION * (up.shieldTowerStrengthMul ?? 1));
+      amt *= 1 - reduction;
+    }
+    if (source === "saboteur") {
+      amt *= this.game.core.upgrades.saboteurTowerDamageMul ?? 1;
+    }
+
+    const prev = t.hp;
+    t.hp = Math.max(0, t.hp - amt);
+    const dealt = prev - t.hp;
+    t.damageFlashTimer = Math.max(t.damageFlashTimer, 0.45);
+    t.lastDamagedAt = this.game.time.elapsed;
+    let nowDisabled = false;
+    if (t.hp <= 0 && !t.disabled) {
+      this.disable(t, source);
+      nowDisabled = true;
+    }
+    // Audio throttle: at most one damage tick sfx per second per tower.
+    if (this.game.time.elapsed - t.lastDamageSfxAt > 1.0) {
+      t.lastDamageSfxAt = this.game.time.elapsed;
+      this.game.audio.sfxTowerDamaged?.(t.pos);
+    }
+    if (this.game.core.settings.showDamageNumbers && dealt >= 1) {
+      this.game.particles.spawnFloatingText(
+        t.pos.x,
+        t.pos.y - 14,
+        `-${Math.round(dealt)}`,
+        source === "saboteur" ? "#ff6f00" : "#ff5252",
+        0.6,
+        10
+      );
+    }
+    return { dealt, nowDisabled };
+  }
+
+  /**
+   * Mark a tower as fully disabled (no firing, dim render). Existing
+   * disable-timer infrastructure is reused so legacy boss/saboteur/mirror
+   * timed-disable flows still work — but this version sticks until repair
+   * brings HP back above zero.
+   */
+  private disable(t: Tower, source: "saboteur" | "boss" | "rift" | "jammer" | "other"): void {
+    if (t.disabled) return;
+    t.disabled = true;
+    t.disabledSinceGameTime = this.game.time.elapsed;
+    t.timer = Math.max(t.timer, t.def.cooldown * 0.6);
+    // Use the existing disable timer as a soft minimum offline window. This
+    // makes saboteur kills feel impactful (you can't insta-engineer them back).
+    let dur = SABOTEUR_DISABLE_DURATION;
+    if (source === "boss") dur = 4.5;
+    if (source === "rift") dur = 2.4;
+    const reduce = this.game.core.upgrades.saboteurDisableReduction ?? 0;
+    if (source === "saboteur" && reduce > 0) dur *= 1 - reduce;
+    const existing = this.disabled.get(t) ?? 0;
+    this.disabled.set(t, Math.max(existing, dur));
+    // Visual + audio for disable transition.
+    this.game.particles.spawnRing(t.pos.x, t.pos.y, 30, "#ff5252", 0.45);
+    this.game.particles.spawnBurst(t.pos.x, t.pos.y, "#ff5252", 10, { speed: 90, life: 0.45, size: 2 });
+    this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 22, "OFFLINE", "#ff5252", 1.0, 12);
+    this.game.audio.sfxTowerDisabled?.(t.pos);
+    this.game.bus.emit("tower:disabled", { tower: t, source });
+  }
+
+  /**
+   * Engineer-style HP repair. amount is HP added per call. Returns the actual
+   * delta (clamped to maxHp). Reviving a fully disabled tower forces hp ≥ 1
+   * before clearing the disabled flag.
+   */
+  repairTower(t: Tower, amount: number): number {
+    if (!t.active || amount <= 0) return 0;
+    const prev = t.hp;
+    t.hp = Math.min(t.maxHp, t.hp + amount);
+    if (t.disabled && t.hp > 0) {
+      t.disabled = false;
+      this.disabled.delete(t);
+      this.game.particles.spawnRing(t.pos.x, t.pos.y, 28, "#00e676", 0.45);
+      this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 24, "RESTORED", "#00e676", 1.1, 12);
+      this.game.audio.sfxTowerRestored?.(t.pos);
+      this.game.bus.emit("tower:restored", { tower: t });
+    }
+    if (t.hp >= t.maxHp && prev < t.maxHp) {
+      this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 22, "FULL HP", "#9be7a7", 0.8, 11);
+      this.game.audio.sfxTowerRepaired?.(t.pos);
+    }
+    return t.hp - prev;
+  }
+
+  /** Tick called by MobileSquadSystem: repair throughput from one engineer. */
+  engineerRepairTick(t: Tower, dt: number, jammed: boolean): { healed: number; restored: boolean } {
+    if (!t.active) return { healed: 0, restored: false };
+    if (t.hp >= t.maxHp && !t.disabled) return { healed: 0, restored: false };
+
+    // Stacking cap: if multiple Engineers channel on the same tower this
+    // frame we keep only the first ENGINEER_REPAIR_STACK_CAP and trim
+    // throughput by ENGINEER_REPAIR_STACK_FACTOR each.
+    const live = this.engineerCountOnTower(t);
+    const slot = Math.min(live, ENGINEER_REPAIR_STACK_CAP);
+    const stackMul = Math.pow(ENGINEER_REPAIR_STACK_FACTOR, Math.max(0, slot - 1));
+
+    const up = this.game.core.upgrades;
+    const baseRate = ENGINEER_TOWER_REPAIR_RATE * (up.engineerRepairMul ?? 1);
+    const disabledBonus = t.disabled ? ENGINEER_DISABLED_REPAIR_BONUS : 1;
+    const jammerMul = jammed ? JAMMER_REPAIR_PENALTY : 1;
+    const restorePrev = t.disabled;
+    const heal = baseRate * disabledBonus * jammerMul * stackMul * dt;
+    const healed = this.repairTower(t, heal);
+    return { healed, restored: restorePrev && !t.disabled };
+  }
+
+  /** Approximate count of Engineers actively in repair contact on the same tower. */
+  private engineerCountOnTower(t: Tower): number {
+    if (!this.game.squads) return 1;
+    let count = 0;
+    for (const s of this.game.squads.list) {
+      if (!s.active || s.type !== "engineer") continue;
+      if (s.targetTower !== t) continue;
+      if (s.state !== "repairing") continue;
+      count++;
+    }
+    return Math.max(1, count);
+  }
+
+  /** Wave-end passive recovery — see WAVE_END_PASSIVE_HEAL_PCT in Config. */
+  applyWaveEndRecovery(): void {
+    const up = this.game.core.upgrades;
+    const grid = this.game.grid;
+    let healedTowers = 0;
+    let nanitesUsed = false;
+    for (const t of this.list) {
+      if (!t.active) continue;
+      // Disabled towers stay disabled. Optional: Emergency Nanites upgrade
+      // restores the FIRST disabled tower per wave to a fraction of max HP.
+      if (t.disabled) {
+        if (!nanitesUsed && up.emergencyNanitesPct > 0) {
+          nanitesUsed = true;
+          const target = Math.max(1, Math.round(t.maxHp * up.emergencyNanitesPct));
+          const delta = target - t.hp;
+          if (delta > 0) {
+            this.repairTower(t, delta);
+            this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 26, "NANITES", "#9be7a7", 1.1, 11);
+          }
+        }
+        continue;
+      }
+      if (t.hp >= t.maxHp) continue;
+      // Only towers inside signal coverage benefit from passive recovery.
+      if (!grid.isCellInSignalCoverage(t.c, t.r)) continue;
+      const heal = Math.max(1, Math.round(t.maxHp * WAVE_END_PASSIVE_HEAL_PCT));
+      this.repairTower(t, heal);
+      healedTowers++;
+    }
+    if (healedTowers > 0) {
+      const corePos = this.game.grid.corePos;
+      this.game.particles.spawnFloatingText(
+        corePos.x,
+        corePos.y - 60,
+        `FIELD REPAIRS: ${healedTowers} TOWERS`,
+        "#9be7a7",
+        1.4,
+        12
+      );
+    }
+  }
+
   upgrade(t: Tower): boolean {
     const cost = t.upgradeCost;
     if (this.game.core.credits < cost) return false;
     if (!this.game.spendCredits(cost)) return false;
     t.level++;
     t.totalInvested += cost;
+    // Upgrade preserves HP percent. Recompute against the new level. If the
+    // tower was disabled we don't auto-restore — it stays offline until repair
+    // brings HP > 0. Documented behavior so future readers know the rule.
+    this.applyDurabilityAggregate(t);
     this.game.audio.sfxUpgrade(t.pos);
     // Dramatic level-up FX.
     this.game.particles.spawnRing(t.pos.x, t.pos.y, 36, "#ffd700");
@@ -116,6 +330,16 @@ export class TowerSystem {
     this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 20, `+${refund}`, "#ffeb3b");
     this.game.bus.emit("credits:changed", this.game.core.credits);
     this.game.bus.emit("tower:sold", t);
+    // Clear any squad target references so engineer/repair beams don't dangle
+    // when the tower is removed mid-channel.
+    if (this.game.squads) {
+      for (const s of this.game.squads.list) {
+        if (s.targetTower === t) {
+          s.targetTower = null;
+          s.effectTimer = 0;
+        }
+      }
+    }
     // Start dissolve animation — tower moves to dissolving list and is removed after timer.
     t.dissolveTimer = Tower.DISSOLVE_MAX;
     this.dissolving.push(t);
@@ -133,6 +357,11 @@ export class TowerSystem {
     this.game.grid.removeTower(t.c, t.r, Boolean(def.requiresCrystal));
     this.list = this.list.filter((x) => x !== t);
     if (this.selected === t) this.selected = null;
+    if (this.game.squads) {
+      for (const s of this.game.squads.list) {
+        if (s.targetTower === t) { s.targetTower = null; s.effectTimer = 0; }
+      }
+    }
     this.game.core.towerRecallUsed = true;
     this.game.audio.sfxSell(t.pos);
     this.game.particles.spawnFloatingText(t.pos.x, t.pos.y - 28, `RECALLED +${refund}`, "#66fcf1", 1.5, 13);
@@ -310,20 +539,37 @@ export class TowerSystem {
     for (const t of this.list) {
       if (t.powerSurgeTimer > 0) t.powerSurgeTimer = Math.max(0, t.powerSurgeTimer - dt);
 
+      // Decay damage-flash + repair flag every frame; squad systems set them on demand.
+      if (t.damageFlashTimer > 0) t.damageFlashTimer = Math.max(0, t.damageFlashTimer - dt);
+      // Clear underRepair flag — squad system sets it on demand each frame
+      // when an engineer is actively in repair contact.
+      t.underRepair = false;
+      // shielded is recomputed each frame.
+      t.shielded = this.computeShielded(t);
+
       // Construction: advance build animation, skip firing until complete.
       if (t.buildProgress < 1) {
         t.buildProgress = Math.min(1, t.buildProgress + dt / 0.4);
         continue;
       }
 
+      // Rift-anchor aura: any tower inside the aura takes a small DPS over time
+      // while the rift is alive. Telegraph + ring already render at the source.
+      this.applyRiftAuraDamage(t, dt);
+
       if (t.manualCooldown > 0) t.manualCooldown = Math.max(0, t.manualCooldown - dt);
 
-      // Handle disables.
+      // Handle disables (legacy timers + HP-driven disabled flag).
       const dTimer = this.disabled.get(t);
       if (dTimer != null) {
         const nt = dTimer - dt;
         if (nt <= 0) this.disabled.delete(t);
         else this.disabled.set(t, nt);
+        continue;
+      }
+      if (t.disabled) {
+        // HP-disabled towers don't fire until restored. The render layer
+        // shows them dimmed and the engineer can repair them back online.
         continue;
       }
 
@@ -376,6 +622,11 @@ export class TowerSystem {
       }
       // Jammer aura: nearby Jammer enemies suppress fire rate by 30%.
       if (this.isInJammerAura(t)) fireRateMul *= 0.7;
+      // Durability-based penalty: damaged towers fire slightly slower; critical
+      // towers fire much slower. Disabled towers were already early-returned.
+      const ds = t.durabilityState;
+      if (ds === "damaged") fireRateMul *= TOWER_DAMAGED_FIRE_RATE_MUL;
+      else if (ds === "critical") fireRateMul *= TOWER_CRITICAL_FIRE_RATE_MUL;
       // Amplifier Overclock specialization: adjacent amplifiers with overclockAdjacent give +10% fire rate.
       for (const amp of this.list) {
         if (amp.type === "amplifier" && amp.flags.overclockAdjacent) {
@@ -568,6 +819,33 @@ export class TowerSystem {
     return false;
   }
 
+  /** True if any active Shield squad's interaction radius covers this tower. */
+  private computeShielded(t: Tower): boolean {
+    if (!this.game.squads) return false;
+    for (const s of this.game.squads.list) {
+      if (s.type !== "shield" || !s.active || s.evacuating) continue;
+      const radius = s.def.interactionRadius;
+      if (s.pos.dist(t.pos) <= radius) return true;
+    }
+    return false;
+  }
+
+  /** Per-tick rift-anchor aura damage to towers caught inside an active rift's radius. */
+  private applyRiftAuraDamage(t: Tower, dt: number): void {
+    const sps = this.game.strategicPoints;
+    if (!sps) return;
+    let dps = 0;
+    for (const p of sps.list) {
+      if (p.type !== "rift_anchor" || p.state !== "enemy") continue;
+      const r = 200; // RIFT_ANCHOR_AURA_RADIUS — kept inline to avoid import churn
+      if (t.pos.dist(p.pos) > r) continue;
+      // Conservative DPS: 3.5 HP/s per rift (Config: RIFT_TOWER_DAMAGE_PER_SECOND).
+      dps += 3.5;
+    }
+    if (dps <= 0) return;
+    this.damageTower(t, dps * dt, "rift");
+  }
+
   private hasAdjacentType(t: Tower, type: TowerType): boolean {
     for (const other of this.list) {
       if (other === t || other.type !== type) continue;
@@ -615,6 +893,7 @@ export class TowerSystem {
     let chainMax = base.chainMax + (t.type === "tesla" ? up.teslaChainAdd : 0);
     let chainRange = t.def.chainRange ?? 0;
     let cooldown = base.cooldown;
+    let damage = base.damage;
 
     if (t.type === "tesla" && this.hasAdjacentType(t, "stasis")) {
       chainRange *= 1.3;
@@ -623,9 +902,15 @@ export class TowerSystem {
       cooldown = 1 / (1 / Math.max(0.05, cooldown) + 1);
     }
 
+    // Critical-HP penalties — damaged towers are less precise.
+    if (t.durabilityState === "critical") {
+      range *= TOWER_CRITICAL_RANGE_MUL;
+      damage *= TOWER_CRITICAL_DAMAGE_MUL;
+    }
+
     return {
       range,
-      damage: base.damage,
+      damage,
       cooldown,
       splashRadius,
       chainMax,

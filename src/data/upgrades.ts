@@ -520,4 +520,66 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
     synergyHint: "Required gear if you push deep into Sector 7.",
     effect: { squadJammerResistance: 0.4 },
   },
+
+  // ──────────────────────────────────────────────────────────
+  // TOWER DURABILITY (Part 15)
+  // A focused, intentionally small set so the new system has runtime presence
+  // without overwhelming the upgrade pool. Each upgrade addresses one slice of
+  // the durability/repair loop. Everything stacks multiplicatively with the
+  // repair/damage paths in TowerSystem.
+  // ──────────────────────────────────────────────────────────
+  {
+    id: "field_repair_crews",
+    name: "Field Repair Crews",
+    description: "Engineer squads repair towers and abandoned turrets 40% faster.",
+    target: "global",
+    rarity: "uncommon",
+    synergyHint: "Pairs with Saboteur-heavy waves and forward expansion.",
+    effect: { engineerRepairMul: 1.4 },
+  },
+  {
+    id: "hardened_circuits",
+    name: "Hardened Circuits",
+    description: "Every tower gains +25 max HP. Existing towers refresh on apply.",
+    target: "global",
+    rarity: "rare",
+    synergyHint: "Best when you've already built a lot of expensive towers.",
+    effect: { towerHpAdd: 25 },
+  },
+  {
+    id: "anti_sabotage_firmware",
+    name: "Anti-Sabotage Firmware",
+    description: "Saboteurs deal 30% less damage to towers and disable durations are 30% shorter.",
+    target: "global",
+    rarity: "rare",
+    synergyHint: "Counter pick for Sector 7 saboteur cascades.",
+    effect: { saboteurTowerDamageMul: 0.7, saboteurDisableReduction: 0.3 },
+  },
+  {
+    id: "shield_coupling",
+    name: "Shield Coupling",
+    description: "Shield Squads reduce structural damage to towers by an extra 25% inside their field.",
+    target: "global",
+    rarity: "rare",
+    synergyHint: "Pairs with Sector 7 final waves and rift-anchor pressure.",
+    effect: { shieldTowerStrengthMul: 1.25 },
+  },
+  {
+    id: "emergency_nanites",
+    name: "Emergency Nanites",
+    description: "At each wave end, the first disabled tower auto-recovers to 50% HP.",
+    target: "global",
+    rarity: "rare",
+    synergyHint: "Insurance for Engineer-light builds.",
+    effect: { emergencyNanitesPct: 0.5 },
+  },
+  {
+    id: "auto_gun_plating",
+    name: "Auto-Gun Plating",
+    description: "Captured abandoned turrets gain 60% more HP.",
+    target: "global",
+    rarity: "uncommon",
+    synergyHint: "Pairs with Sector 6/7 forward turret captures.",
+    effect: { abandonedTurretHpMul: 1.6 },
+  },
 ];

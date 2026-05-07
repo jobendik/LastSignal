@@ -645,8 +645,8 @@ function blackoutWaves(): WaveDefinition[] {
       id: "s7_w11_saboteur_cascade",
       name: "Wave 11: Saboteur Cascade",
       description: "Tower-disabler infiltrators arrive with phantom support.",
-      warning: "Saboteurs disable towers on contact. Snare/EMP and detection are crucial.",
-      recommendedCounters: ["Snare", "Tesla EMP arc", "Scanner drone"],
+      warning: "Saboteurs damage and disable towers. Engineer to restore, Shield to protect, Snare/EMP to slow them.",
+      recommendedCounters: ["Engineer Squad to repair", "Shield Squad on key towers", "Snare", "Tesla EMP arc"],
       rewardCredits: 220,
       rewardChoice: false,
       lanes: [

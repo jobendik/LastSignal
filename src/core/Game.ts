@@ -410,6 +410,24 @@ export class Game {
         this.core.coreIntegrity + u.effect.coreIntegrityAdd
       );
     }
+    // Hardened Circuits / Tower HP upgrades: refresh existing towers' max HP.
+    if (
+      u.effect.towerHpAdd != null ||
+      u.effect.towerHpMul != null
+    ) {
+      for (const t of this.towers.list) this.towers.applyDurabilityAggregate(t);
+    }
+    // Auto-Gun Plating: bump captured abandoned turret HP cap retroactively.
+    if (u.effect.abandonedTurretHpMul != null && this.strategicPoints) {
+      const mul = u.effect.abandonedTurretHpMul;
+      for (const p of this.strategicPoints.list) {
+        if (p.type !== "abandoned_turret" || p.state !== "captured") continue;
+        const newMax = Math.max(1, Math.round(p.maxHealth * mul));
+        const pct = p.maxHealth > 0 ? p.health / p.maxHealth : 1;
+        (p as { maxHealth: number }).maxHealth = newMax;
+        p.health = Math.max(1, Math.round(newMax * pct));
+      }
+    }
     // Cursed upgrades also add a permanent debuff modifier for the rest of the run.
     if (u.curse) {
       this.core.activeModifiers.push(u.curse);

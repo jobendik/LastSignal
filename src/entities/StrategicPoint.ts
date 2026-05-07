@@ -86,6 +86,18 @@ export class StrategicPoint {
   contested = false;
   /** Live "currently inside an active hostile jammer field" — set by SPS each tick. */
   jammed = false;
+  /**
+   * For captured abandoned turrets: while disabled the turret stops firing and
+   * renders as broken. Engineer repair restores HP and clears the flag. Other
+   * structure types ignore this field.
+   */
+  disabled = false;
+  /** Game-time of last damage taken (used for HUD readout / sfx throttling). */
+  lastDamagedAt = -Infinity;
+  /** Damage flash timer used by the renderer (0..0.5s). */
+  damageFlashTimer = 0;
+  /** True while an Engineer squad is currently channeling repair on this point. */
+  underRepair = false;
   /** Last-known reward summary used by the tooltip helper. */
   readonly rewardSummary: string;
 
@@ -154,6 +166,7 @@ function defaultHealth(type: StrategicPointType): number {
   switch (type) {
     case "rift_anchor": return 320;
     case "jammer": return 220;
+    case "abandoned_turret": return 130;
     default: return 0;
   }
 }
