@@ -360,6 +360,23 @@ export interface UpgradeEffect {
   droneRevealAll?: boolean;
   /** Drone: repair drone restores towers faster (shorter disable timers). */
   droneRepairFaster?: boolean;
+  // ---------- SQUAD COMMAND PROTOCOLS (Part 16) ----------
+  /** Bonus added to global squad cap (cap = base + tier bonus + squadCapAdd). */
+  squadCapAdd?: number;
+  /** Multiplier on squad cooldowns (< 1 = faster recharge). */
+  squadCooldownMul?: number;
+  /** Multiplier on squad cost (< 1 = cheaper deployment). */
+  squadCostMul?: number;
+  /** Multiplier on Recon reveal radius and scan-pulse reach. */
+  squadReconRevealMul?: number;
+  /** Bonus to engineer capture multiplier (additive on top of base). */
+  squadEngineerCaptureBonus?: number;
+  /** Multiplier on Strike squad damage vs enemies and structures. */
+  squadStrikeDamageMul?: number;
+  /** Multiplier on Shield damage reduction (capped at SHIELD_DAMAGE_REDUCTION_MAX). */
+  squadShieldStrengthMul?: number;
+  /** Reduce jammer/rift suppression effect on squads (0..1, fraction subtracted from penalty). */
+  squadJammerResistance?: number;
   /** Economy: harvester also shields adjacent towers (reduces incoming disable durations). */
   harvesterShieldAdjacent?: boolean;
   /** Economy: bonus credits per non-harvester tower adjacent to harvester. */
@@ -423,9 +440,21 @@ export type SquadState =
   | "repairing"
   | "attacking"
   | "shielding"
+  | "evacuating"
   | "returning"
   | "expired"
   | "destroyed";
+
+/** Active retask command applied to a deployed squad. */
+export type SquadCommand =
+  | { kind: "move"; x: number; y: number }
+  | { kind: "scout"; x: number; y: number }
+  | { kind: "capture"; pointId: string }
+  | { kind: "repair"; towerId: number }
+  | { kind: "strike_structure"; pointId: string }
+  | { kind: "strike_area"; x: number; y: number }
+  | { kind: "shield"; x: number; y: number }
+  | { kind: "evac" };
 
 /**
  * Authoring-time definition for a squad type. Numbers live in /src/core/Config

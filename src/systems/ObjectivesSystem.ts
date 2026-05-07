@@ -1,5 +1,5 @@
 import type { Game } from "../core/Game";
-import type { EnemyType, StrategicPointType, TowerType } from "../core/Types";
+import type { EnemyType, SquadType, StrategicPointType, TowerType } from "../core/Types";
 import type { ObjectiveDefinition, SectorObjectives } from "../data/objectives";
 import { sectorObjectives } from "../data/objectives";
 
@@ -22,6 +22,10 @@ export interface ObjectiveSnapshot {
   /** Strategic point counts captured / destroyed this run. */
   strategicCapturedByType: Partial<Record<StrategicPointType, number>>;
   strategicDestroyedByType: Partial<Record<StrategicPointType, number>>;
+  /** Per-squad-type deploys this run. */
+  squadDeployedByType: Partial<Record<SquadType, number>>;
+  /** Per-strategic-type kills credited to squad damage this run. */
+  squadDestroyedStrategicByType: Partial<Record<StrategicPointType, number>>;
 }
 
 export interface ObjectiveEvalResult {
@@ -50,6 +54,10 @@ export class ObjectivesSystem {
   private soldCount = 0;
   /** Ever-built type set so build_any_of_type still credits a player who later sells. */
   private builtAnyByType = new Set<TowerType>();
+  /** Per-squad-type deploy counts this run. */
+  private squadDeployedByType: Partial<Record<SquadType, number>> = {};
+  /** Per-strategic-type kills credited to squad damage this run. */
+  private squadDestroyedStrategicByType: Partial<Record<StrategicPointType, number>> = {};
 
   constructor(private readonly game: Game) {
     const bus = game.bus;
@@ -71,6 +79,17 @@ export class ObjectivesSystem {
     bus.on("tower:sold", () => {
       this.soldCount++;
     });
+    // Squad deploy & strike-credit tracking — drives deploy_any_squad,
+    // deploy_n_squad, and squad_destroy_n_strategic objectives.
+    bus.on<{ type: SquadType }>("squad:deployed", (ev) => {
+      const t = ev.type;
+      this.squadDeployedByType[t] = (this.squadDeployedByType[t] ?? 0) + 1;
+    });
+    bus.on<{ type: SquadType; structureType: StrategicPointType }>("squad:structureKill", (ev) => {
+      if (ev.type !== "strike") return;
+      const t = ev.structureType;
+      this.squadDestroyedStrategicByType[t] = (this.squadDestroyedStrategicByType[t] ?? 0) + 1;
+    });
   }
 
   reset(): void {
@@ -81,6 +100,8 @@ export class ObjectivesSystem {
     this.builtByType = {};
     this.soldCount = 0;
     this.builtAnyByType.clear();
+    this.squadDeployedByType = {};
+    this.squadDestroyedStrategicByType = {};
   }
 
   get currentSectorObjectives(): SectorObjectives | null {
@@ -111,6 +132,8 @@ export class ObjectivesSystem {
       enemiesKilledTotal: c.stats.enemiesKilled,
       strategicCapturedByType: sps?.capturedCounts ?? {},
       strategicDestroyedByType: sps?.destroyedCounts ?? {},
+      squadDeployedByType: this.squadDeployedByType,
+      squadDestroyedStrategicByType: this.squadDestroyedStrategicByType,
     };
   }
 
@@ -242,6 +265,47 @@ export class ObjectivesSystem {
         const need = def.value ?? 1;
         const t = def.strategicType;
         const have = t ? (snap.strategicDestroyedByType[t] ?? 0) : 0;
+        out.completed = have >= need;
+        out.progressText = `${have}/${need}`;
+        out.progress = Math.min(1, have / Math.max(1, need));
+        break;
+      }
+      case "deploy_any_squad": {
+        const t = def.squadType;
+        const have = t ? (snap.squadDeployedByType[t] ?? 0) : 0;
+        out.completed = have >= 1;
+        out.progressText = have > 0 ? "✓" : "0/1";
+        out.progress = have > 0 ? 1 : 0;
+        break;
+      }
+      case "deploy_n_squad": {
+        const need = def.value ?? 1;
+        if (def.squadType) {
+          const have = snap.squadDeployedByType[def.squadType] ?? 0;
+          out.completed = have >= need;
+          out.progressText = `${have}/${need}`;
+          out.progress = Math.min(1, have / Math.max(1, need));
+        } else {
+          // Diversity check: at least N distinct types deployed.
+          const types: SquadType[] = ["recon", "engineer", "strike", "shield"];
+          const distinct = types.filter((tt) => (snap.squadDeployedByType[tt] ?? 0) > 0).length;
+          out.completed = distinct >= need;
+          out.progressText = `${distinct}/${need}`;
+          out.progress = Math.min(1, distinct / Math.max(1, need));
+        }
+        break;
+      }
+      case "squad_destroy_n_strategic": {
+        const need = def.value ?? 1;
+        const t = def.strategicType;
+        // If a strategicType is named, count only kills of that type. Otherwise
+        // count any structure killed by a strike squad.
+        let have: number;
+        if (t) {
+          have = snap.squadDestroyedStrategicByType[t] ?? 0;
+        } else {
+          have = Object.values(snap.squadDestroyedStrategicByType).reduce((s, v) => s + (v ?? 0), 0);
+        }
         out.completed = have >= need;
         out.progressText = `${have}/${need}`;
         out.progress = Math.min(1, have / Math.max(1, need));

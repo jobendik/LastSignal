@@ -7,6 +7,16 @@ import type { Tower } from "./Tower";
 
 let squadIdCounter = 0;
 
+/** Lightweight active-command flavor on top of Squad — drives behavior dispatch. */
+export type SquadOrder =
+  | "auto"
+  | "scout"
+  | "capture"
+  | "repair"
+  | "strike"
+  | "shield"
+  | "evac";
+
 /**
  * Runtime mobile squad. Represents a small group of drone scouts/engineers/
  * strike units commanded by the player as a single beacon. Sub-drones around
@@ -41,6 +51,24 @@ export class Squad {
   active = true;
   /** Snapshot color so HUD can match button accents. */
   readonly color: string;
+  /** Active command tag (set by MobileSquadSystem retask/deploy). */
+  order: SquadOrder = "auto";
+  /** True while an evac order is active and the squad is fleeing to safety. */
+  evacuating = false;
+  /** Live "is currently inside a hostile jammer field" — set each tick. */
+  jammed = false;
+  /** Live "is currently inside a hostile rift aura" — set each tick. */
+  inRiftAura = false;
+  /** Recent damage timestamp (game.time.elapsed) — used by HUD damage indicator. */
+  lastHitTime = -Infinity;
+  /** Brief retask-acknowledged flash timer (seconds). */
+  ackTimer = 0;
+  /** Time of last shield ring pulse so the visual ripple stays on a steady cadence. */
+  lastShieldPulse = 0;
+  /** True once the squad has applied a one-time scan effect at its current target. */
+  scanCompletedAt: { x: number; y: number } | null = null;
+  /** Last-tick HP snapshot — used to detect drops for the damage-flash badge. */
+  prevHealth = 0;
 
   constructor(type: SquadType, x: number, y: number, target: Vector2) {
     this.id = ++squadIdCounter;
@@ -50,6 +78,7 @@ export class Squad {
     this.target = target.clone();
     this.health = this.def.maxHealth;
     this.maxHealth = this.def.maxHealth;
+    this.prevHealth = this.health;
     this.duration = this.def.duration;
     this.maxDuration = this.def.duration;
     this.color = this.def.color;

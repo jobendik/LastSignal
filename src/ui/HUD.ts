@@ -91,6 +91,20 @@ export class HUD {
       this.objectiveLastCompleted.clear();
       this.refresh();
     });
+    // Squad lifecycle events — force the panel signature to refresh so the
+    // active-squad list updates immediately rather than on next tick.
+    const invalidate = () => { this.squadPanelLastSig = ""; };
+    bus.on("squad:deployed", invalidate);
+    bus.on("squad:selected", invalidate);
+    bus.on("squad:retask", invalidate);
+    bus.on("squad:retaskBegin", invalidate);
+    bus.on("squad:retaskCancel", invalidate);
+    bus.on("squad:evacBegin", invalidate);
+    bus.on("squad:recalled", invalidate);
+    bus.on("squad:expired", invalidate);
+    bus.on("squad:destroyed", invalidate);
+    bus.on("squad:arm", invalidate);
+    bus.on("squad:disarm", invalidate);
   }
 
   private build(): void {
@@ -651,16 +665,27 @@ export class HUD {
 
     const statuses = sys.statuses();
     const cap = sys.globalCap();
-    // Build a compact signature of all relevant state so we only re-render
-    // the panel when something actually changed.
+    const selectedId = sys.selected?.id ?? null;
+    const retask = sys.retaskMode;
+    // Active-squad list signature so we rebuild only on real state changes.
+    const activeParts: string[] = [];
+    for (const s of sys.list) {
+      if (!s.active) continue;
+      activeParts.push(
+        `${s.id}:${s.type}:${Math.ceil(s.health)}:${Math.ceil(s.duration)}:${s.state}:${s.evacuating ? "E" : "_"}:${s.jammed ? "J" : "_"}`
+      );
+    }
     const sigParts: string[] = [
       `tier:${this.game.core.commandTier}`,
       `cap:${sys.list.length}/${cap}`,
       `pending:${sys.pendingCommand ?? "_"}`,
+      `sel:${selectedId ?? "_"}`,
+      `retask:${retask ? 1 : 0}`,
+      `act:${activeParts.join(",")}`,
     ];
     for (const s of statuses) {
       sigParts.push(
-        `${s.type}:${s.unlocked ? 1 : 0}:${Math.ceil(s.cooldownRemaining)}:${s.active}:${s.affordable ? 1 : 0}:${s.reason ?? ""}`
+        `${s.type}:${s.unlocked ? 1 : 0}:${Math.ceil(s.cooldownRemaining)}:${s.active}:${s.affordable ? 1 : 0}:${s.effectiveCost}:${s.reason ?? ""}`
       );
     }
     const sig = sigParts.join("|");
@@ -668,10 +693,83 @@ export class HUD {
     this.squadPanelLastSig = sig;
 
     clear(this.squadPanel);
-    this.squadPanel.append(
+    const titleRow = el("div", { class: "ls-squad-title-row" });
+    titleRow.append(
       el("div", { class: "ls-command-title", text: "SQUAD COMMAND" }),
       el("div", { class: "ls-squad-cap", text: `Slots ${sys.list.length}/${cap}` })
     );
+    this.squadPanel.append(titleRow);
+
+    // Active squad roster — clickable rows with HP, duration, state.
+    if (sys.list.length > 0) {
+      const roster = el("div", { class: "ls-squad-roster" });
+      for (const s of sys.list) {
+        if (!s.active) continue;
+        const sel = s.id === selectedId;
+        const hpPct = Math.max(0, s.health / s.maxHealth);
+        const durPct = Math.max(0, s.duration / s.maxDuration);
+        const state = s.state;
+        const status = stateLabel(state, s.evacuating, s.jammed);
+        const row = el("div", {
+          class: `ls-squad-active${sel ? " selected" : ""}${s.evacuating ? " evac" : ""}${s.jammed ? " jammed" : ""}`,
+        });
+        row.style.borderLeftColor = s.def.color;
+        const head = el("div", { class: "ls-squad-active-head" });
+        head.append(
+          el("span", { class: "ls-squad-active-name", text: s.def.name }),
+          el("span", { class: "ls-squad-active-state", text: status })
+        );
+        // Mini HP and duration bars.
+        const bars = el("div", { class: "ls-squad-active-bars" });
+        const hpBar = el("div", { class: "ls-squad-active-bar" });
+        const hpFill = el("div", { class: "ls-squad-active-bar-fill" });
+        hpFill.style.width = `${(hpPct * 100).toFixed(0)}%`;
+        hpFill.style.background =
+          hpPct > 0.5 ? "#9be7a7" : hpPct > 0.25 ? "#ffd180" : "#ff5252";
+        hpBar.append(hpFill);
+        const durBar = el("div", { class: "ls-squad-active-bar" });
+        const durFill = el("div", { class: "ls-squad-active-bar-fill" });
+        durFill.style.width = `${(durPct * 100).toFixed(0)}%`;
+        durFill.style.background = "#80d8ff";
+        durBar.append(durFill);
+        bars.append(hpBar, durBar);
+        // Action row
+        const actions = el("div", { class: "ls-squad-active-actions" });
+        const retaskBtn = el("button", {
+          class: `ls-squad-mini-btn${retask && sel ? " active" : ""}`,
+          text: retask && sel ? "PICK TARGET" : "RETASK",
+        });
+        retaskBtn.disabled = s.evacuating;
+        retaskBtn.title = "Retask the selected squad to a new target/location.";
+        retaskBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          if (!sel) sys.selectSquad(s);
+          if (sys.selected) sys.beginRetask();
+        };
+        const evacBtn = el("button", { class: "ls-squad-mini-btn", text: "EVAC" });
+        evacBtn.disabled = s.evacuating;
+        evacBtn.title = "Recall the squad to the nearest core/relay (Q).";
+        evacBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          sys.evacSquad(s);
+        };
+        actions.append(retaskBtn, evacBtn);
+        row.append(head, bars, actions);
+        row.onclick = () => sys.selectSquad(s);
+        row.title = `${s.def.name} — click to select. Right-click world to retask, Q to evac.`;
+        roster.append(row);
+      }
+      // Roster footer — global EVAC ALL action.
+      const footer = el("div", { class: "ls-squad-roster-footer" });
+      const evacAllBtn = el("button", { class: "ls-squad-mini-btn evac-all", text: "EVAC ALL" });
+      evacAllBtn.title = "Recall every active squad to safety (Shift+Q).";
+      evacAllBtn.disabled = sys.list.every((s) => !s.active || s.evacuating);
+      evacAllBtn.onclick = () => sys.evacAll();
+      footer.append(evacAllBtn);
+      roster.append(footer);
+      this.squadPanel.append(roster);
+    }
+
     const grid = el("div", { class: "ls-squad-grid" });
     for (const status of statuses) {
       const def = status.def;
@@ -688,13 +786,16 @@ export class HUD {
       const btn = el("button", { class: cls });
       btn.style.borderColor = def.color;
       const header = el("div", { class: "ls-squad-row" });
+      const hotkey = squadHotkeyLabel(status.type);
       header.append(
-        el("span", { class: "ls-squad-name", text: def.name }),
-        el("span", { class: "ls-squad-cost", text: `${def.cost}CR` })
+        el("span", { class: "ls-squad-name", text: `${hotkey} ${def.name}` }),
+        el("span", { class: "ls-squad-cost", text: `${status.effectiveCost}CR` })
       );
       const meta = el("div", { class: "ls-squad-meta" });
       const cdLabel =
-        status.cooldownRemaining > 0 ? `CD ${Math.ceil(status.cooldownRemaining)}s` : `CD ${def.cooldown}s`;
+        status.cooldownRemaining > 0
+          ? `CD ${Math.ceil(status.cooldownRemaining)}s`
+          : `CD ${Math.round(status.effectiveCooldown)}s`;
       meta.append(
         el("span", { class: "ls-squad-role", text: def.role }),
         el("span", { class: "ls-squad-cd", text: cdLabel })
@@ -706,7 +807,7 @@ export class HUD {
           : `${status.active}/${status.capPerType} active · T${def.tierRequired}+`,
       });
       btn.append(header, meta, detail);
-      btn.title = `${def.name}\n${def.description}\nUnlock: Command Tier ${def.tierRequired}\nCost: ${def.cost} CR · Cooldown: ${def.cooldown}s`;
+      btn.title = `${def.name}\n${def.description}\nUnlock: Command Tier ${def.tierRequired}\nCost: ${status.effectiveCost} CR · Cooldown: ${Math.round(status.effectiveCooldown)}s\nHotkey: ${hotkey}`;
       btn.onclick = () => {
         if (!status.unlocked) return;
         sys.armCommand(status.type);
@@ -716,10 +817,43 @@ export class HUD {
     this.squadPanel.append(grid);
   }
 
+  /** Public hook for InputSystem to refresh the squad panel when state changes. */
+  invalidateSquadPanel(): void {
+    this.squadPanelLastSig = "";
+  }
+
   private hasRecommendedTower(counters: string[]): boolean {
     const names = counters.map((c) => c.toLowerCase());
     const towers = this.game.towers.list as Tower[];
     if (names.length === 0) return towers.length >= 2;
     return towers.some((t) => names.some((n) => t.name.toLowerCase().includes(n)));
+  }
+}
+
+function squadHotkeyLabel(type: "recon" | "engineer" | "strike" | "shield"): string {
+  switch (type) {
+    case "recon": return "[F1]";
+    case "engineer": return "[F2]";
+    case "strike": return "[F3]";
+    case "shield": return "[F4]";
+  }
+}
+
+/** Compact human label for a squad's current behavior state. */
+function stateLabel(state: string, evacuating: boolean, jammed: boolean): string {
+  if (evacuating) return "EVAC";
+  if (jammed) return "JAMMED";
+  switch (state) {
+    case "spawning": return "DEPLOYING";
+    case "moving": return "MOVING";
+    case "scouting": return "SCANNING";
+    case "capturing": return "CAPTURING";
+    case "repairing": return "REPAIRING";
+    case "attacking": return "ATTACKING";
+    case "shielding": return "SHIELDING";
+    case "evacuating": return "EVAC";
+    case "expired": return "EXPIRED";
+    case "destroyed": return "LOST";
+    default: return state.toUpperCase();
   }
 }

@@ -49,6 +49,15 @@ export interface UpgradeAggregate {
   unspentInterestCap: number;
   waveCompleteCredits: number;
   reflectorRailgunMul: number;
+  // ---------- SQUAD COMMAND PROTOCOLS (Part 16) ----------
+  squadCapAdd: number;
+  squadCooldownMul: number;
+  squadCostMul: number;
+  squadReconRevealMul: number;
+  squadEngineerCaptureBonus: number;
+  squadStrikeDamageMul: number;
+  squadShieldStrengthMul: number;
+  squadJammerResistance: number;
 }
 
 export function createEmptyUpgradeAggregate(): UpgradeAggregate {
@@ -95,6 +104,14 @@ export function createEmptyUpgradeAggregate(): UpgradeAggregate {
     unspentInterestCap: 0,
     waveCompleteCredits: 0,
     reflectorRailgunMul: 1,
+    squadCapAdd: 0,
+    squadCooldownMul: 1,
+    squadCostMul: 1,
+    squadReconRevealMul: 1,
+    squadEngineerCaptureBonus: 0,
+    squadStrikeDamageMul: 1,
+    squadShieldStrengthMul: 1,
+    squadJammerResistance: 0,
   };
 }
 
@@ -300,4 +317,14 @@ export function applyUpgradeEffect(
   if (effect.unspentInterestCap != null) agg.unspentInterestCap = Math.max(agg.unspentInterestCap, effect.unspentInterestCap);
   if (effect.waveCompleteCredits != null) agg.waveCompleteCredits += effect.waveCompleteCredits;
   if (effect.reflectorRailgunMul != null) agg.reflectorRailgunMul *= effect.reflectorRailgunMul;
+  if (effect.squadCapAdd != null) agg.squadCapAdd += effect.squadCapAdd;
+  if (effect.squadCooldownMul != null) agg.squadCooldownMul *= effect.squadCooldownMul;
+  if (effect.squadCostMul != null) agg.squadCostMul *= effect.squadCostMul;
+  if (effect.squadReconRevealMul != null) agg.squadReconRevealMul *= effect.squadReconRevealMul;
+  if (effect.squadEngineerCaptureBonus != null) agg.squadEngineerCaptureBonus += effect.squadEngineerCaptureBonus;
+  if (effect.squadStrikeDamageMul != null) agg.squadStrikeDamageMul *= effect.squadStrikeDamageMul;
+  if (effect.squadShieldStrengthMul != null) agg.squadShieldStrengthMul *= effect.squadShieldStrengthMul;
+  if (effect.squadJammerResistance != null) {
+    agg.squadJammerResistance = Math.min(0.9, agg.squadJammerResistance + effect.squadJammerResistance);
+  }
 }

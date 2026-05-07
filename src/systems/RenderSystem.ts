@@ -2087,14 +2087,43 @@ export class RenderSystem {
     const t = this.game.time.elapsed;
     const spawnPct = 1 - s.spawnTimer / 0.4;
     const alpha = spawnPct < 1 ? Math.max(0.2, spawnPct) : 1;
+    const isSelected = this.game.squads?.selected === s;
+    const recentlyHit = t - s.lastHitTime < 0.4;
 
-    // Optional path/destination marker for moving squads.
-    if (s.state === "moving" || s.state === "spawning") {
+    // Selection ring — thick pulsing ring under the squad center.
+    if (isSelected) {
       ctx.save();
-      ctx.globalAlpha = 0.35 + Math.sin(t * 5) * 0.1;
+      ctx.globalAlpha = 0.55 + Math.sin(t * 5) * 0.25;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(s.pos.x, s.pos.y, 22, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.4;
       ctx.strokeStyle = s.def.color;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(s.pos.x, s.pos.y, 26, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Optional path/destination marker for moving squads, selected squads,
+    // and acknowledged retasks. Selected squads always show the path so the
+    // player can read what they ordered.
+    const showPath =
+      s.state === "moving" ||
+      s.state === "spawning" ||
+      s.state === "evacuating" ||
+      isSelected ||
+      s.ackTimer > 0;
+    if (showPath) {
+      ctx.save();
+      ctx.globalAlpha = (isSelected ? 0.65 : 0.35) + Math.sin(t * 5) * 0.1;
+      ctx.strokeStyle = s.evacuating ? "#ffd180" : s.def.color;
+      ctx.lineWidth = isSelected ? 1.5 : 1;
+      ctx.setLineDash(s.evacuating ? [3, 6] : [4, 4]);
+      ctx.lineDashOffset = -((t * 24) % 12);
       ctx.beginPath();
       ctx.moveTo(s.pos.x, s.pos.y);
       ctx.lineTo(s.target.x, s.target.y);
@@ -2103,6 +2132,15 @@ export class RenderSystem {
       ctx.beginPath();
       ctx.arc(s.target.x, s.target.y, 7, 0, Math.PI * 2);
       ctx.stroke();
+      // X marker for evac destination, target reticle for normal.
+      if (s.evacuating) {
+        ctx.beginPath();
+        ctx.moveTo(s.target.x - 4, s.target.y - 4);
+        ctx.lineTo(s.target.x + 4, s.target.y + 4);
+        ctx.moveTo(s.target.x - 4, s.target.y + 4);
+        ctx.lineTo(s.target.x + 4, s.target.y - 4);
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -2203,18 +2241,92 @@ export class RenderSystem {
     ctx.arc(s.pos.x, s.pos.y + 13, 8, Math.PI, Math.PI + Math.PI * durPct);
     ctx.stroke();
     ctx.restore();
+
+    // State badge above the HP ring — JAMMED / EVAC / DAMAGED. We show the
+    // most relevant single label so it's never noisy.
+    let badge: { label: string; color: string } | null = null;
+    if (s.evacuating) badge = { label: "EVAC", color: "#ffd180" };
+    else if (s.jammed) badge = { label: "JAMMED", color: "#ef6c00" };
+    else if (recentlyHit && hpPct < 0.6) badge = { label: "DAMAGED", color: "#ff5252" };
+    else if (s.inRiftAura) badge = { label: "RIFT", color: "#ff5252" };
+    if (badge) {
+      ctx.save();
+      ctx.font = "bold 8px monospace";
+      ctx.textAlign = "center";
+      const w = ctx.measureText(badge.label).width + 8;
+      ctx.fillStyle = "rgba(8, 12, 18, 0.9)";
+      ctx.fillRect(s.pos.x - w / 2, s.pos.y - 30, w, 10);
+      ctx.strokeStyle = badge.color;
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(s.pos.x - w / 2, s.pos.y - 30, w, 10);
+      ctx.fillStyle = badge.color;
+      ctx.fillText(badge.label, s.pos.x, s.pos.y - 22);
+      ctx.restore();
+    }
+
+    // Hit flash — a quick bright ring when the squad takes damage.
+    if (recentlyHit) {
+      const flashAlpha = Math.max(0, 1 - (t - s.lastHitTime) / 0.4);
+      ctx.save();
+      ctx.globalAlpha = flashAlpha * 0.55;
+      ctx.strokeStyle = "#ff5252";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(s.pos.x, s.pos.y, 14 + (1 - flashAlpha) * 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
-  /** Targeting preview when a squad command is armed. */
+  /** Targeting preview when a squad command is armed (or a retask is staged). */
   private drawSquadDeployPreview(ctx: CanvasRenderingContext2D): void {
     if (!this.game.squads) return;
-    const pending = this.game.squads.pendingCommand;
-    if (!pending) return;
     const cursor = this.game.input.hoverWorld;
     if (!cursor) return;
+    const t = this.game.time.elapsed;
+
+    // Retask mode — draw a "RETASK SELECTED → HERE" preview from the squad
+    // to the cursor with the squad's interaction radius hint.
+    if (this.game.squads.retaskMode && this.game.squads.selected) {
+      const sq = this.game.squads.selected;
+      const def = sq.def;
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = def.color;
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([5, 4]);
+      ctx.lineDashOffset = -((t * 28) % 9);
+      ctx.beginPath();
+      ctx.moveTo(sq.pos.x, sq.pos.y);
+      ctx.lineTo(cursor.x, cursor.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const radius = sq.type === "recon" ? def.revealRadius * 0.7 : def.interactionRadius;
+      ctx.globalAlpha = 0.4 + Math.sin(t * 5) * 0.1;
+      ctx.beginPath();
+      ctx.arc(cursor.x, cursor.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      // Crosshair
+      ctx.beginPath();
+      ctx.moveTo(cursor.x - 12, cursor.y);
+      ctx.lineTo(cursor.x + 12, cursor.y);
+      ctx.moveTo(cursor.x, cursor.y - 12);
+      ctx.lineTo(cursor.x, cursor.y + 12);
+      ctx.stroke();
+      ctx.fillStyle = def.color;
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = "#000000";
+      ctx.font = "bold 11px Courier New";
+      ctx.textAlign = "center";
+      ctx.fillText(`${def.name.toUpperCase()} → RETASK`, cursor.x, cursor.y - radius - 14);
+      ctx.restore();
+      return;
+    }
+
+    const pending = this.game.squads.pendingCommand;
+    if (!pending) return;
     const def = this.game.squads.statuses().find((s) => s.type === pending)?.def;
     if (!def) return;
-    const t = this.game.time.elapsed;
 
     ctx.save();
     // Origin → cursor line from the nearest core/relay so the player sees the
@@ -3812,6 +3924,37 @@ export class RenderSystem {
       }
     }
 
+    // Squad markers — drawn on top of structures but under the viewport rect
+    // so the camera box stays readable. Each squad type has a distinct shape;
+    // the selected squad gets a brighter outer ring and a path line to its
+    // current target/destination.
+    if (this.game.squads && this.game.squads.list.length > 0) {
+      const selected = this.game.squads.selected;
+      for (const s of this.game.squads.list) {
+        if (!s.active) continue;
+        const sx = mx + (s.pos.x / TILE_SIZE) * tileW;
+        const sy = my + (s.pos.y / TILE_SIZE) * tileH;
+        const sel = s === selected;
+        // Path line from squad → target/destination for selected or evac.
+        if (sel || s.evacuating) {
+          const tx = mx + (s.target.x / TILE_SIZE) * tileW;
+          const ty = my + (s.target.y / TILE_SIZE) * tileH;
+          ctx.save();
+          ctx.globalAlpha = 0.7;
+          ctx.strokeStyle = s.evacuating ? "#ffd180" : s.def.color;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 3]);
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(tx, ty);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+        drawMinimapSquadMarker(ctx, sx, sy, s.type, s.def.color, sel, s.evacuating);
+      }
+    }
+
     // Camera viewport rectangle.
     const vb = cam.getVisibleBounds();
     const vx = mx + (vb.x / (COLS * TILE_SIZE)) * mapW;
@@ -4225,4 +4368,78 @@ function displayType(t: StrategicPointType): string {
     case "rift_anchor": return "RIFT ANCHOR";
     case "jammer": return "JAMMER";
   }
+}
+
+/**
+ * Distinct minimap markers for each squad type. We use small shapes (≤ 4 px)
+ * so the minimap stays readable even with several squads. Selected squads
+ * get an outer halo; evacuating squads pulse with a warm tint.
+ */
+function drawMinimapSquadMarker(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  type: "recon" | "engineer" | "strike" | "shield",
+  color: string,
+  selected: boolean,
+  evacuating: boolean
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  if (selected) {
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = evacuating ? "#ffd180" : color;
+  ctx.strokeStyle = "rgba(8, 12, 18, 0.85)";
+  ctx.lineWidth = 0.8;
+  switch (type) {
+    case "recon": {
+      // Triangle pointing up.
+      ctx.beginPath();
+      ctx.moveTo(0, -3);
+      ctx.lineTo(2.6, 2.2);
+      ctx.lineTo(-2.6, 2.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case "engineer": {
+      // Plus / cross.
+      ctx.fillRect(-2.6, -0.8, 5.2, 1.6);
+      ctx.fillRect(-0.8, -2.6, 1.6, 5.2);
+      ctx.strokeRect(-2.6, -0.8, 5.2, 1.6);
+      ctx.strokeRect(-0.8, -2.6, 1.6, 5.2);
+      break;
+    }
+    case "strike": {
+      // Chevron pointing right.
+      ctx.beginPath();
+      ctx.moveTo(-2.6, -2.6);
+      ctx.lineTo(2.4, 0);
+      ctx.lineTo(-2.6, 2.6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case "shield": {
+      // Ring with center dot.
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, 0, 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
 }

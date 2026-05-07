@@ -346,8 +346,16 @@ function expanseWaves(): WaveDefinition[] {
     }
     w.rewardCredits = Math.round(w.rewardCredits * 1.4);
   }
-  // Add 10 more waves of escalating pressure using all spawners.
+  // Add 10 more waves of escalating pressure using all spawners. Squad-aware
+  // counter hints rotate so the player is reminded of role tools at intervals
+  // without every wave feeling like a tutorial.
   const extraTypes: EnemyType[] = ["grunt", "brute", "phantom", "splitter", "shielder", "carrier", "jammer", "tunneler", "saboteur", "juggernaut"];
+  const squadHints = [
+    "Recon helps reveal the route.",
+    "Engineer accelerates capture under pressure.",
+    "Strike can suppress rift anchors.",
+    "Shield exposed relays during boss waves.",
+  ];
   for (let i = 0; i < 10; i++) {
     const mainType = extraTypes[i]!;
     const supportType = extraTypes[(i + 3) % extraTypes.length]!;
@@ -356,8 +364,10 @@ function expanseWaves(): WaveDefinition[] {
       id: `s6_extra_${i + 16}`,
       name: `Expanse ${i + 16}`,
       description: `Multi-lane ${mainType} pressure.`,
-      warning: "Enemies attack from multiple directions.",
-      recommendedCounters: [],
+      warning: i % 2 === 0
+        ? `Enemies attack from multiple directions. ${squadHints[i % squadHints.length]}`
+        : "Enemies attack from multiple directions.",
+      recommendedCounters: i % 3 === 0 ? [squadHints[Math.floor(i / 3) % squadHints.length]!] : [],
       rewardCredits: 180 + i * 20,
       rewardChoice: i % 2 === 0,
       lanes: [
@@ -521,8 +531,8 @@ function blackoutWaves(): WaveDefinition[] {
       id: "s7_w03_blackout_echo",
       name: "Wave 3: Blackout Echo",
       description: "Light pressure from two spawners simultaneously.",
-      warning: "Multi-lane scouts. The radar dish to the west would help here.",
-      recommendedCounters: ["Pulse", "Blaster", "Stasis on chokepoints"],
+      warning: "Multi-lane scouts. The radar dish to the west would help — Recon Squad reveals the route.",
+      recommendedCounters: ["Pulse", "Blaster", "Recon Squad to scout west"],
       rewardCredits: 70,
       rewardChoice: false,
       lanes: [
@@ -563,8 +573,8 @@ function blackoutWaves(): WaveDefinition[] {
       id: "s7_w06_jammer_echo",
       name: "Wave 6: Jammer Echo",
       description: "Hostile Jammer units suppress nearby towers.",
-      warning: "Jammer enemies dim your fire rate. Focus them down or retreat the line.",
-      recommendedCounters: ["Tesla", "Mortar splash", "Forward kill zone"],
+      warning: "Jammer enemies dim your fire rate. Strike Squad can suppress them on the move.",
+      recommendedCounters: ["Tesla", "Mortar splash", "Strike Squad on jammer enemies"],
       rewardCredits: 120,
       rewardChoice: true,
       lanes: [
@@ -607,8 +617,8 @@ function blackoutWaves(): WaveDefinition[] {
       id: "s7_w09_rift_bloom",
       name: "Wave 9: Rift Bloom",
       description: "Rift anchors pulse aggressively. Splitters multiply on death.",
-      warning: "Rift anchors empower nearby enemies — destroying one will lighten this pressure.",
-      recommendedCounters: ["Mortar splash", "Stasis", "Tesla chain"],
+      warning: "Rift anchors empower nearby enemies — Strike Squad can break one alongside tower fire.",
+      recommendedCounters: ["Mortar splash", "Stasis", "Strike Squad on rift anchors"],
       rewardCredits: 175,
       rewardChoice: false,
       lanes: [
@@ -712,8 +722,8 @@ function blackoutWaves(): WaveDefinition[] {
       id: "s7_w16_harbinger_approach",
       name: "Wave 16: Harbinger Approach",
       description: "An artillery boss anchors a coordinated assault.",
-      warning: "HARBINGER INCOMING. Spread your towers — artillery clusters are lethal.",
-      recommendedCounters: ["Spread placement", "Railgun + Reflector", "Snare"],
+      warning: "HARBINGER INCOMING. Spread your towers and Shield exposed relays — artillery clusters are lethal.",
+      recommendedCounters: ["Spread placement", "Shield Squad on relays", "Snare"],
       rewardCredits: 340,
       rewardChoice: true,
       isBossWave: true,
@@ -745,8 +755,8 @@ function blackoutWaves(): WaveDefinition[] {
       id: "s7_w18_array_awakens",
       name: "Wave 18: The Array Awakens",
       description: "The Blackout Array surges in unison. The Leviathan emerges.",
-      warning: "FINAL BLACKOUT ASSAULT. All four lanes push. Leviathan from the east.",
-      recommendedCounters: ["Boss damage", "Spread placement", "Sustained AoE"],
+      warning: "FINAL BLACKOUT ASSAULT. Shield the core, Strike the rifts, EVAC squads if you can't save them.",
+      recommendedCounters: ["Boss damage", "Shield Squad on home core", "Strike Squad on rifts"],
       rewardCredits: 450,
       rewardChoice: false,
       isBossWave: true,

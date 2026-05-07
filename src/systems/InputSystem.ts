@@ -1,7 +1,9 @@
 import type { Game } from "../core/Game";
-import { CellKind, type TowerType } from "../core/Types";
+import { CellKind, type SquadType, type TowerType } from "../core/Types";
 import { towerOrder } from "../data/towers";
+import { squadOrder } from "../data/squads";
 import { TILE_SIZE } from "../core/Config";
+import type { Squad } from "../entities/Squad";
 
 export class InputSystem {
   mouseX = 0;
@@ -197,10 +199,29 @@ export class InputSystem {
     if (!this.isBuildingState()) return;
     const cell = this.cellFromEvent(e);
 
+    // Squad retask: a selected squad with retask mode active consumes the
+    // next click as a new target. We resolve this BEFORE deploy so the player
+    // can't accidentally deploy a NEW squad while retasking.
+    if (this.game.squads && this.game.squads.retaskMode && this.game.squads.selected) {
+      this.game.squads.retaskSelectedTo(this.mouseX, this.mouseY);
+      return;
+    }
+
     // Squad command deployment: when armed, the next click drops the squad.
     if (this.game.squads && this.game.squads.pendingCommand) {
       this.game.squads.deployAt(this.mouseX, this.mouseY);
       return;
+    }
+
+    // World-space squad selection: clicking near an active squad selects it.
+    // We do this before tower selection so the squad can be picked even if
+    // it's hovering over a tower-built tile.
+    if (this.game.squads) {
+      const squad = this.findSquadAtWorld(this.mouseX, this.mouseY, 22);
+      if (squad) {
+        this.game.squads.selectSquad(squad);
+        return;
+      }
     }
 
     // Salvage collection: click within 22px of a pickup to collect it.
@@ -253,11 +274,25 @@ export class InputSystem {
   }
 
   private handleSecondaryAction(e: MouseEvent): void {
-    // Right-click cancels an armed squad command before any other handling
-    // so the player always has a quick out from targeting mode.
+    // Right-click cancels an armed squad command, then a retask, then any
+    // selection — in that order — so the player always has a quick out.
     if (this.game.squads && this.game.squads.pendingCommand) {
       this.game.squads.cancelCommand();
       return;
+    }
+    if (this.game.squads && this.game.squads.retaskMode) {
+      this.game.squads.cancelCommand();
+      return;
+    }
+    // Right-click on world while a squad is selected — treat it as "retask
+    // here" if no tower is at the cell so it feels like RTS-light commanding.
+    if (this.game.squads && this.game.squads.selected && this.game.squads.selected.active && !this.game.squads.selected.evacuating) {
+      const cell = this.cellFromEvent(e);
+      const tower = this.game.towers.findTowerAt(cell.c, cell.r);
+      if (!tower) {
+        this.game.squads.retaskSelectedTo(this.mouseX, this.mouseY);
+        return;
+      }
     }
     if (this.isBuildingState()) {
       const cell = this.cellFromEvent(e);
@@ -397,12 +432,56 @@ export class InputSystem {
       e.preventDefault();
     }
 
+    // Squad hotkeys — F1-F4 arm a squad command, Q evacs the selected squad.
+    // We use F1-F4 instead of digits because Digit1-Digit4 are already bound
+    // to tower build slots. F-keys avoid every other game shortcut and read
+    // as "command" rather than "build".
+    if (this.game.squads && this.isBuildingState()) {
+      let armed: SquadType | null = null;
+      switch (code) {
+        case "F1": armed = "recon"; break;
+        case "F2": armed = "engineer"; break;
+        case "F3": armed = "strike"; break;
+        case "F4": armed = "shield"; break;
+      }
+      if (armed) {
+        this.game.squads.armCommand(armed);
+        e.preventDefault();
+        return;
+      }
+      if (code === "KeyQ") {
+        if (e.shiftKey) {
+          if (this.game.squads.evacAll() === 0) {
+            this.game.audio.sfxShoot(0.5, 0.07);
+          }
+        } else if (this.game.squads.selected && this.game.squads.selected.active) {
+          this.game.squads.evacSquad(this.game.squads.selected);
+        } else {
+          // No selection — try the most-recent active squad.
+          const last = [...this.game.squads.list].reverse().find((s) => s.active);
+          if (last) this.game.squads.evacSquad(last);
+        }
+        e.preventDefault();
+        return;
+      }
+      if (code === "KeyE" && this.game.squads.selected) {
+        this.game.squads.beginRetask();
+        e.preventDefault();
+        return;
+      }
+    }
+    void squadOrder; // referenced for future use; currently iterated via switch.
+
     switch (code) {
       case "Escape":
         this.clearSelection();
         this.game.core.coreDeployMode = false;
         this.game.core.killZoneMode = false;
-        if (this.game.squads) this.game.squads.cancelCommand();
+        if (this.game.squads) {
+          this.game.squads.cancelCommand();
+          // Escape also clears squad selection so the player can fully bail.
+          if (this.game.squads.selected) this.game.squads.selectSquad(null);
+        }
         this.game.bus.emit("ui:esc");
         break;
       case bindings.wavePreview:
@@ -527,5 +606,23 @@ export class InputSystem {
   get hoverWorld(): { x: number; y: number } | null {
     if (!this.overCell) return null;
     return { x: this.overCell.c * TILE_SIZE + TILE_SIZE / 2, y: this.overCell.r * TILE_SIZE + TILE_SIZE / 2 };
+  }
+
+  /** Find an active squad whose center is within `maxPx` of (x,y). */
+  findSquadAtWorld(x: number, y: number, maxPx = 22): Squad | null {
+    if (!this.game.squads) return null;
+    let best: Squad | null = null;
+    let bestSq = maxPx * maxPx;
+    for (const s of this.game.squads.list) {
+      if (!s.active) continue;
+      const dx = x - s.pos.x;
+      const dy = y - s.pos.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestSq) {
+        bestSq = d2;
+        best = s;
+      }
+    }
+    return best;
   }
 }

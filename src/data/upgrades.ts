@@ -442,4 +442,82 @@ export const upgradeDefinitions: UpgradeDefinition[] = [
       enemyHpMul: 1.5,
     },
   },
+
+  // ──────────────────────────────────────────────────────────
+  // SQUAD COMMAND PROTOCOLS (Part 16)
+  // Light-touch progression for the mobile squad system. Each upgrade
+  // sharpens one squad role without making any squad mandatory.
+  // ──────────────────────────────────────────────────────────
+  {
+    id: "command_bandwidth",
+    name: "Command Bandwidth",
+    description: "Field one extra mobile squad simultaneously (+1 squad slot).",
+    target: "global",
+    rarity: "rare",
+    synergyHint: "Pairs with multi-front sectors and Recon scouting.",
+    effect: { squadCapAdd: 1 },
+  },
+  {
+    id: "rapid_recall",
+    name: "Rapid Recall",
+    description: "All squad cooldowns reduced by 25%.",
+    target: "global",
+    rarity: "uncommon",
+    synergyHint: "Pairs with Strike-heavy suppression plans.",
+    effect: { squadCooldownMul: 0.75 },
+  },
+  {
+    id: "recon_lens",
+    name: "Recon Lens",
+    description: "Recon reveal radius +30% — scan more ground per scout.",
+    target: "global",
+    rarity: "uncommon",
+    synergyHint: "Pairs with darkness sectors and the Radar Dish.",
+    effect: { squadReconRevealMul: 1.3 },
+  },
+  {
+    id: "field_engineers",
+    name: "Field Engineers",
+    description: "Engineer Squads add +0.6× capture multiplier (stacks on base).",
+    target: "global",
+    rarity: "rare",
+    synergyHint: "Pairs with Sector 6/7 strategic-point objectives.",
+    effect: { squadEngineerCaptureBonus: 0.6 },
+  },
+  {
+    id: "strike_capacitors",
+    name: "Strike Capacitors",
+    description: "Strike Squad damage +30% to enemies and structures.",
+    target: "global",
+    rarity: "rare",
+    synergyHint: "Pairs with rift anchor / jammer suppression objectives.",
+    effect: { squadStrikeDamageMul: 1.3 },
+  },
+  {
+    id: "shield_harmonics",
+    name: "Shield Harmonics",
+    description: "Shield Squad damage reduction +25% (capped at 65%).",
+    target: "global",
+    rarity: "rare",
+    synergyHint: "Pairs with boss waves and exposed relay defense.",
+    effect: { squadShieldStrengthMul: 1.25 },
+  },
+  {
+    id: "emergency_uplink",
+    name: "Emergency Uplink",
+    description: "Squad deployment costs reduced by 20%.",
+    target: "economy",
+    rarity: "uncommon",
+    synergyHint: "Helps you afford Strike + Shield in the same wave.",
+    effect: { squadCostMul: 0.8 },
+  },
+  {
+    id: "interference_dampers",
+    name: "Interference Dampers",
+    description: "Squads ignore 40% of jammer/rift suppression and aura damage.",
+    target: "global",
+    rarity: "rare",
+    synergyHint: "Required gear if you push deep into Sector 7.",
+    effect: { squadJammerResistance: 0.4 },
+  },
 ];

@@ -40,7 +40,13 @@ export type ObjectiveKind =
   /** Strategic map points: capture at least N points of a given type. */
   | "capture_n_strategic"
   /** Strategic map points: destroy at least N hostile structures of a given type. */
-  | "destroy_n_strategic";
+  | "destroy_n_strategic"
+  /** Deploy at least one squad of the named type during the run. */
+  | "deploy_any_squad"
+  /** Deploy at least N squads of the named type during the run. */
+  | "deploy_n_squad"
+  /** Strike-squad damage destroyed at least N hostile structures of a given type. */
+  | "squad_destroy_n_strategic";
 
 export interface ObjectiveDefinition {
   id: string;
@@ -58,6 +64,8 @@ export interface ObjectiveDefinition {
   towerType?: TowerType;
   /** Strategic point type referenced by capture_/destroy_ objectives. */
   strategicType?: StrategicPointType;
+  /** Squad type referenced by deploy_* / squad_* objectives. */
+  squadType?: "recon" | "engineer" | "strike" | "shield";
   /** Research point reward for completing this secondary objective. */
   rewardResearch?: number;
   /** Optional credit reward at run end. */
@@ -308,11 +316,12 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
 
   sector_06_fractured_expanse: {
     briefing:
-      "Lost relays, hostile rifts, and dead-air zones stretch past the dish. Push your signal network outward — capture what helps you, suppress what's killing you, and survive the multi-front swarm.",
+      "Lost relays, hostile rifts, and dead-air zones stretch past the dish. Push your signal network outward — deploy Recon to scout dark corridors, Engineer to accelerate captures, and survive the multi-front swarm.",
     counterplay: [
       "Roll relays toward signal nodes",
       "Capture the radar dish for wave intel",
       "Bring towers within range of rift anchors",
+      "Deploy Recon squads to scout the eastern frontier",
     ],
     hazards: "Hostile rift anchors and a jammer dim the map until destroyed.",
     primary: {
@@ -387,17 +396,27 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
         value: 0.5,
         rewardResearch: 2,
       },
+      {
+        id: "s6_recon_used",
+        label: "Deploy a Recon squad.",
+        detail: "Scout the dark expansion routes once.",
+        kind: "deploy_any_squad",
+        squadType: "recon",
+        rewardResearch: 1,
+      },
     ],
   },
 
   sector_07_blackout_array: {
     briefing:
-      "Blackout Array — A hostile suppression operation inside a jammed frontier. Expand carefully, restore visibility with the radar, then dismantle enemy infrastructure before the final blackout assault.",
+      "Blackout Array — A hostile suppression operation inside a jammed frontier. Deploy Recon to lift the blackout, Engineer to capture under fire, Strike to suppress hostile infrastructure, and Shield to weather the final pulses.",
     counterplay: [
       "Restore visibility with the western radar",
       "Activate the forward auto-gun for a midline foothold",
       "Destroy rift anchors to cut pulse pressure",
       "Silence jammers before fire rate cripples you",
+      "Deploy Recon to scout the east — Strike to break rifts",
+      "Shield exposed relays during boss waves",
     ],
     hazards: "Three rift anchors, two jammers, signal interference, darkness. 18 waves.",
     primary: {
@@ -461,6 +480,24 @@ export const sectorObjectives: Record<string, SectorObjectives> = {
         detail: "The Array hits hard — keep the home core breathing.",
         kind: "core_above_pct",
         value: 0.4,
+        rewardResearch: 2,
+      },
+      {
+        id: "s7_strike_structure_kill",
+        label: "Strike Squad finishes a hostile structure.",
+        detail: "Destroy at least one rift anchor or jammer with Strike Squad damage.",
+        kind: "squad_destroy_n_strategic",
+        squadType: "strike",
+        value: 1,
+        rewardResearch: 2,
+        rewardCredits: 60,
+      },
+      {
+        id: "s7_squad_diversity",
+        label: "Deploy Recon, Engineer, and Strike at least once each.",
+        detail: "Use the full command roster across the assault.",
+        kind: "deploy_n_squad",
+        value: 3,
         rewardResearch: 2,
       },
     ],
