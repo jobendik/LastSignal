@@ -75,6 +75,8 @@ export const defaultProfile: PersistedProfile = {
   guidanceSeen: [],
   tutorialHintsEnabled: true,
   contextualHintsEnabled: true,
+  trainingCompleted: false,
+  trainingStagesCompleted: 0,
 };
 
 export class PersistenceSystem {
@@ -121,6 +123,8 @@ export class PersistenceSystem {
         guidanceSeen: parsed.guidanceSeen ?? [],
         tutorialHintsEnabled: parsed.tutorialHintsEnabled ?? true,
         contextualHintsEnabled: parsed.contextualHintsEnabled ?? true,
+        trainingCompleted: parsed.trainingCompleted ?? false,
+        trainingStagesCompleted: parsed.trainingStagesCompleted ?? 0,
       };
     } catch {
       return this.emptyProfile();
@@ -175,6 +179,8 @@ export class PersistenceSystem {
       guidanceSeen: [],
       tutorialHintsEnabled: true,
       contextualHintsEnabled: true,
+      trainingCompleted: false,
+      trainingStagesCompleted: 0,
     };
   }
 }

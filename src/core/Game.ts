@@ -273,9 +273,11 @@ export class Game {
     this.core.speed = 1;
     this.time.timeScale = 1;
 
-    // Roll run modifiers (skip on very first sector to ease new players in).
+    // Roll run modifiers (skip on very first sector to ease new players in,
+    // and always skip on the optional Operator Training run so the
+    // simulation stays predictable).
     const sectorIdx = sectorDefinitions.findIndex((s) => s.id === sector.id);
-    const mods = rollModifiers(sectorIdx);
+    const mods = sector.isTraining ? [] : rollModifiers(sectorIdx);
     this.core.activeModifiers = mods;
     // Apply core integrity modifier, then sync coreIntegrity to final coreMax.
     for (const m of mods) {
@@ -737,10 +739,22 @@ export class Game {
     const p = this.core.profile;
     if (!this.core.sector) return;
     const result = this.state === "VICTORY" ? "victory" : "defeat";
+    const isTraining = this.core.sector.isTraining === true;
     const sectorIndex =
       sectorDefinitions.findIndex((s) => s.id === this.core.sector!.id) + 1;
     if (this.state === "VICTORY") {
-      p.bestSectorCleared = Math.max(p.bestSectorCleared, sectorIndex);
+      // Training never updates campaign progression — it's optional and
+      // sits outside the Sector 1 → 7 unlock chain.
+      if (!isTraining) {
+        p.bestSectorCleared = Math.max(p.bestSectorCleared, sectorIndex);
+      } else {
+        // Mark training as completed + count secondary stages cleared so the
+        // completion screen and Sector Select can show "Training Complete".
+        p.trainingCompleted = true;
+        const secondaries = this.objectives.evaluateSecondaries(true);
+        const cleared = secondaries.filter((r) => r.completed).length;
+        p.trainingStagesCompleted = Math.max(p.trainingStagesCompleted, cleared);
+      }
     }
     p.bestWaveReached = Math.max(p.bestWaveReached, this.core.waveIndex);
     const corePct = Math.floor(
@@ -755,6 +769,11 @@ export class Game {
     const dailyScore = this.core.waveIndex * 1000 + this.core.stats.enemiesKilled + corePct * 10;
     if (p.dailyBestDate === today) p.dailyBestScore = Math.max(p.dailyBestScore, dailyScore);
     this.persistence.saveProfile(p);
+  }
+
+  /** Convenience getter — true while the active sector is the training run. */
+  get isTraining(): boolean {
+    return this.core.sector?.isTraining === true;
   }
 
   // ----- Update -----

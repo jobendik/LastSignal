@@ -7,6 +7,7 @@ import type {
 import { defaultWaves, sector2Waves, sector3Waves, sector4Waves, summarize } from "./waves";
 import { COLS, ROWS } from "../core/Config";
 import { mulberry32 } from "../core/Random";
+import { trainingSectorDefinition } from "./training";
 
 /**
  * Base layouts are authored in a compact format, then auto-expanded to the runtime map size.
@@ -911,6 +912,10 @@ const baseSectorDefinitions: SectorDefinition[] = [
     hazards: { meteors: true, gravity: false, signalInterference: true, powerSurges: false },
     strategicPoints: blackoutStrategicPoints,
   },
+  // Operator Training is appended at the end so it does NOT disturb the
+  // sector index used for modifier rolls or campaign progression. Sector
+  // Select renders it first via the trainingSectorDefinition.isTraining flag.
+  trainingSectorDefinition,
 ];
 
 export const sectorDefinitions: SectorDefinition[] = baseSectorDefinitions.map((s) => {
