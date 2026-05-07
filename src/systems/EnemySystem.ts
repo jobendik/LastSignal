@@ -225,8 +225,11 @@ export class EnemySystem {
         this.updateSaboteur(e);
       }
 
-      // Check breach (near the core).
-      const distToCore = e.pos.dist(this.game.grid.corePos);
+      // Check breach (near the nearest core/relay center). Enemies route to
+      // whichever core/relay is closest via the BFS flow-field, so testing
+      // distance to nearest cluster is the right semantic.
+      const nearestCore = this.game.grid.getNearestCoreCenter(e.pos.x, e.pos.y);
+      const distToCore = e.pos.dist(nearestCore);
       if (distToCore < 20) {
         if (e.type === "cache") {
           // Data Cache just escapes — no core damage, no reward.
@@ -236,9 +239,9 @@ export class EnemySystem {
           this.game.damageCore(e.breach, e.type, e.pos.x, e.pos.y);
           e.breached = true;
           e.active = false;
-          // Breach impact FX: enemy color burst converging into core + warning flash.
-          const cx = this.game.grid.corePos.x;
-          const cy = this.game.grid.corePos.y;
+          // Breach impact FX: localize at the breached cluster center.
+          const cx = nearestCore.x;
+          const cy = nearestCore.y;
           this.game.particles.spawnBurst(cx, cy, e.color, 10, { speed: 90, life: 0.45, size: 2.2 });
           this.game.particles.spawnRing(cx, cy, 44, e.color, 0.45);
           if (e.breach >= 2) {

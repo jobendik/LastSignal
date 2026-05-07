@@ -39,6 +39,28 @@ export const SELL_REFUND_DEFAULT = 0.5;
 
 export const REWARD_WAVES = new Set<number>([2, 4, 6, 8, 10, 12, 14]); // wave indices (1-based) that grant reward choice
 
+// ──────────────────────────────────────────────────────────
+// Signal / Relay network
+// Buildable territory radiates from the primary core and from each relay
+// core. Tower & harvester placement is gated by these radii so the large
+// map becomes meaningful expansion territory rather than free real estate.
+// ──────────────────────────────────────────────────────────
+/**
+ * Radius (in cells) within which the player can build around the primary core.
+ * Sized so legacy 32×22 sectors stay playable end-to-end without relays, while
+ * the 64×44 Fractured Expanse only has its inner ring of crystals reachable
+ * from the start.
+ */
+export const MAIN_CORE_SIGNAL_RADIUS_CELLS = 11;
+/** Radius (in cells) within which the player can build around each deployed relay core. */
+export const RELAY_CORE_SIGNAL_RADIUS_CELLS = 8;
+/** Max distance (in cells) a relay core may be deployed from the existing signal network. */
+export const RELAY_DEPLOY_RADIUS_CELLS = 11;
+/** Minimum spacing (in cells) between two core cluster centers. */
+export const MIN_RELAY_SPACING_CELLS = 6;
+/** Minimum distance (in cells) a relay must be from any spawner. */
+export const MIN_RELAY_TO_SPAWNER_CELLS = 3;
+
 export const COLOR = {
   accent: "#66fcf1",
   accentDim: "#45a29e",

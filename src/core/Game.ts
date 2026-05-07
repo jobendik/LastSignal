@@ -9,7 +9,15 @@ import {
   type GravityAnomaly,
   type SignalInterference,
 } from "./GameState";
-import { MAX_DT, SPEED_MULTIPLIERS, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "./Config";
+import {
+  MAX_DT,
+  RELAY_CORE_SIGNAL_RADIUS_CELLS,
+  RELAY_DEPLOY_RADIUS_CELLS,
+  SPEED_MULTIPLIERS,
+  TILE_SIZE,
+  VIEW_HEIGHT,
+  VIEW_WIDTH,
+} from "./Config";
 import { Camera } from "./Camera";
 import type {
   EnemyType,
@@ -268,6 +276,7 @@ export class Game {
     this.core.coreIntegrity = this.core.coreMax;
 
     this.grid.loadSector(sector);
+    this.applyCommandTierToGrid();
     this.camera.init(this.grid.worldW, this.grid.worldH, this.grid.corePos.x, this.grid.corePos.y);
     this.camera.snap();
     this.render.invalidateTerrainCache();
@@ -400,10 +409,15 @@ export class Game {
   }
 
   damageCore(amount: number, byType?: EnemyType, fromX?: number, fromY?: number): void {
+    // Resolve which cluster was struck so feedback localizes there. Falls back
+    // to the primary core when no impact position is supplied (UI / scripted hits).
+    const impact = fromX != null && fromY != null
+      ? this.grid.getNearestCoreCenter(fromX, fromY)
+      : this.grid.getPrimaryCoreCenter();
     if (amount > 0 && this.hasCoreDeflector()) {
       amount = Math.max(0, amount - 1);
-      this.particles.spawnRing(this.grid.corePos.x, this.grid.corePos.y, 78, "#80d8ff");
-      this.particles.spawnFloatingText(this.grid.corePos.x, this.grid.corePos.y - 38, "DEFLECT", "#80d8ff", 0.7, 11);
+      this.particles.spawnRing(impact.x, impact.y, 78, "#80d8ff");
+      this.particles.spawnFloatingText(impact.x, impact.y - 38, "DEFLECT", "#80d8ff", 0.7, 11);
       if (amount <= 0) {
         this.bus.emit("core:shielded", { amount: 1 });
         return;
@@ -421,12 +435,12 @@ export class Game {
     // Core hits use slow-decay rumble profile.
     this.core.shakeDecay = Math.min(this.core.shakeDecay, 6);
     if (fromX != null && fromY != null) {
-      const cx = this.grid.corePos.x;
-      const cy = this.grid.corePos.y;
+      const cx = impact.x;
+      const cy = impact.y;
       const len = Math.hypot(fromX - cx, fromY - cy) || 1;
       this.core.shakeDir = { x: (fromX - cx) / len, y: (fromY - cy) / len };
     }
-    this.audio.sfxCoreHit(this.grid.corePos);
+    this.audio.sfxCoreHit(impact);
     this.bus.emit("core:damaged", { amount, by: byType });
     if (this.core.coreIntegrity <= 0) {
       this.core.coreIntegrity = 0;
@@ -436,10 +450,15 @@ export class Game {
 
   hasCoreDeflector(): boolean {
     if (!this.towers) return false;
-    const core = this.grid.corePos;
+    // Deflector grids count if they cover ANY core/relay cluster — once a
+    // relay's territory is yours, its deflector should defend your home too.
+    const centers = this.grid.getCoreCenters();
     for (const t of this.towers.list) {
       if (t.type !== "barrier" || !t.flags.deflectorGrid) continue;
-      if (t.pos.dist(core) <= this.towers.effectiveStats(t).range) return true;
+      const range = this.towers.effectiveStats(t).range;
+      for (const c of centers) {
+        if (t.pos.dist(c) <= range) return true;
+      }
     }
     return false;
   }
@@ -468,22 +487,45 @@ export class Game {
     return true;
   }
 
+  /**
+   * How many relay cores the player may build this run.
+   * Tier 1 → up to 2, Tier 2 → up to 3, Tier 3 → up to 4.
+   * Early waves still gate on at least 2 cleared waves so the first one
+   * always feels earned.
+   */
   maxRelayCoresForRun(): number {
-    // Unlock one extra relay every 4 cleared waves, up to 3.
-    return Math.min(3, 1 + Math.floor(this.core.waveIndex / 4));
+    const earned = 1 + Math.floor(this.core.waveIndex / 3); // wave gating
+    const tierCap = 1 + this.core.commandTier; // T1=2, T2=3, T3=4
+    return Math.max(0, Math.min(tierCap, earned));
+  }
+
+  /** Cost to deploy the next relay core. Slight discount at higher tiers. */
+  relayCoreCost(): number {
+    if (this.core.commandTier >= 3) return 150;
+    if (this.core.commandTier >= 2) return 165;
+    return 180;
   }
 
   canDeployRelayCore(): boolean {
     if (this.state !== "PLANNING" && this.state !== "WAVE_COMPLETE") return false;
     if (this.core.waveIndex < 2) return false;
     if (this.core.coreNodesBuilt >= this.maxRelayCoresForRun()) return false;
-    return this.core.credits >= 180;
+    return this.core.credits >= this.relayCoreCost();
   }
 
   deployRelayCore(c: number, r: number): boolean {
     if (!this.canDeployRelayCore()) return false;
-    if (!this.grid.canPlaceCoreCluster(c, r)) return false;
-    if (!this.spendCredits(180)) return false;
+    const placement = this.grid.canPlaceCoreCluster(c, r);
+    if (!placement.ok) {
+      // Surface the reason at the player's cursor so they can react.
+      const px = (c + 1) * TILE_SIZE;
+      const py = (r + 1) * TILE_SIZE;
+      this.particles.spawnFloatingText(px, py - 16, placement.reason ?? "Invalid", "#ff5252", 1.0, 11);
+      this.audio.sfxShoot(0.45, 0.06);
+      return false;
+    }
+    const cost = this.relayCoreCost();
+    if (!this.spendCredits(cost)) return false;
     this.grid.placeCoreCluster(c, r);
     this.core.coreNodesBuilt++;
     this.core.coreMax += 40;
@@ -491,6 +533,7 @@ export class Game {
     const x = (c + 1) * TILE_SIZE;
     const y = (r + 1) * TILE_SIZE;
     this.particles.spawnRing(x, y, 46, "#66fcf1");
+    this.particles.spawnRing(x, y, this.grid.relaySignalRadiusCells * TILE_SIZE, "#66fcf1", 0.4);
     this.particles.spawnBurst(x, y, "#66fcf1", 18, { speed: 160, life: 0.55, size: 2.5 });
     this.particles.spawnFloatingText(x, y - 24, "RELAY CORE ONLINE", "#66fcf1", 1.2, 11);
     this.audio.sfxReward();
@@ -517,11 +560,38 @@ export class Game {
     if (!this.spendCredits(cost)) return false;
     this.core.commandTier = Math.min(3, this.core.commandTier + 1) as 1 | 2 | 3;
     this.core.militiaPulseTimer = 6;
+    this.applyCommandTierToGrid();
     this.particles.spawnFloatingText(this.grid.corePos.x, this.grid.corePos.y - 42, `COMMAND TIER ${this.core.commandTier}`, "#ffeb3b", 1.4, 12);
     this.particles.spawnRing(this.grid.corePos.x, this.grid.corePos.y, 72, "#ffeb3b");
+    // Pulse all existing core/relay rings to advertise the territory expansion.
+    for (const c of this.grid.coreClusters) {
+      this.particles.spawnRing(c.center.x, c.center.y, c.signalRadiusCells * TILE_SIZE, "#ffeb3b", 0.45);
+    }
     this.audio.sfxReward();
     this.bus.emit("command:tierUp", { tier: this.core.commandTier });
     return true;
+  }
+
+  /**
+   * Apply Command-Tier driven scaling to relay/coverage radii. Tier 1 leaves
+   * everything at its base; Tier 2 grows relay coverage modestly; Tier 3 grows
+   * both coverage and the deploy reach so expansion accelerates.
+   */
+  applyCommandTierToGrid(): void {
+    const t = this.core.commandTier;
+    // Base values are pulled from Config so a single source of truth governs
+    // both the initial sector load and the tier-up scaling.
+    const base = RELAY_CORE_SIGNAL_RADIUS_CELLS;
+    const baseDeploy = RELAY_DEPLOY_RADIUS_CELLS;
+    const relayBonus = t === 3 ? 2 : t === 2 ? 1 : 0;
+    const deployBonus = t === 3 ? 2 : t === 2 ? 1 : 0;
+    this.grid.relaySignalRadiusCells = base + relayBonus;
+    this.grid.relayDeployRadiusCells = baseDeploy + deployBonus;
+    // Apply the new radius to existing relay clusters so they actually grow.
+    for (const cluster of this.grid.coreClusters) {
+      if (cluster.isPrimary) continue;
+      cluster.signalRadiusCells = this.grid.relaySignalRadiusCells;
+    }
   }
 
   activateCoreAbility(): boolean {

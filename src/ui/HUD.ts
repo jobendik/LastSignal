@@ -129,9 +129,17 @@ export class HUD {
     this.pauseBtn.onclick = () => this.game.togglePause();
     this.repairBtn.onclick = () => this.game.repairCore();
     this.commandTierBtn.onclick = () => this.game.upgradeCommandTier();
+    this.relayCoreBtn.title = "Relay cores extend signal range and unlock new build zones.";
+    this.commandTierBtn.title = "Command Tier increases drone cap, militia pulse, and relay reach.";
     this.relayCoreBtn.onclick = () => {
       if (!this.game.canDeployRelayCore()) return;
       this.game.core.coreDeployMode = !this.game.core.coreDeployMode;
+      // Toggling into deploy mode should cancel any in-progress tower build,
+      // so the click on the map deploys a relay instead of trying to place a tower.
+      if (this.game.core.coreDeployMode) {
+        this.game.input.selectedTowerType = null;
+        this.game.input.showPlacementPreview = false;
+      }
     };
     this.empBtn.onclick = () => this.game.activateCoreAbility();
     this.settingsBtn.onclick = () => this.game.ui.openSettings();
@@ -438,7 +446,10 @@ export class HUD {
         : `COMMAND T${this.game.core.commandTier} → T${this.game.core.commandTier + 1} (${nextTierCost})`;
     this.commandTierBtn.style.display = this.repairBtn.style.display;
     this.commandTierBtn.classList.toggle("disabled", !canTierUp);
-    this.relayCoreBtn.textContent = `RELAY ${relayBuilds} (R)`;
+    const relayCost = this.game.relayCoreCost();
+    this.relayCoreBtn.textContent = this.game.core.coreDeployMode
+      ? `PLACE RELAY (ESC)`
+      : `RELAY ${relayBuilds} • ${relayCost}CR (R)`;
     this.relayCoreBtn.style.display = this.repairBtn.style.display;
     this.relayCoreBtn.classList.toggle("disabled", !canRelay);
     this.relayCoreBtn.classList.toggle("active", this.game.core.coreDeployMode);
@@ -473,6 +484,35 @@ export class HUD {
       this.directiveRow(perfectWaveOk, perfectWaveOk ? "Perfect wave possible (no core breaches)." : "Core breached this wave."),
       this.directiveRow(reserveOk, reserveOk ? "Emergency reserve secured (30+ credits)." : "Hold 30 credits for repair/EMP safety.")
     );
+    this.commandPanel.append(this.relayDirectiveRow());
+  }
+
+  /**
+   * One-line tutorial-style hint about the relay system. Adapts to current
+   * game state: locked, ready, or active. Renders below the directives so it's
+   * always visible without dominating the panel.
+   */
+  private relayDirectiveRow(): HTMLElement {
+    const game = this.game;
+    const built = game.core.coreNodesBuilt;
+    const max = game.maxRelayCoresForRun();
+    const cost = game.relayCoreCost();
+    let text: string;
+    let ok = false;
+    if (game.core.coreDeployMode) {
+      text = "Place a relay on signal-network edge to expand build zone.";
+    } else if (built >= max) {
+      text = `Relay cap ${built}/${max} — raise Command Tier for more.`;
+      ok = true;
+    } else if (game.canDeployRelayCore()) {
+      text = `Relay ready — extend signal range for ${cost}CR (R).`;
+      ok = true;
+    } else if (game.core.waveIndex < 2) {
+      text = "Relay cores extend signal range and unlock new build zones.";
+    } else {
+      text = `Save ${cost}CR for next relay deployment.`;
+    }
+    return el("div", { class: `ls-command-row ${ok ? "ok" : "warn"}`, text: `◇ ${text}` });
   }
 
   private directiveRow(ok: boolean, text: string): HTMLElement {
