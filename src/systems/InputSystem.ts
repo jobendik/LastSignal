@@ -51,6 +51,11 @@ export class InputSystem {
   private static readonly TAP_DRAG_THRESHOLD = 12;
   /** Max duration (ms) for a touch to still count as a tap. */
   private static readonly TAP_MAX_DURATION = 500;
+  /** Sentinel value assigned to `touchDragDist` to suppress the next tap on
+   *  release (e.g. when transitioning from a multi-touch gesture or after a
+   *  long-press has already been handled). Any value larger than
+   *  TAP_DRAG_THRESHOLD works; we use a clearly-out-of-band number. */
+  private static readonly TAP_SUPPRESSED = Number.MAX_SAFE_INTEGER;
 
   constructor(private readonly game: Game) {}
 
@@ -142,7 +147,7 @@ export class InputSystem {
       this.pinchLastMidX = (t0.clientX + t1.clientX) / 2;
       this.pinchLastMidY = (t0.clientY + t1.clientY) / 2;
       // Wipe single-touch state so a tap doesn't fire when the second finger lifts.
-      this.touchDragDist = 9999;
+      this.touchDragDist = InputSystem.TAP_SUPPRESSED;
       return;
     }
 
@@ -276,7 +281,7 @@ export class InputSystem {
       this.touchLastY = t.clientY;
       this.touchStartX = t.clientX;
       this.touchStartY = t.clientY;
-      this.touchDragDist = 9999;       // suppress tap-on-release
+      this.touchDragDist = InputSystem.TAP_SUPPRESSED; // suppress tap-on-release
       this.touchPanning = true;        // the lingering finger acts as pan only
       this.touchPinching = e.touches.length >= 2;
       return;
