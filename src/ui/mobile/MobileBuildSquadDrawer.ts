@@ -2,8 +2,9 @@ import type { Game } from "../../core/Game";
 import { el, clear } from "./dom";
 import type { MobileShell } from "./MobileShell";
 import { towerDefinitions, towerOrder } from "../../data/towers";
+import { droneDefinitions, droneOrder } from "../../data/drones";
 import { squadDefinitions } from "../../data/squads";
-import type { TowerType, SquadType } from "../../core/Types";
+import type { DroneType, TowerType, SquadType } from "../../core/Types";
 
 /**
  * Tower category buckets for the build drawer's category tabs. Categories
@@ -17,8 +18,8 @@ const CATEGORIES = {
   ECONOMY: ["harvester"] as TowerType[],
   ELITE: ["mortar"] as TowerType[],
 } as const;
-type Category = keyof typeof CATEGORIES;
-const CATEGORY_ORDER: Category[] = ["ATTACK", "CONTROL", "SUPPORT", "ECONOMY", "ELITE"];
+type Category = "ALL" | keyof typeof CATEGORIES;
+const CATEGORY_ORDER: Category[] = ["ALL", "ATTACK", "CONTROL", "SUPPORT", "ECONOMY", "ELITE"];
 
 /**
  * MobileBuildSquadDrawer — bottom drawer that swaps between BUILD and SQUAD
@@ -36,7 +37,7 @@ export class MobileBuildSquadDrawer {
   isOpen = false;
 
   private mode: "build" | "squad" = "build";
-  private buildCategory: Category = "ATTACK";
+  private buildCategory: Category = "ALL";
 
   private handle: HTMLElement;
   private cats: HTMLElement;
@@ -141,6 +142,11 @@ export class MobileBuildSquadDrawer {
       const cost = game.towers.buildCost(t);
       sigParts.push(`${t}:${cost}:${unlocked ? 1 : 0}:${built}`);
     }
+    sigParts.push(`drones:${game.drones.list.length}/${game.drones.maxDrones()}`);
+    for (const d of droneOrder) {
+      const count = game.drones.list.filter((x) => x.type === d).length;
+      sigParts.push(`${d}:${game.drones.nextCost(d)}:${count}`);
+    }
     const sig = sigParts.join("|");
     if (sig === this.lastSig) return;
     this.lastSig = sig;
@@ -175,10 +181,17 @@ export class MobileBuildSquadDrawer {
       grid.append(this.buildTowerCard(type));
     }
     this.body.append(grid);
+
+    this.body.append(el("div", { class: "ls-mdrawer-section-title", text: "DRONES" }));
+    const droneGrid = el("div", { class: "ls-mdrawer-grid drones" });
+    for (const type of droneOrder) {
+      droneGrid.append(this.buildDroneCard(type));
+    }
+    this.body.append(droneGrid);
   }
 
   private towersInCategory(cat: Category): TowerType[] {
-    const candidates = CATEGORIES[cat];
+    const candidates = cat === "ALL" ? towerOrder : CATEGORIES[cat];
     // Filter out research-locked towers (railgun/flamer/barrier) the player hasn't unlocked yet.
     const metaUnlocks = new Set(this.game.meta.aggregate().unlockedTowers);
     const gated = new Set<TowerType>(["railgun", "flamer", "barrier"] as TowerType[]);
@@ -237,6 +250,44 @@ export class MobileBuildSquadDrawer {
       // Cancel any squad arming so the action bar shows the tower confirm slot.
       game.squads?.cancelCommand();
       this.shell.haptic(8);
+    };
+    return card;
+  }
+
+  private buildDroneCard(type: DroneType): HTMLElement {
+    const def = droneDefinitions[type];
+    const cost = this.game.drones.nextCost(type);
+    const count = this.game.drones.list.filter((d) => d.type === type).length;
+    const cap = this.game.drones.maxDrones();
+    const capped = this.game.drones.list.length >= cap;
+    const affordable = this.game.core.credits >= cost && !capped;
+    const cls = ["ls-mcard", "drone"];
+    if (capped) cls.push("disabled");
+    else if (!affordable) cls.push("unaffordable");
+
+    const card = el("button", { class: cls.join(" ") });
+    card.style.borderColor = def.color;
+    card.append(
+      el("div", { class: "ls-mcard-name", text: def.name }),
+      el("div", { class: "ls-mcard-role", text: def.role }),
+      el("div", { class: "ls-mcard-meta" }, [
+        el("span", { class: "ls-mcard-cost", text: `${cost}` }),
+        el("span", { class: "ls-mcard-stat", text: `D${Math.round(def.damage)}` }),
+        el("span", { class: "ls-mcard-stat", text: `R${Math.round(def.range)}` }),
+      ]),
+      el("div", {
+        class: "ls-mcard-footnote",
+        text: capped ? `Drone cap ${this.game.drones.list.length}/${cap}` : `${count} owned`,
+      }),
+    );
+    card.onclick = () => {
+      if (!this.game.drones.buy(type)) {
+        this.shell.haptic(40);
+        return;
+      }
+      this.game.input.setBuildTool(null);
+      this.shell.setArmed(null);
+      this.shell.haptic([8, 18, 8]);
     };
     return card;
   }

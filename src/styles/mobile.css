@@ -543,6 +543,21 @@ body.ls-mobile .ls-mdrawer { display: flex; }
   gap: 8px;
   align-content: start;
 }
+.ls-mdrawer-section-title {
+  flex: 0 0 auto;
+  margin: 8px 10px 4px;
+  color: var(--ls-m-accent);
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 1.4px;
+}
+.ls-mdrawer-grid.drones {
+  flex: 0 0 auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: visible;
+  padding-top: 0;
+  padding-bottom: 8px;
+}
 
 /* Single tower / squad card. */
 .ls-mcard {
@@ -570,6 +585,9 @@ body.ls-mobile .ls-mdrawer { display: flex; }
 .ls-mcard.active {
   background: rgba(102, 252, 241, 0.2);
   box-shadow: 0 0 10px rgba(102, 252, 241, 0.35);
+}
+.ls-mcard.drone {
+  min-height: 78px;
 }
 .ls-mcard.disabled {
   opacity: 0.45;
