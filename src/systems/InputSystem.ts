@@ -28,6 +28,35 @@ export class InputSystem {
   /** Keys currently held (for continuous pan). */
   private heldKeys = new Set<string>();
 
+  // ─── Touch state ──────────────────────────────────────────────────────
+  /** Client coords of the active single-finger touch's last position. */
+  private touchLastX = 0;
+  private touchLastY = 0;
+  /** Client coords where the active touch started (for tap vs drag). */
+  private touchStartX = 0;
+  private touchStartY = 0;
+  private touchStartTime = 0;
+  /** Total drag distance accumulated for the active gesture (px). */
+  private touchDragDist = 0;
+  /** True once a single-finger touch crosses the drag threshold; cancels tap. */
+  private touchPanning = false;
+  /** True when a two-finger gesture (pinch / pan) is in progress. */
+  private touchPinching = false;
+  /** Distance between the two fingers at the last frame. */
+  private pinchLastDist = 0;
+  /** Midpoint between the two fingers at the last frame (client coords). */
+  private pinchLastMidX = 0;
+  private pinchLastMidY = 0;
+  /** Threshold (px) before a single-touch becomes a pan instead of a tap. */
+  private static readonly TAP_DRAG_THRESHOLD = 12;
+  /** Max duration (ms) for a touch to still count as a tap. */
+  private static readonly TAP_MAX_DURATION = 500;
+  /** Sentinel value assigned to `touchDragDist` to suppress the next tap on
+   *  release (e.g. when transitioning from a multi-touch gesture or after a
+   *  long-press has already been handled). Any value larger than
+   *  TAP_DRAG_THRESHOLD works; we use a clearly-out-of-band number. */
+  private static readonly TAP_SUPPRESSED = Number.MAX_SAFE_INTEGER;
+
   constructor(private readonly game: Game) {}
 
   attach(): void {
@@ -61,7 +90,8 @@ export class InputSystem {
     });
     canvas.addEventListener("touchstart", (e) => this.onTouchStart(e), { passive: false });
     canvas.addEventListener("touchmove", (e) => this.onTouchMove(e), { passive: false });
-    canvas.addEventListener("touchend", () => this.onTouchEnd(), { passive: false });
+    canvas.addEventListener("touchend", (e) => this.onTouchEnd(e), { passive: false });
+    canvas.addEventListener("touchcancel", (e) => this.onTouchEnd(e), { passive: false });
     window.addEventListener("keydown", (e) => { this.heldKeys.add(e.code); this.onKey(e); });
     window.addEventListener("keyup", (e) => { this.heldKeys.delete(e.code); });
   }
@@ -104,15 +134,48 @@ export class InputSystem {
   private onTouchStart(e: TouchEvent): void {
     if (e.touches.length === 0) return;
     e.preventDefault();
+
+    // Two-finger gesture: kick off pinch zoom + two-finger pan and cancel
+    // any pending single-finger tap / long-press.
+    if (e.touches.length >= 2) {
+      this.cancelTouchLongPress();
+      this.touchPanning = false;
+      this.touchPinching = true;
+      const t0 = e.touches[0]!;
+      const t1 = e.touches[1]!;
+      this.pinchLastDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      this.pinchLastMidX = (t0.clientX + t1.clientX) / 2;
+      this.pinchLastMidY = (t0.clientY + t1.clientY) / 2;
+      // Wipe single-touch state so a tap doesn't fire when the second finger lifts.
+      this.touchDragDist = InputSystem.TAP_SUPPRESSED;
+      return;
+    }
+
     const t = e.touches[0]!;
+    this.touchStartX = t.clientX;
+    this.touchStartY = t.clientY;
+    this.touchLastX = t.clientX;
+    this.touchLastY = t.clientY;
+    this.touchStartTime = performance.now();
+    this.touchDragDist = 0;
+    this.touchPanning = false;
+    this.touchPinching = false;
+
     this.overCell = this.cellFromClient(t.clientX, t.clientY);
     this.showPlacementPreview = Boolean(this.placementTowerType) && this.isBuildingState();
     this.touchLongPress = window.setTimeout(() => {
-      if (!this.overCell) return;
+      this.touchLongPress = null;
+      // Long-press only makes sense as a "select tower" gesture if the touch
+      // hasn't drifted into a pan. Cancelling here also prevents the
+      // subsequent touchend from firing the build action.
+      if (this.touchPanning || this.touchPinching || !this.overCell) return;
       const tower = this.game.towers.findTowerAt(this.overCell.c, this.overCell.r);
       if (tower) {
         this.game.towers.selected = tower;
         this.game.bus.emit("tower:selected", tower);
+        // Mark the gesture as consumed so touchend doesn't ALSO try to build
+        // / select again.
+        this.touchPanning = true;
       }
     }, 450);
   }
@@ -120,16 +183,124 @@ export class InputSystem {
   private onTouchMove(e: TouchEvent): void {
     if (e.touches.length === 0) return;
     e.preventDefault();
+
+    // Two-finger pinch + pan.
+    if (e.touches.length >= 2) {
+      this.touchPinching = true;
+      this.cancelTouchLongPress();
+      const t0 = e.touches[0]!;
+      const t1 = e.touches[1]!;
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      const midX = (t0.clientX + t1.clientX) / 2;
+      const midY = (t0.clientY + t1.clientY) / 2;
+
+      const cam = this.game.camera;
+      // Translate two-finger drag into camera pan (use midpoint delta).
+      const rect = this.game.canvas.getBoundingClientRect();
+      const scaleX = this.game.canvas.width / Math.max(1, rect.width);
+      const scaleY = this.game.canvas.height / Math.max(1, rect.height);
+      const dpr = this.game.render.dpr;
+      const dx = (midX - this.pinchLastMidX) * scaleX / dpr;
+      const dy = (midY - this.pinchLastMidY) * scaleY / dpr;
+      cam.targetX -= dx / cam.zoom;
+      cam.targetY -= dy / cam.zoom;
+      // Pinch — convert distance ratio into a zoom multiplier centred on midpoint.
+      if (this.pinchLastDist > 0 && dist > 0) {
+        const ratio = dist / this.pinchLastDist;
+        if (Math.abs(ratio - 1) > 0.001) {
+          const world = this.worldFromClient(midX, midY);
+          // Apply the new zoom in one step (clamped) and re-anchor camera so
+          // the world point under the midpoint stays put.
+          const oldZoom = cam.targetZoom;
+          const newZoom = Math.max(cam.minZoom, Math.min(cam.maxZoom, oldZoom * ratio));
+          cam.targetZoom = newZoom;
+          const k = 1 - oldZoom / newZoom;
+          cam.targetX += (world.x - cam.targetX) * k;
+          cam.targetY += (world.y - cam.targetY) * k;
+        }
+      }
+      this.pinchLastDist = dist;
+      this.pinchLastMidX = midX;
+      this.pinchLastMidY = midY;
+      return;
+    }
+
     const t = e.touches[0]!;
-    this.overCell = this.cellFromClient(t.clientX, t.clientY);
-    this.showPlacementPreview = Boolean(this.placementTowerType) && this.isBuildingState();
-    this.updatePlacementFeedback();
+    // Track total drag distance to disambiguate tap vs pan.
+    const ddx = t.clientX - this.touchLastX;
+    const ddy = t.clientY - this.touchLastY;
+    this.touchDragDist += Math.hypot(ddx, ddy);
+    this.touchLastX = t.clientX;
+    this.touchLastY = t.clientY;
+
+    if (!this.touchPanning && this.touchDragDist > InputSystem.TAP_DRAG_THRESHOLD) {
+      // Promote single-finger gesture to a pan once the user has moved far
+      // enough. We only enter pan mode when NOT actively placing a tower /
+      // squad / kill zone — otherwise the player is dragging the placement
+      // preview around, which is handled below.
+      const placing =
+        this.selectedTowerType ||
+        this.game.core.killZoneMode ||
+        this.game.core.coreDeployMode ||
+        (this.game.squads && (this.game.squads.pendingCommand || this.game.squads.retaskMode));
+      if (!placing) {
+        this.touchPanning = true;
+        this.cancelTouchLongPress();
+      }
+    }
+
+    if (this.touchPanning) {
+      const cam = this.game.camera;
+      const rect = this.game.canvas.getBoundingClientRect();
+      const scaleX = this.game.canvas.width / Math.max(1, rect.width);
+      const scaleY = this.game.canvas.height / Math.max(1, rect.height);
+      const dpr = this.game.render.dpr;
+      const dx = ddx * scaleX / dpr;
+      const dy = ddy * scaleY / dpr;
+      cam.targetX -= dx / cam.zoom;
+      cam.targetY -= dy / cam.zoom;
+    } else {
+      // Still a candidate tap — keep the overCell up to date so the placement
+      // preview / range indicator follows the finger.
+      this.overCell = this.cellFromClient(t.clientX, t.clientY);
+      this.showPlacementPreview = Boolean(this.placementTowerType) && this.isBuildingState();
+      this.updatePlacementFeedback();
+    }
   }
 
-  private onTouchEnd(): void {
-    if (this.touchLongPress) window.clearTimeout(this.touchLongPress);
-    this.touchLongPress = null;
+  private onTouchEnd(e?: TouchEvent): void {
+    // If fingers are still on the screen we're transitioning between gestures
+    // (e.g. two-finger → one-finger). Reset state so the next move starts
+    // fresh and don't fire any tap.
+    if (e && e.touches.length > 0) {
+      this.cancelTouchLongPress();
+      // Re-seed single-touch state from the remaining finger so a continued
+      // drag doesn't jump.
+      const t = e.touches[0]!;
+      this.touchLastX = t.clientX;
+      this.touchLastY = t.clientY;
+      this.touchStartX = t.clientX;
+      this.touchStartY = t.clientY;
+      this.touchDragDist = InputSystem.TAP_SUPPRESSED; // suppress tap-on-release
+      this.touchPanning = true;        // the lingering finger acts as pan only
+      this.touchPinching = e.touches.length >= 2;
+      return;
+    }
+
+    this.cancelTouchLongPress();
+
+    const wasPinching = this.touchPinching;
+    const wasPanning = this.touchPanning;
+    this.touchPinching = false;
+    this.touchPanning = false;
+
+    // Suppress the tap if the gesture was a pan/pinch or it lasted too long.
+    const duration = performance.now() - this.touchStartTime;
+    if (wasPinching || wasPanning || duration > InputSystem.TAP_MAX_DURATION) {
+      return;
+    }
     if (!this.overCell) return;
+
     if (this.game.core.killZoneMode) {
       const px = (this.overCell.c + 0.5) * TILE_SIZE;
       const py = (this.overCell.r + 0.5) * TILE_SIZE;
@@ -142,12 +313,38 @@ export class InputSystem {
       if (this.game.deployRelayCore(this.overCell.c, this.overCell.r)) {
         this.game.core.coreDeployMode = false;
       }
+    } else if (this.game.squads && this.game.squads.retaskMode && this.game.squads.selected) {
+      this.game.squads.retaskSelectedTo(this.mouseX, this.mouseY);
+    } else if (this.game.squads && this.game.squads.pendingCommand) {
+      this.game.squads.deployAt(this.mouseX, this.mouseY);
     } else if (this.selectedTowerType) {
       this.tryBuild(this.overCell, false);
     } else {
+      // Tap on a squad? Select it. Otherwise try tower-at-cell, falling back
+      // to clearing the selection so tapping empty space is a "deselect".
+      if (this.game.squads) {
+        const squad = this.findSquadAtWorld(this.mouseX, this.mouseY, 22);
+        if (squad) {
+          this.game.squads.selectSquad(squad);
+          return;
+        }
+      }
       const tower = this.game.towers.findTowerAt(this.overCell.c, this.overCell.r);
-      this.game.towers.selected = tower;
-      this.game.bus.emit("tower:selected", tower);
+      if (tower) {
+        this.game.towers.selected = tower;
+        this.game.bus.emit("tower:selected", tower);
+      } else {
+        // Tap empty space → clear current selection (cheap "back" gesture).
+        this.clearSelection();
+        if (this.game.squads && this.game.squads.selected) this.game.squads.selectSquad(null);
+      }
+    }
+  }
+
+  private cancelTouchLongPress(): void {
+    if (this.touchLongPress) {
+      window.clearTimeout(this.touchLongPress);
+      this.touchLongPress = null;
     }
   }
 

@@ -1791,6 +1791,31 @@
   color: #ffe082;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Mobile / touch layout
+   --------------------------------------------------------------------------
+   The desktop layout has fixed-position panels (top HUD bar, left build menu,
+   right sidebar, right tower panel) and assumes a ≥1024×704 viewport. On a
+   phone we restructure so:
+     • The HUD becomes a compact two-row top bar, scrollable horizontally,
+       with finger-sized buttons.
+     • The build menu becomes a bottom drawer (horizontal scroll) with taller
+       tower cards that double as drag-handles.
+     • The optional info sidebar (objectives / squad / command) is hidden by
+       default and toggled in via the HUD's INFO button.
+     • The tower panel becomes a bottom-anchored sheet so the right side
+       isn't permanently consumed.
+     • Hit targets are at least ~40px on each axis.
+   These styles only fire when (a) the viewport is small or in portrait
+   AND (b) the JS runtime has tagged <body> with `ls-mobile`. The dual-gate
+   keeps narrow desktop windows from collapsing into the touch layout
+   accidentally while still letting mobile-class hardware override CSS via
+   the body class.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.ls-mobile-only { display: none !important; }
+body.ls-mobile .ls-mobile-only { display: inline-flex !important; }
+
 @media (max-width: 760px), (orientation: portrait) {
   .ls-hud {
     align-items: stretch;
@@ -1849,6 +1874,273 @@
   .ls-title {
     font-size: 40px;
     letter-spacing: 5px;
+  }
+}
+
+/* ── Touch-class device overrides (applied by JS via body.ls-mobile) ──── */
+body.ls-mobile {
+  /* Slightly larger base font so HUD labels are readable on small screens. */
+  --ls-font-scale: 1.05;
+}
+body.ls-mobile #ls-app::before,
+body.ls-mobile #game-root::before {
+  /* Scanlines stay but at a milder opacity — small screens get noisy fast. */
+  opacity: 0.55;
+}
+
+/* Canvas fills the screen edge-to-edge on mobile. */
+body.ls-mobile canvas#ls-canvas,
+body.ls-mobile canvas#game-canvas {
+  box-shadow: none;
+  max-width: 100vw;
+  max-height: 100vh;
+}
+body.ls-mobile #ls-app,
+body.ls-mobile #game-root,
+body.ls-mobile #game-container {
+  background: #03050a;
+}
+
+/* HUD: compact 2-row top bar, scrollable horizontally so the long button
+   list never wraps into a tall column that eats the play area. */
+body.ls-mobile .ls-hud {
+  padding: max(6px, env(safe-area-inset-top, 0px)) 8px 6px;
+  gap: 4px;
+  font-size: 11px;
+  /* Slightly translucent so the player can still see the map underneath. */
+  background: linear-gradient(to bottom, rgba(4, 7, 12, 0.92), rgba(4, 7, 12, 0.55));
+  border-bottom: 1px solid rgba(102, 252, 241, 0.35);
+}
+body.ls-mobile .ls-hud-left,
+body.ls-mobile .ls-hud-right {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  /* Hide the default scrollbar — the row scrolls by drag. */
+  scrollbar-width: none;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+body.ls-mobile .ls-hud-left::-webkit-scrollbar,
+body.ls-mobile .ls-hud-right::-webkit-scrollbar { display: none; }
+body.ls-mobile .ls-hud-left {
+  /* Keep the credits + core readouts pinned, the rest can scroll. */
+  flex: 0 0 auto;
+}
+body.ls-mobile .ls-hud-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+body.ls-mobile .ls-core-bar-segmented {
+  /* The 10-segment bar would dominate the top row at desktop width — shrink
+     it on mobile to fit the action row beside it. */
+  width: 88px;
+  gap: 1px;
+}
+body.ls-mobile .ls-core-segment { height: 8px; }
+
+/* Bigger, finger-sized buttons everywhere. ≥40px hit target. */
+body.ls-mobile .ls-btn {
+  padding: 10px 14px;
+  font-size: 11px;
+  min-height: 40px;
+  min-width: 40px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+body.ls-mobile .ls-btn-ghost { border-color: #66fcf1; color: #66fcf1; }
+
+/* Mobile sidebar toggle: lights up when the panel is open. */
+body.ls-mobile .ls-mobile-sidebar-toggle {
+  border-color: #ffd54f;
+  color: #ffd54f;
+}
+body.ls-mobile .ls-mobile-sidebar-toggle.active {
+  background: rgba(255, 213, 79, 0.18);
+  box-shadow: 0 0 12px rgba(255, 213, 79, 0.4);
+}
+
+/* Right sidebar on mobile: hidden until the player taps INFO. Slides in from
+   the right; sits under the HUD top bar. */
+body.ls-mobile .ls-hud-right-sidebar {
+  top: 96px;
+  right: 4px;
+  width: min(260px, calc(100vw - 12px));
+  max-height: calc(100vh - 96px - 36vh - 12px); /* leave room for build menu */
+  overflow-y: auto;
+  pointer-events: auto;
+  transform: translateX(110%);
+  opacity: 0;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+body.ls-mobile .ls-hud-right-sidebar.ls-mobile-open {
+  transform: translateX(0);
+  opacity: 1;
+}
+body.ls-mobile .ls-hud-right-sidebar.hidden-by-tower-panel {
+  /* Tower panel takes priority on mobile too. */
+  transform: translateX(110%);
+  opacity: 0;
+}
+
+/* Build menu on mobile: bottom drawer, horizontal scroll, larger cards. */
+body.ls-mobile .ls-build-menu {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: auto;
+  max-height: 32vh;
+  flex-direction: column;
+  padding: 6px 6px max(6px, env(safe-area-inset-bottom, 0px));
+  background: rgba(4, 7, 12, 0.96);
+  border: 1px solid rgba(102, 252, 241, 0.35);
+  border-bottom: none;
+  z-index: 60;
+}
+body.ls-mobile .ls-economy-mini {
+  /* Compress earned/spent line so the towers row can be the focus. */
+  display: none;
+}
+body.ls-mobile .ls-build-title {
+  font-size: 9px;
+  letter-spacing: 2px;
+  margin-top: 0;
+  padding-bottom: 2px;
+}
+body.ls-mobile .ls-build-menu .ls-tower-list {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  min-width: 0;
+}
+body.ls-mobile .ls-build-menu .ls-tower-list::-webkit-scrollbar { display: none; }
+body.ls-mobile .ls-tower-btn {
+  flex: 0 0 auto;
+  min-width: 100px;
+  padding: 8px 10px;
+  font-size: 11px;
+  min-height: 56px;
+}
+body.ls-mobile .ls-tower-btn:hover {
+  /* No pseudo-hover translate on touch — leaves a stuck-state after the
+     finger lifts otherwise. */
+  transform: none;
+  box-shadow: 0 0 8px rgba(102, 252, 241, 0.25);
+}
+body.ls-mobile .ls-tower-btn .ls-tower-name { font-size: 11px; }
+body.ls-mobile .ls-tower-btn .ls-tower-role { font-size: 10px; }
+
+/* Tower panel: bottom-sheet style on mobile so the right column stays free. */
+body.ls-mobile .ls-tower-panel {
+  top: auto;
+  right: 0;
+  left: 0;
+  bottom: 33vh;
+  width: auto;
+  max-height: 40vh;
+  border-left: none;
+  border-right: none;
+  border-bottom: 1px solid rgba(102, 252, 241, 0.4);
+  transform: translateY(40px);
+}
+body.ls-mobile .ls-tower-panel.visible {
+  transform: translateY(0);
+}
+
+/* Wave / countdown / objectives panels — keep them compact and out of the
+   build-menu drawer's way. */
+body.ls-mobile .ls-wave-countdown {
+  font-size: 11px;
+  padding: 4px 6px;
+}
+body.ls-mobile .ls-wave-intel,
+body.ls-mobile .ls-wave-timeline,
+body.ls-mobile .ls-modifier-strip {
+  font-size: 10px;
+}
+body.ls-mobile .ls-objectives-panel,
+body.ls-mobile .ls-squad-panel,
+body.ls-mobile .ls-command-panel {
+  font-size: 10px;
+  max-height: none;
+}
+
+/* Boss bar / rift warning — keep them visible above the build drawer. */
+body.ls-mobile .ls-boss-bar {
+  bottom: calc(34vh + 8px);
+}
+body.ls-mobile .ls-rift-warning {
+  bottom: calc(34vh + 32px);
+}
+
+/* Overlays (Codex, Settings, Pause, Briefing, GameOver, Victory…) need to
+   scroll on phones since their content is taller than the viewport. */
+body.ls-mobile .ls-overlay {
+  padding: 16px 12px;
+  overflow-y: auto;
+  align-items: stretch;
+}
+body.ls-mobile .ls-overlay-title { font-size: 28px; letter-spacing: 4px; }
+body.ls-mobile .ls-overlay-actions { gap: 8px; }
+body.ls-mobile .ls-overlay-actions .ls-btn { flex: 1 1 140px; }
+body.ls-mobile .ls-stats { min-width: 0; padding: 10px 12px; font-size: 12px; }
+
+/* Sector select / main menu — single-column, large tap targets. */
+body.ls-mobile .ls-sector-grid {
+  grid-template-columns: 1fr;
+  padding: 0 8px;
+}
+body.ls-mobile .ls-sector-card { padding: 12px; }
+body.ls-mobile .ls-title { font-size: 36px; letter-spacing: 4px; }
+
+/* Settings / Codex panels — let internal scroll do the work. */
+body.ls-mobile .ls-codex-card-root {
+  padding: 8px 10px;
+}
+body.ls-mobile .ls-codex-tabs {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+body.ls-mobile .ls-codex-tabs::-webkit-scrollbar { display: none; }
+
+/* Disable transform-on-hover effects on touch — they leave stuck states
+   because there's no mouseleave on a phone. */
+body.ls-mobile .ls-sector-card:hover,
+body.ls-mobile .ls-btn:hover,
+body.ls-mobile .ls-tower-btn:hover {
+  transform: none;
+}
+
+/* Landscape phone tweaks: HUD becomes a single horizontal row again, build
+   menu shrinks, and the right sidebar appears in a narrower form. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body.ls-mobile .ls-hud {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 4px 8px;
+  }
+  body.ls-mobile .ls-build-menu {
+    max-height: 28vh;
+  }
+  body.ls-mobile .ls-tower-btn {
+    min-height: 44px;
+    min-width: 90px;
+  }
+  body.ls-mobile .ls-hud-right-sidebar {
+    top: 64px;
+    max-height: calc(100vh - 64px - 28vh - 8px);
+  }
+  body.ls-mobile .ls-tower-panel {
+    bottom: 28vh;
+    max-height: 44vh;
   }
 }
 

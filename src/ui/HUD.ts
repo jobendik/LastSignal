@@ -51,6 +51,8 @@ export class HUD {
   private creditsPrimed = false;
   private waveCoreIntegrityStart = 0;
   private tookCoreDamageThisWave = false;
+  /** Mobile-only toggle button for the right-side info sidebar. */
+  private mobileSidebarBtn = el("button", { class: "ls-btn ls-btn-ghost ls-mobile-only ls-mobile-sidebar-toggle", text: "INFO" });
 
   constructor(private readonly game: Game) {
     this.el = el("div", { class: "ls-panel ls-hud" });
@@ -139,6 +141,7 @@ export class HUD {
       speedDown, this.speedEl, speedUp,
       this.pauseBtn,
       this.codexBtn,
+      this.mobileSidebarBtn,
       this.settingsBtn,
     );
 
@@ -175,6 +178,14 @@ export class HUD {
     this.empBtn.onclick = () => this.game.activateCoreAbility();
     this.settingsBtn.onclick = () => this.game.ui.openSettings();
     this.codexBtn.onclick = () => this.game.ui.openCodex();
+    this.mobileSidebarBtn.title = "Show / hide objectives, squad and command panels.";
+    this.mobileSidebarBtn.onclick = () => {
+      this.rightSidebar.classList.toggle("ls-mobile-open");
+      this.mobileSidebarBtn.classList.toggle(
+        "active",
+        this.rightSidebar.classList.contains("ls-mobile-open"),
+      );
+    };
 
     this.countdownBar.append(this.countdownFill);
     this.countdownEl.append(this.countdownLabel, this.countdownValue, this.countdownBar);
