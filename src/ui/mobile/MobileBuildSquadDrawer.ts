@@ -67,6 +67,7 @@ export class MobileBuildSquadDrawer {
     bus.on("tower:built", refresh);
     bus.on("tower:sold", refresh);
     bus.on("tower:upgraded", refresh);
+    bus.on("drone:bought", refresh);
     bus.on("squad:deployed", refresh);
     bus.on("squad:expired", refresh);
     bus.on("squad:destroyed", refresh);
