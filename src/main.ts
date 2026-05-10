@@ -33,14 +33,79 @@ uiRoot.classList.add("ls-ui-root");
 
 const gameCanvas = canvas!;
 const gameUiRoot = uiRoot!;
+
+// ──────────────────────────────────────────────────────────
+// Mobile / touch device detection.
+// We tag the <body> with `ls-mobile` (coarse pointer / small viewport / mobile
+// UA) so CSS can switch to the touch-friendly layout, and `ls-portrait` /
+// `ls-landscape` so layout can react to orientation. The flags are recomputed
+// on resize/orientation change.
+// ──────────────────────────────────────────────────────────
+function detectMobile(): boolean {
+  try {
+    const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+    const ua = navigator.userAgent || "";
+    const uaMobile = /Android|iPhone|iPad|iPod|Mobile|Mobi|Touch|Tablet|Silk|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const smallViewport = Math.min(window.innerWidth, window.innerHeight) <= 820;
+    // Treat as mobile if either:
+    //  - the device clearly identifies itself (UA / coarse pointer), OR
+    //  - the viewport is small enough that the desktop HUD won't fit.
+    return uaMobile || (coarse && smallViewport);
+  } catch {
+    return false;
+  }
+}
+const isMobile = detectMobile();
+function applyDeviceClasses(): void {
+  const body = document.body;
+  body.classList.toggle("ls-mobile", isMobile);
+  const portrait = window.innerHeight >= window.innerWidth;
+  body.classList.toggle("ls-portrait", portrait);
+  body.classList.toggle("ls-landscape", !portrait);
+}
+applyDeviceClasses();
+
+// Prevent browser-native gestures (pinch-zoom, double-tap zoom, scroll) from
+// stealing input over the canvas. The InputSystem implements its own
+// pinch / pan / tap handling and needs full ownership of touch events.
+gameCanvas.style.touchAction = "none";
+gameUiRoot.style.touchAction = "manipulation";
+// Block iOS Safari's legacy gesture events (pinch zoom on the whole page).
+// The viewport meta `user-scalable=no` covers modern browsers; this is
+// belt-and-braces for older iOS.
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+document.addEventListener("gesturechange", (e) => e.preventDefault());
+
 const game = new Game(gameCanvas, gameUiRoot);
 game.start();
 
 // Resize canvas to fit viewport while preserving aspect ratio.
 function fit(): void {
-  const margin = 16;
-  const availW = window.innerWidth - margin * 2;
-  const availH = window.innerHeight - margin * 2;
+  applyDeviceClasses();
+  // On mobile we want the game to fill the screen edge-to-edge so the play
+  // area is as large as possible. On desktop we keep a small breathing-room
+  // margin around the CRT box.
+  //
+  // On mobile the HUD top bar (≈ 96 px tall, more in portrait when buttons
+  // wrap) and the build-menu bottom drawer (≈ 32 vh in portrait) overlay
+  // the screen, so we shrink the available area by their reserved height
+  // before fitting the canvas. That way the canvas slots cleanly in between
+  // and the player can see the whole map without HUD chrome covering it.
+  let availW: number;
+  let availH: number;
+  if (isMobile) {
+    const portrait = window.innerHeight >= window.innerWidth;
+    const hudReserve = portrait ? 110 : 64;          // top HUD bar
+    const buildReserve = portrait
+      ? Math.round(window.innerHeight * 0.32) + 8    // bottom drawer (32vh + gutter)
+      : Math.round(window.innerHeight * 0.30) + 8;
+    availW = window.innerWidth;
+    availH = Math.max(120, window.innerHeight - hudReserve - buildReserve);
+  } else {
+    const margin = 16;
+    availW = window.innerWidth - margin * 2;
+    availH = window.innerHeight - margin * 2;
+  }
   const scale = Math.min(availW / VIEW_WIDTH, availH / VIEW_HEIGHT);
   const dpr = window.devicePixelRatio || 1;
   const backingW = VIEW_WIDTH * dpr;
@@ -55,6 +120,12 @@ function fit(): void {
 }
 fit();
 window.addEventListener("resize", fit);
+window.addEventListener("orientationchange", () => {
+  // Some mobile browsers fire `orientationchange` before innerWidth updates;
+  // fit twice to catch the post-rotate dimensions.
+  fit();
+  setTimeout(fit, 200);
+});
 try {
   const hot = (import.meta as unknown as { hot?: { accept: (deps?: string[], cb?: () => void) => void } }).hot;
   hot?.accept(["./data/towers.ts", "./data/enemies.ts", "./data/waves.ts", "./data/sectors.ts"], () => {

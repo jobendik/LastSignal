@@ -65,6 +65,42 @@ canvas#ls-canvas, canvas#game-canvas {
   background: #04080c;
   max-width: 100%;
   max-height: 100%;
+  /* Prevent browser-native gestures (pinch-zoom, double-tap zoom, scroll)
+     from stealing input. The InputSystem implements its own pinch / pan /
+     tap handling and needs full ownership of touch events. */
+  touch-action: none;
+  -ms-touch-action: none;
+}
+
+/* Mobile: stretch the play area to the viewport edges so testers don't see
+   a tiny letterboxed canvas surrounded by empty bg on a phone. The canvas
+   is centered between the top HUD bar (~96 px) and the bottom build drawer
+   (~32 vh), so we add equivalent top/bottom padding to game-container so
+   flex `align-items: center` parks the canvas in the gameplay zone instead
+   of behind the HUD. */
+body.ls-mobile #ls-app,
+body.ls-mobile #game-root,
+body.ls-mobile #game-container {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh; /* dynamic viewport — accounts for iOS bottom bar */
+  padding: 0;
+}
+body.ls-portrait.ls-mobile #game-container {
+  padding-top: 96px;
+  padding-bottom: 32vh;
+}
+body.ls-landscape.ls-mobile #game-container {
+  padding-top: 56px;
+  padding-bottom: 30vh;
+}
+body.ls-mobile {
+  /* iOS Safari sometimes allows a rubber-band scroll even with overflow:hidden;
+     this kills it. */
+  position: fixed;
+  inset: 0;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 #ls-ui, #ui-root, .ls-ui-root {
