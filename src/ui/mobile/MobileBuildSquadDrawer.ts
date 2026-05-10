@@ -18,15 +18,16 @@ const CATEGORIES = {
   ECONOMY: ["harvester"] as TowerType[],
   ELITE: ["mortar"] as TowerType[],
 } as const;
-type Category = "ALL" | keyof typeof CATEGORIES;
-const CATEGORY_ORDER: Category[] = ["ALL", "ATTACK", "CONTROL", "SUPPORT", "ECONOMY", "ELITE"];
+type TowerCategory = keyof typeof CATEGORIES;
+type Category = "ALL" | TowerCategory | "DRONES";
+const CATEGORY_ORDER: Category[] = ["ALL", "ATTACK", "DRONES", "CONTROL", "SUPPORT", "ECONOMY", "ELITE"];
 
 /**
  * MobileBuildSquadDrawer — bottom drawer that swaps between BUILD and SQUAD
  * modes. The tab switch is owned by the parent MobileShell; this component
  * just renders whichever side is active.
  *
- *   BUILD: category tab strip (ATTACK | CONTROL | SUPPORT | ECONOMY | ELITE)
+ *   BUILD: category tab strip (ALL | ATTACK | DRONES | CONTROL | SUPPORT | ECONOMY | ELITE)
  *          + grid of large tower cards (~88px tall, finger-sized).
  *   SQUAD: roster strip of currently-deployed squads (HP bar, EVAC, RETASK
  *          chips, tap-to-select), then a 2x2 grid of squad command buttons
@@ -143,10 +144,12 @@ export class MobileBuildSquadDrawer {
       const cost = game.towers.buildCost(t);
       sigParts.push(`${t}:${cost}:${unlocked ? 1 : 0}:${built}`);
     }
-    sigParts.push(`drones:${game.drones.list.length}/${game.drones.maxDrones()}`);
-    for (const d of droneOrder) {
-      const count = game.drones.list.filter((x) => x.type === d).length;
-      sigParts.push(`${d}:${game.drones.nextCost(d)}:${count}`);
+    if (cat === "DRONES") {
+      sigParts.push(`drones:${game.drones.list.length}/${game.drones.maxDrones()}`);
+      for (const d of droneOrder) {
+        const count = game.drones.list.filter((x) => x.type === d).length;
+        sigParts.push(`${d}:${game.drones.nextCost(d)}:${count}`);
+      }
     }
     const sig = sigParts.join("|");
     if (sig === this.lastSig) return;
@@ -174,24 +177,26 @@ export class MobileBuildSquadDrawer {
 
     // Body grid.
     clear(this.body);
-    const grid = el("div", { class: "ls-mdrawer-grid" });
-    if (towersInCat.length === 0) {
-      grid.append(el("div", { class: "ls-mdrawer-empty", text: "No towers in this category yet." }));
+    if (cat === "DRONES") {
+      const droneGrid = el("div", { class: "ls-mdrawer-grid drones" });
+      for (const type of droneOrder) {
+        droneGrid.append(this.buildDroneCard(type));
+      }
+      this.body.append(droneGrid);
+    } else {
+      const grid = el("div", { class: "ls-mdrawer-grid" });
+      if (towersInCat.length === 0) {
+        grid.append(el("div", { class: "ls-mdrawer-empty", text: "No towers in this category yet." }));
+      }
+      for (const type of towersInCat) {
+        grid.append(this.buildTowerCard(type));
+      }
+      this.body.append(grid);
     }
-    for (const type of towersInCat) {
-      grid.append(this.buildTowerCard(type));
-    }
-    this.body.append(grid);
-
-    this.body.append(el("div", { class: "ls-mdrawer-section-title", text: "DRONES" }));
-    const droneGrid = el("div", { class: "ls-mdrawer-grid drones" });
-    for (const type of droneOrder) {
-      droneGrid.append(this.buildDroneCard(type));
-    }
-    this.body.append(droneGrid);
   }
 
   private towersInCategory(cat: Category): TowerType[] {
+    if (cat === "DRONES") return [];
     const candidates = cat === "ALL" ? towerOrder : CATEGORIES[cat];
     // Filter out research-locked towers (railgun/flamer/barrier) the player hasn't unlocked yet.
     const metaUnlocks = new Set(this.game.meta.aggregate().unlockedTowers);

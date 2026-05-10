@@ -1189,6 +1189,15 @@ body.ls-mobile .ls-stats {
 }
 
 /* Sector select & main menu — single column, big tap targets. */
+body.ls-mobile .ls-sector-select {
+  justify-content: flex-start;
+  padding: calc(18px + var(--ls-m-safe-top)) calc(12px + var(--ls-m-safe-right)) calc(18px + var(--ls-m-safe-bottom)) calc(12px + var(--ls-m-safe-left));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
 body.ls-mobile .ls-sector-grid {
   grid-template-columns: 1fr;
   padding: 0;
@@ -1200,6 +1209,13 @@ body.ls-mobile .ls-loadout-grid {
   grid-template-columns: 1fr;
   padding: 0;
   gap: 10px;
+}
+body.ls-mobile .ls-sector-grid,
+body.ls-mobile .ls-loadout-grid,
+body.ls-mobile .ls-training-card,
+body.ls-mobile .ls-sector-buttons,
+body.ls-mobile .ls-diff-picker {
+  touch-action: pan-y;
 }
 
 /* Disable hover/transform effects on all touch interactions — no mouseleave
