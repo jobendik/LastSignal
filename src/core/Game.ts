@@ -68,6 +68,8 @@ export class Game {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   uiRoot: HTMLElement;
+  /** True when running with the touch-first mobile chrome enabled. */
+  public isMobile = false;
 
   // Systems
   persistence = new PersistenceSystem();
@@ -104,8 +106,9 @@ export class Game {
   private running = false;
   private replayEvents: { t: number; event: string; data?: unknown }[] = [];
 
-  constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
+  constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement, isMobile = false) {
     this.canvas = canvas;
+    this.isMobile = isMobile;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("No 2D context");
     this.ctx = ctx;

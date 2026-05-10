@@ -1,5 +1,6 @@
 import "./styles/main.css";
 import "./styles/ui.css";
+import "./styles/mobile.css";
 import { Game } from "./core/Game";
 import { VIEW_HEIGHT, VIEW_WIDTH } from "./core/Config";
 
@@ -76,7 +77,7 @@ gameUiRoot.style.touchAction = "manipulation";
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("gesturechange", (e) => e.preventDefault());
 
-const game = new Game(gameCanvas, gameUiRoot);
+const game = new Game(gameCanvas, gameUiRoot, isMobile);
 game.start();
 
 // Resize canvas to fit viewport while preserving aspect ratio.

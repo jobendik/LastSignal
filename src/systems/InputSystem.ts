@@ -27,6 +27,8 @@ export class InputSystem {
   private panDragStartY = 0;
   /** Keys currently held (for continuous pan). */
   private heldKeys = new Set<string>();
+  /** Mobile only: touch-end keeps the tower ghost armed until the player taps PLACE. */
+  private isMobileGhostMode = false;
 
   // ─── Touch state ──────────────────────────────────────────────────────
   /** Client coords of the active single-finger touch's last position. */
@@ -194,29 +196,29 @@ export class InputSystem {
       const midX = (t0.clientX + t1.clientX) / 2;
       const midY = (t0.clientY + t1.clientY) / 2;
 
-      const cam = this.game.camera;
-      // Translate two-finger drag into camera pan (use midpoint delta).
       const rect = this.game.canvas.getBoundingClientRect();
       const scaleX = this.game.canvas.width / Math.max(1, rect.width);
       const scaleY = this.game.canvas.height / Math.max(1, rect.height);
       const dpr = this.game.render.dpr;
-      const dx = (midX - this.pinchLastMidX) * scaleX / dpr;
-      const dy = (midY - this.pinchLastMidY) * scaleY / dpr;
-      cam.targetX -= dx / cam.zoom;
-      cam.targetY -= dy / cam.zoom;
-      // Pinch — convert distance ratio into a zoom multiplier centred on midpoint.
+      const mx = (midX - rect.left) * scaleX / dpr;
+      const my = (midY - rect.top) * scaleY / dpr;
+      const cam = this.game.camera;
+      // Pinch around the midpoint in a single pass so zoom does not drift.
       if (this.pinchLastDist > 0 && dist > 0) {
         const ratio = dist / this.pinchLastDist;
         if (Math.abs(ratio - 1) > 0.001) {
-          const world = this.worldFromClient(midX, midY);
-          // Apply the new zoom in one step (clamped) and re-anchor camera so
-          // the world point under the midpoint stays put.
-          const oldZoom = cam.targetZoom;
+          const oldZoom = cam.zoom;
           const newZoom = Math.max(cam.minZoom, Math.min(cam.maxZoom, oldZoom * ratio));
-          cam.targetZoom = newZoom;
-          const k = 1 - oldZoom / newZoom;
-          cam.targetX += (world.x - cam.targetX) * k;
-          cam.targetY += (world.y - cam.targetY) * k;
+          if (newZoom !== oldZoom) {
+            const wx = cam.x + (mx - cam.viewW * 0.5) / oldZoom;
+            const wy = cam.y + (my - cam.viewH * 0.5) / oldZoom;
+            cam.zoom = newZoom;
+            cam.targetZoom = newZoom;
+            cam.x = wx - (mx - cam.viewW * 0.5) / newZoom;
+            cam.y = wy - (my - cam.viewH * 0.5) / newZoom;
+            cam.targetX = cam.x;
+            cam.targetY = cam.y;
+          }
         }
       }
       this.pinchLastDist = dist;
@@ -366,6 +368,11 @@ export class InputSystem {
     this.overCell = this.cellFromEvent(e);
     this.showPlacementPreview = Boolean(this.placementTowerType) && this.isBuildingState();
     this.updatePlacementFeedback();
+    if (this.game.isMobile) {
+      this.game.camera.edgePanX = 0;
+      this.game.camera.edgePanY = 0;
+      return;
+    }
     // Edge scrolling.
     const rect = this.game.canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
@@ -514,13 +521,30 @@ export class InputSystem {
       // Invalid — play a small rejection sound.
       this.game.audio.sfxShoot(0.5, 0.08);
       this.placementInvalidTimer = 0.22;
+      this.vibrate(40);
       return;
     }
+    this.vibrate([10, 25, 10]);
     if (!keepSelected) {
       this.selectedTowerType = null;
       this.showPlacementPreview = false;
+      this.isMobileGhostMode = false;
       this.game.bus.emit("build:tool", this.selectedTowerType);
     }
+  }
+
+  public confirmGhostPlacement(): boolean {
+    if (!this.selectedTowerType || !this.overCell) return false;
+    const before = this.selectedTowerType;
+    this.tryBuild(this.overCell, false);
+    return this.selectedTowerType !== before;
+  }
+
+  public cancelGhostPlacement(): void {
+    this.selectedTowerType = null;
+    this.showPlacementPreview = false;
+    this.isMobileGhostMode = false;
+    this.game.bus.emit("build:tool", this.selectedTowerType);
   }
 
   setBuildTool(type: TowerType | null): void {
@@ -530,6 +554,10 @@ export class InputSystem {
       this.selectedTowerType = type;
     }
     this.showPlacementPreview = Boolean(this.selectedTowerType);
+    this.isMobileGhostMode =
+      this.game.isMobile &&
+      document.body.classList.contains("ls-mobile-shell-ready") &&
+      this.selectedTowerType !== null;
     if (this.selectedTowerType && this.game.squads) {
       this.game.squads.cancelCommand();
     }
@@ -560,8 +588,18 @@ export class InputSystem {
     this.selectedTowerType = null;
     this.hoverTowerType = null;
     this.showPlacementPreview = false;
+    this.isMobileGhostMode = false;
     this.game.towers.selected = null;
     this.game.bus.emit("ui:cleared");
+  }
+
+  private vibrate(pattern: number | number[]): void {
+    try {
+      if (this.game.core.settings?.reducedMotion) return;
+      navigator.vibrate?.(pattern);
+    } catch {
+      /* ignore */
+    }
   }
 
   private updatePlacementFeedback(force = false): void {

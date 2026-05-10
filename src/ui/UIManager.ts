@@ -18,6 +18,7 @@ import { SubtitleOverlay } from "./SubtitleOverlay";
 import { TutorialOverlay } from "./TutorialOverlay";
 import { SectorBriefingOverlay } from "./SectorBriefingOverlay";
 import { GuidanceOverlay } from "./GuidanceOverlay";
+import { MobileShell } from "./mobile/MobileShell";
 
 /**
  * Orchestrates all UI panels. Each panel is a small DOM component that
@@ -44,6 +45,7 @@ export class UIManager {
   tutorial: TutorialOverlay;
   sectorBriefing: SectorBriefingOverlay;
   guidanceOverlay: GuidanceOverlay;
+  mobileShell: MobileShell | null = null;
 
   constructor(private readonly game: Game) {
     this.root = game.uiRoot;
@@ -67,6 +69,9 @@ export class UIManager {
     this.tutorial = new TutorialOverlay(game);
     this.sectorBriefing = new SectorBriefingOverlay(game);
     this.guidanceOverlay = new GuidanceOverlay(game);
+    if (game.isMobile) {
+      this.mobileShell = new MobileShell(game);
+    }
   }
 
   attach(): void {
@@ -91,6 +96,7 @@ export class UIManager {
       this.sectorBriefing.el,
       this.guidanceOverlay.el
     );
+    if (this.mobileShell) this.root.append(this.mobileShell.el);
     this.root.addEventListener("pointerover", (e) => {
       const target = e.target as Element | null;
       const button = target?.closest("button");

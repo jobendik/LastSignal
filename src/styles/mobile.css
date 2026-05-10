@@ -1,0 +1,1225 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   LAST SIGNAL — Mobile UI
+   --------------------------------------------------------------------------
+   Loaded AFTER ui.css. When body.ls-mobile is set, this file:
+     1. Hides the desktop HUD chrome (.ls-hud, .ls-build-menu, .ls-tower-panel,
+        .ls-hud-right-sidebar, .ls-modifier-strip, etc.).
+     2. Replaces it with thumb-zone mobile components that read top → status,
+        bottom → actionable.
+     3. Respects iOS safe-area-insets and uses dvh so the bottom bar isn't
+        eaten by Safari's browser chrome.
+
+   Color palette mirrors core/Config.ts COLOR:
+     accent     #66fcf1
+     accentDim  #45a29e
+     warning    #ffb300
+     danger     #f44336
+     good       #4caf50
+
+   Typography stays "Courier New" monospace.
+   Min touch target: 48px (56px for primary actions).
+   All transitions ≤ 200ms — mobile expects snap.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Custom-property defaults so individual modules can tweak. */
+body.ls-mobile {
+  --ls-m-accent: #66fcf1;
+  --ls-m-accent-dim: #45a29e;
+  --ls-m-warning: #ffb300;
+  --ls-m-danger: #f44336;
+  --ls-m-good: #4caf50;
+  --ls-m-bg: rgba(4, 7, 12, 0.94);
+  --ls-m-bg-solid: #04070c;
+  --ls-m-border: rgba(102, 252, 241, 0.35);
+  --ls-m-border-dim: rgba(102, 252, 241, 0.18);
+  --ls-m-text: #c5c6c7;
+  --ls-m-text-dim: #8a9099;
+  --ls-m-text-bright: #ffffff;
+  --ls-m-top-h: 56px;
+  --ls-m-bottom-h: 64px;
+  --ls-m-safe-top: env(safe-area-inset-top, 0px);
+  --ls-m-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --ls-m-safe-left: env(safe-area-inset-left, 0px);
+  --ls-m-safe-right: env(safe-area-inset-right, 0px);
+}
+
+.ls-mshell {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+}
+
+body.ls-mobile .ls-mshell.visible {
+  display: block !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   1. Hide desktop chrome.
+   The old ui.css mobile media query did some of this; we redo it here so
+   load order doesn't matter and we have a single source of truth.
+   ────────────────────────────────────────────────────────────────────────── */
+body.ls-mobile.ls-mobile-shell-ready .ls-hud,
+body.ls-mobile.ls-mobile-shell-ready .ls-build-menu,
+body.ls-mobile.ls-mobile-shell-ready .ls-tower-panel,
+body.ls-mobile.ls-mobile-shell-ready .ls-hud-right-sidebar,
+body.ls-mobile.ls-mobile-shell-ready .ls-modifier-strip,
+body.ls-mobile.ls-mobile-shell-ready .ls-wave-intel,
+body.ls-mobile.ls-mobile-shell-ready .ls-wave-timeline,
+body.ls-mobile.ls-mobile-shell-ready .ls-kill-feed,
+body.ls-mobile.ls-mobile-shell-ready .ls-wave-preview {
+  display: none !important;
+}
+
+/* Canvas + game container fill mobile screen edge-to-edge. */
+body.ls-mobile #ls-app,
+body.ls-mobile #game-root,
+body.ls-mobile #game-container {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: 0;
+  background: #03050a;
+}
+body.ls-mobile canvas#ls-canvas,
+body.ls-mobile canvas#game-canvas {
+  box-shadow: none;
+  max-width: 100vw;
+  max-height: 100vh;
+  max-height: 100dvh;
+}
+
+/* Reserve space so the canvas sits between the top HUD and the bottom bar.
+   Drawer height (when closed) is included in the bottom reserve. */
+body.ls-mobile.ls-portrait #game-container,
+body.ls-mobile.ls-landscape #game-container {
+  padding-top: calc(var(--ls-m-top-h) + var(--ls-m-safe-top));
+  padding-bottom: calc(var(--ls-m-bottom-h) + var(--ls-m-safe-bottom));
+}
+
+body.ls-mobile {
+  position: fixed;
+  inset: 0;
+  overscroll-behavior: none;
+  touch-action: none;
+  --ls-font-scale: 1.05;
+}
+
+/* Soften CRT scanline overlay on mobile so it doesn't drown small text. */
+body.ls-mobile #ls-app::before,
+body.ls-mobile #game-root::before {
+  opacity: 0.5;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   2. Top HUD bar — credits / core / wave / pause / more / settings.
+   Single fixed-height row, no scroll. Important numbers visible always.
+   ────────────────────────────────────────────────────────────────────────── */
+.ls-mhud {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--ls-m-top-h) + var(--ls-m-safe-top));
+  padding: var(--ls-m-safe-top) calc(8px + var(--ls-m-safe-right)) 0 calc(8px + var(--ls-m-safe-left));
+  background: linear-gradient(to bottom, rgba(4, 7, 12, 0.96) 0%, rgba(4, 7, 12, 0.78) 70%, rgba(4, 7, 12, 0) 100%);
+  border-bottom: 1px solid var(--ls-m-border);
+  z-index: 50;
+  pointer-events: auto;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  color: var(--ls-m-text);
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.ls-mobile .ls-mhud { display: flex; }
+
+.ls-mhud-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ls-mhud-stat-label {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--ls-m-text-dim);
+  text-transform: uppercase;
+}
+.ls-mhud-stat-value {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--ls-m-accent);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.ls-mhud-stat-value.danger { color: var(--ls-m-danger); }
+.ls-mhud-stat-value.warning { color: var(--ls-m-warning); }
+.ls-mhud-stat-value.good { color: var(--ls-m-good); }
+
+/* Core HP bar — compact horizontal segmented strip. */
+.ls-mhud-core {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 92px;
+}
+.ls-mhud-core-bar {
+  position: relative;
+  height: 10px;
+  width: 80px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--ls-m-border-dim);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.ls-mhud-core-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--ls-m-good);
+  transition: width 0.18s ease, background 0.18s ease;
+}
+.ls-mhud-core.critical .ls-mhud-core-fill {
+  animation: ls-m-core-pulse 0.7s ease-in-out infinite;
+}
+@keyframes ls-m-core-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.ls-mhud-core-text {
+  font-size: 10px;
+  color: var(--ls-m-text);
+  letter-spacing: 0.5px;
+  min-width: 36px;
+}
+
+.ls-mhud-spacer { flex: 1 1 auto; min-width: 0; }
+
+/* Wave status text — truncates if long. */
+.ls-mhud-status {
+  font-size: 10px;
+  color: var(--ls-m-warning);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+/* Top-bar icon buttons (pause / more / settings). */
+.ls-mhud-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
+  background: rgba(8, 12, 18, 0.7);
+  border: 1px solid var(--ls-m-border-dim);
+  color: var(--ls-m-accent);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  border-radius: 2px;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-mhud-btn:active {
+  background: rgba(102, 252, 241, 0.18);
+  transform: scale(0.96);
+}
+.ls-mhud-btn.warning { color: var(--ls-m-warning); border-color: rgba(255, 179, 0, 0.4); }
+.ls-mhud-btn.warning:active { background: rgba(255, 179, 0, 0.18); }
+.ls-mhud-btn.primary {
+  color: var(--ls-m-warning);
+  border-color: var(--ls-m-warning);
+  background: rgba(255, 179, 0, 0.12);
+  font-weight: bold;
+}
+.ls-mhud-btn.primary:active { background: rgba(255, 179, 0, 0.28); }
+
+/* Mobile-specific: start-wave button takes priority real-estate when shown. */
+.ls-mhud-start {
+  padding: 0 14px;
+  height: 40px;
+  background: rgba(255, 179, 0, 0.15);
+  border: 1px solid var(--ls-m-warning);
+  color: var(--ls-m-warning);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  border-radius: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-mhud-start.visible { display: inline-flex; align-items: center; }
+.ls-mhud-start:active { background: rgba(255, 179, 0, 0.3); transform: scale(0.97); }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   3. Bottom action bar — speed | build/squad tab toggle | confirm/cancel slot.
+   ────────────────────────────────────────────────────────────────────────── */
+.ls-mabar {
+  display: none;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--ls-m-bottom-h) + var(--ls-m-safe-bottom));
+  padding: 6px calc(8px + var(--ls-m-safe-right)) calc(6px + var(--ls-m-safe-bottom)) calc(8px + var(--ls-m-safe-left));
+  background: linear-gradient(to top, rgba(4, 7, 12, 0.98) 60%, rgba(4, 7, 12, 0.75) 100%);
+  border-top: 1px solid var(--ls-m-border);
+  z-index: 55;
+  pointer-events: auto;
+  font-family: "Courier New", monospace;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.ls-mobile .ls-mabar { display: flex; }
+
+.ls-mabar-speed {
+  height: 52px;
+  min-width: 56px;
+  padding: 0 12px;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid var(--ls-m-border-dim);
+  border-radius: 2px;
+  color: var(--ls-m-accent);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+.ls-mabar-speed:active {
+  background: rgba(102, 252, 241, 0.2);
+  transform: scale(0.96);
+}
+.ls-mabar-speed .ls-mabar-speed-label {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: var(--ls-m-text-dim);
+  font-weight: normal;
+  margin-bottom: 1px;
+}
+
+/* Tab toggle: BUILD | SQUAD — single rounded element split in two. */
+.ls-mabar-tabs {
+  flex: 1 1 auto;
+  height: 52px;
+  display: flex;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid var(--ls-m-border-dim);
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 0;
+}
+.ls-mabar-tab {
+  flex: 1 1 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--ls-m-text-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0 4px;
+}
+.ls-mabar-tab + .ls-mabar-tab {
+  border-left: 1px solid var(--ls-m-border-dim);
+}
+.ls-mabar-tab.active {
+  background: rgba(102, 252, 241, 0.14);
+  color: var(--ls-m-accent);
+  box-shadow: inset 0 -3px 0 0 var(--ls-m-accent);
+}
+.ls-mabar-tab:active { background: rgba(102, 252, 241, 0.2); }
+.ls-mabar-tab-sub {
+  font-size: 8px;
+  font-weight: normal;
+  color: var(--ls-m-text-dim);
+  letter-spacing: 1px;
+  margin-top: 1px;
+}
+.ls-mabar-tab.active .ls-mabar-tab-sub { color: var(--ls-m-accent-dim); }
+
+/* Notification dot — alerts on squad cooldown ready / disabled tower etc. */
+.ls-mabar-tab-dot {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ls-m-warning);
+  box-shadow: 0 0 6px var(--ls-m-warning);
+  display: none;
+}
+.ls-mabar-tab.has-alert .ls-mabar-tab-dot { display: block; }
+
+/* Confirm / cancel slot — appears in place of the tabs when armed. */
+.ls-mabar-confirm-slot {
+  flex: 1 1 auto;
+  display: none;
+  gap: 8px;
+  min-width: 0;
+}
+.ls-mabar.armed .ls-mabar-tabs { display: none; }
+.ls-mabar.armed .ls-mabar-confirm-slot { display: flex; }
+
+.ls-mabar-confirm,
+.ls-mabar-cancel {
+  flex: 1 1 50%;
+  height: 52px;
+  border: 1px solid;
+  background: rgba(8, 12, 18, 0.9);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  cursor: pointer;
+  border-radius: 2px;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.ls-mabar-confirm {
+  color: var(--ls-m-warning);
+  border-color: var(--ls-m-warning);
+  background: rgba(255, 179, 0, 0.18);
+}
+.ls-mabar-confirm:active { background: rgba(255, 179, 0, 0.32); transform: scale(0.97); }
+.ls-mabar-confirm.disabled {
+  color: rgba(255, 179, 0, 0.35);
+  border-color: rgba(255, 179, 0, 0.3);
+  background: rgba(40, 30, 8, 0.4);
+  pointer-events: none;
+}
+.ls-mabar-cancel {
+  color: var(--ls-m-danger);
+  border-color: var(--ls-m-danger);
+  background: rgba(244, 67, 54, 0.12);
+}
+.ls-mabar-cancel:active { background: rgba(244, 67, 54, 0.28); transform: scale(0.97); }
+
+/* Hint text inside confirm — e.g. "TAP MAP TO POSITION". */
+.ls-mabar-armed-hint {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--ls-m-text-bright);
+  background: rgba(4, 7, 12, 0.92);
+  border: 1px solid var(--ls-m-warning);
+  padding: 4px 10px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: ls-m-fade-in 0.18s ease;
+}
+@keyframes ls-m-fade-in {
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   4. Build / Squad drawer — slides up above the bottom action bar.
+   ────────────────────────────────────────────────────────────────────────── */
+.ls-mdrawer {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--ls-m-bottom-h) + var(--ls-m-safe-bottom));
+  max-height: 50vh;
+  max-height: 50dvh;
+  background: var(--ls-m-bg-solid);
+  border-top: 1px solid var(--ls-m-border);
+  border-bottom: 1px solid var(--ls-m-border);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 54;
+  font-family: "Courier New", monospace;
+  color: var(--ls-m-text);
+  flex-direction: column;
+  transform: translateY(110%);
+  opacity: 0;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.ls-mobile .ls-mdrawer { display: flex; }
+.ls-mdrawer.open {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Drag handle bar at the top of the drawer. */
+.ls-mdrawer-handle {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.ls-mdrawer-handle::before {
+  content: "";
+  width: 44px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ls-m-border);
+}
+
+/* Category tab row inside the drawer. */
+.ls-mdrawer-cats {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.ls-mdrawer-cats::-webkit-scrollbar { display: none; }
+.ls-mdrawer-cat {
+  flex: 0 0 auto;
+  min-width: 56px;
+  height: 32px;
+  padding: 0 10px;
+  background: rgba(8, 12, 18, 0.7);
+  border: 1px solid var(--ls-m-border-dim);
+  color: var(--ls-m-text-dim);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  border-radius: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-mdrawer-cat.active {
+  background: rgba(102, 252, 241, 0.14);
+  border-color: var(--ls-m-accent);
+  color: var(--ls-m-accent);
+}
+.ls-mdrawer-cat:active { transform: scale(0.96); }
+
+/* Card grid — towers / squads. Scrolls vertically inside the drawer. */
+.ls-mdrawer-grid {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 8px 12px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  align-content: start;
+}
+
+/* Single tower / squad card. */
+.ls-mcard {
+  position: relative;
+  min-height: 76px;
+  background: rgba(10, 14, 20, 0.85);
+  border: 1px solid var(--ls-m-border-dim);
+  border-left-width: 3px;
+  border-radius: 2px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--ls-m-text);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.ls-mcard:active {
+  transform: scale(0.97);
+  background: rgba(102, 252, 241, 0.14);
+}
+.ls-mcard.active {
+  background: rgba(102, 252, 241, 0.2);
+  box-shadow: 0 0 10px rgba(102, 252, 241, 0.35);
+}
+.ls-mcard.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  filter: grayscale(0.4);
+}
+.ls-mcard.unaffordable {
+  filter: grayscale(0.3);
+}
+.ls-mcard.unaffordable .ls-mcard-cost { color: var(--ls-m-danger); }
+
+.ls-mcard-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  justify-content: space-between;
+}
+.ls-mcard-name {
+  flex: 1 1 auto;
+  font-size: 12px;
+  color: var(--ls-m-text-bright);
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ls-mcard-cost {
+  font-size: 11px;
+  color: var(--ls-m-warning);
+  font-weight: bold;
+  white-space: nowrap;
+}
+.ls-mcard-role {
+  font-size: 9px;
+  color: var(--ls-m-text-dim);
+  letter-spacing: 0.3px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.ls-mcard-meta {
+  display: flex;
+  gap: 6px;
+  font-size: 9px;
+  color: var(--ls-m-text-dim);
+  margin-top: auto;
+}
+.ls-mcard-meta b { color: var(--ls-m-accent); font-weight: bold; }
+
+/* Cooldown overlay (squad). */
+.ls-mcard-cd {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 10px;
+  color: var(--ls-m-warning);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 1px 5px;
+  border-radius: 1px;
+}
+.ls-mcard.locked .ls-mcard-cd { color: var(--ls-m-text-dim); }
+
+/* Active squad mini-roster (inside SQUAD tab) — horizontal scroll strip. */
+.ls-mdrawer-roster {
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  padding: 4px 8px 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--ls-m-border-dim);
+}
+.ls-mdrawer-roster:empty { display: none; }
+.ls-mdrawer-roster::-webkit-scrollbar { display: none; }
+.ls-mroster-item {
+  flex: 0 0 auto;
+  min-width: 110px;
+  height: 56px;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid var(--ls-m-border-dim);
+  border-left-width: 3px;
+  border-radius: 2px;
+  padding: 5px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-mroster-item.selected {
+  background: rgba(102, 252, 241, 0.16);
+  box-shadow: 0 0 10px rgba(102, 252, 241, 0.3);
+}
+.ls-mroster-item.evac { opacity: 0.85; }
+.ls-mroster-item.jammed { background: rgba(239, 108, 0, 0.12); }
+.ls-mroster-name {
+  font-size: 9px;
+  color: var(--ls-m-text-bright);
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ls-mroster-state {
+  font-size: 8px;
+  color: var(--ls-m-accent);
+  letter-spacing: 0.5px;
+}
+.ls-mroster-item.evac .ls-mroster-state { color: var(--ls-m-warning); }
+.ls-mroster-item.jammed .ls-mroster-state { color: #ef6c00; }
+.ls-mroster-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: auto;
+}
+.ls-mroster-bar {
+  height: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.ls-mroster-bar-fill {
+  height: 100%;
+  background: var(--ls-m-good);
+  width: 0%;
+  transition: width 0.12s ease;
+}
+.ls-mroster-actions {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px 8px;
+  flex-shrink: 0;
+}
+.ls-mroster-actions:empty { display: none; }
+.ls-mroster-action {
+  flex: 1 1 auto;
+  height: 32px;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid var(--ls-m-border-dim);
+  color: var(--ls-m-accent);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  border-radius: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-mroster-action.warning { color: var(--ls-m-warning); border-color: rgba(255, 179, 0, 0.4); }
+.ls-mroster-action:active { transform: scale(0.97); }
+.ls-mroster-action:disabled,
+.ls-mroster-action.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   5. Tower sheet — appears when a tower is selected.
+   Bottom-anchored card, replaces the drawer height when visible.
+   ────────────────────────────────────────────────────────────────────────── */
+.ls-msheet {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--ls-m-bottom-h) + var(--ls-m-safe-bottom));
+  max-height: 60vh;
+  max-height: 60dvh;
+  background: var(--ls-m-bg-solid);
+  border-top: 1px solid var(--ls-m-accent);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 56;
+  font-family: "Courier New", monospace;
+  color: var(--ls-m-text);
+  flex-direction: column;
+  transform: translateY(110%);
+  opacity: 0;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.ls-mobile .ls-msheet { display: flex; }
+.ls-msheet.open { transform: translateY(0); opacity: 1; }
+
+.ls-msheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--ls-m-border-dim);
+}
+.ls-msheet-handle {
+  width: 32px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ls-m-border);
+  flex-shrink: 0;
+}
+.ls-msheet-title {
+  flex: 1 1 auto;
+  font-size: 14px;
+  color: var(--ls-m-accent);
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ls-msheet-lvl {
+  font-size: 10px;
+  color: var(--ls-m-warning);
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+.ls-msheet-close {
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: var(--ls-m-text-dim);
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-msheet-close:active { color: var(--ls-m-text-bright); }
+
+.ls-msheet-body {
+  padding: 8px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
+}
+.ls-msheet-hp {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ls-msheet-hp-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+.ls-msheet-hp-row b { color: var(--ls-m-accent); }
+.ls-msheet-hp-state {
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+.ls-msheet-hp-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--ls-m-border-dim);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.ls-msheet-hp-fill {
+  height: 100%;
+  background: var(--ls-m-good);
+  transition: width 0.18s ease, background 0.18s ease;
+}
+.ls-msheet-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  font-size: 10px;
+}
+.ls-msheet-stat {
+  background: rgba(8, 12, 18, 0.7);
+  border: 1px solid var(--ls-m-border-dim);
+  padding: 4px 6px;
+  text-align: center;
+  border-radius: 1px;
+}
+.ls-msheet-stat-label {
+  font-size: 8px;
+  color: var(--ls-m-text-dim);
+  letter-spacing: 1px;
+}
+.ls-msheet-stat-value {
+  font-size: 12px;
+  color: var(--ls-m-accent);
+  font-weight: bold;
+}
+.ls-msheet-fx-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.ls-msheet-fx-row:empty { display: none; }
+.ls-msheet-fx {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 1px;
+}
+.ls-msheet-fx.shield { color: #80deea; }
+.ls-msheet-fx.repair { color: var(--ls-m-good); }
+.ls-msheet-fx.hit { color: #ff8a65; }
+.ls-msheet-fx.jammed { color: #ef6c00; }
+.ls-msheet-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 4px;
+}
+.ls-msheet-actions.three { grid-template-columns: repeat(3, 1fr); }
+.ls-msheet-act {
+  height: 44px;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid var(--ls-m-accent);
+  color: var(--ls-m-accent);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-msheet-act:active { background: rgba(102, 252, 241, 0.2); transform: scale(0.97); }
+.ls-msheet-act.warning { border-color: var(--ls-m-warning); color: var(--ls-m-warning); }
+.ls-msheet-act.warning:active { background: rgba(255, 179, 0, 0.2); }
+.ls-msheet-act.danger { border-color: var(--ls-m-danger); color: var(--ls-m-danger); }
+.ls-msheet-act.danger:active { background: rgba(244, 67, 54, 0.18); }
+.ls-msheet-act.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.ls-msheet-act-sub {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  font-weight: normal;
+}
+.ls-msheet-target-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.ls-msheet-target-btn {
+  flex: 1 1 0;
+  min-width: 56px;
+  height: 28px;
+  background: rgba(8, 12, 18, 0.7);
+  border: 1px solid var(--ls-m-border-dim);
+  color: var(--ls-m-text-dim);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  border-radius: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-msheet-target-btn.active {
+  background: rgba(102, 252, 241, 0.18);
+  border-color: var(--ls-m-accent);
+  color: var(--ls-m-accent);
+}
+.ls-msheet-spec {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ls-m-border-dim);
+}
+.ls-msheet-spec-title {
+  font-size: 10px;
+  color: #ff9800;
+  letter-spacing: 1.5px;
+  margin-bottom: 4px;
+}
+.ls-msheet-spec-opt {
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 152, 0, 0.06);
+  border: 1px solid #ff9800;
+  color: var(--ls-m-text);
+  font-family: inherit;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-msheet-spec-opt:active { background: rgba(255, 152, 0, 0.18); transform: scale(0.98); }
+.ls-msheet-spec-name { font-size: 11px; color: #ff9800; font-weight: bold; letter-spacing: 1px; }
+.ls-msheet-spec-desc { font-size: 10px; color: var(--ls-m-text); margin-top: 2px; }
+.ls-msheet-hint {
+  font-size: 10px;
+  background: rgba(102, 252, 241, 0.08);
+  border-left: 2px solid var(--ls-m-accent);
+  padding: 4px 6px;
+  border-radius: 1px;
+}
+.ls-msheet-hint.warn {
+  background: rgba(244, 67, 54, 0.1);
+  border-left-color: var(--ls-m-danger);
+  color: #ff8a65;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   6. More-menu flyout — secondary actions (repair, EMP, relay, etc).
+   ────────────────────────────────────────────────────────────────────────── */
+.ls-mmore-backdrop {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 70;
+  pointer-events: auto;
+}
+.ls-mmore-backdrop.visible { display: block; animation: ls-m-fade-bg 0.18s ease; }
+@keyframes ls-m-fade-bg { from { opacity: 0; } to { opacity: 1; } }
+
+.ls-mmore {
+  position: absolute;
+  top: calc(var(--ls-m-top-h) + var(--ls-m-safe-top) + 4px);
+  right: calc(8px + var(--ls-m-safe-right));
+  width: 240px;
+  max-width: calc(100vw - 16px);
+  background: var(--ls-m-bg-solid);
+  border: 1px solid var(--ls-m-accent);
+  border-radius: 2px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  z-index: 71;
+  font-family: "Courier New", monospace;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  animation: ls-m-fade-in-r 0.18s ease;
+}
+@keyframes ls-m-fade-in-r {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ls-mmore-title {
+  font-size: 10px;
+  color: var(--ls-m-text-dim);
+  letter-spacing: 2px;
+  padding: 8px 12px 4px;
+  border-bottom: 1px solid var(--ls-m-border-dim);
+}
+.ls-mmore-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ls-m-border-dim);
+  color: var(--ls-m-text);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ls-mmore-btn:last-child { border-bottom: none; }
+.ls-mmore-btn:active { background: rgba(102, 252, 241, 0.1); }
+.ls-mmore-btn.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.ls-mmore-btn.active { background: rgba(102, 252, 241, 0.14); color: var(--ls-m-accent); }
+.ls-mmore-btn .ls-mmore-label {
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+.ls-mmore-btn .ls-mmore-sub {
+  font-size: 9px;
+  color: var(--ls-m-text-dim);
+  letter-spacing: 0.5px;
+  flex: 1 1 auto;
+  margin-left: 8px;
+}
+.ls-mmore-btn .ls-mmore-cost {
+  font-size: 10px;
+  color: var(--ls-m-warning);
+  font-weight: bold;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   7. Ghost-placement HUD — small floating chip near the canvas cursor that
+   tells the player "drag to position, tap CONFIRM".
+   ────────────────────────────────────────────────────────────────────────── */
+.ls-mghost-hint {
+  display: none;
+  position: absolute;
+  top: calc(var(--ls-m-top-h) + var(--ls-m-safe-top) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(4, 7, 12, 0.94);
+  border: 1px solid var(--ls-m-warning);
+  color: var(--ls-m-warning);
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  padding: 6px 12px;
+  border-radius: 2px;
+  z-index: 53;
+  pointer-events: none;
+  white-space: nowrap;
+  text-align: center;
+  animation: ls-m-fade-in 0.18s ease;
+}
+.ls-mghost-hint.visible { display: block; }
+.ls-mghost-hint.invalid {
+  border-color: var(--ls-m-danger);
+  color: var(--ls-m-danger);
+  background: rgba(40, 8, 8, 0.92);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   8. Critical-core indicator pulse used by mobile top bar.
+   ────────────────────────────────────────────────────────────────────────── */
+.ls-mhud-stat-value.flash {
+  animation: ls-m-flash 0.4s ease-out;
+}
+@keyframes ls-m-flash {
+  0% { transform: scale(1.2); color: var(--ls-m-text-bright); text-shadow: 0 0 8px var(--ls-m-accent); }
+  100% { transform: scale(1); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   9. Boss bar / rift warning positioning on mobile — sit between top HUD
+   and drawer so they don't overlap chrome.
+   ────────────────────────────────────────────────────────────────────────── */
+body.ls-mobile .ls-boss-bar {
+  top: calc(var(--ls-m-top-h) + var(--ls-m-safe-top) + 6px);
+  min-width: 240px;
+  max-width: calc(100vw - 24px);
+  font-size: 10px;
+}
+body.ls-mobile .ls-rift-warning {
+  top: calc(var(--ls-m-top-h) + var(--ls-m-safe-top) + 44px);
+  font-size: 10px;
+  padding: 3px 8px;
+}
+body.ls-mobile .ls-critical-overlay {
+  /* Keep the inset glow but soften so it doesn't fight the top bar. */
+  box-shadow: inset 0 0 40px rgba(244, 67, 54, 0.28);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   10. Mobile-only inline status chips — credits-changed flash, etc.
+   ────────────────────────────────────────────────────────────────────────── */
+.ls-mhud-stat-value {
+  transition: color 0.15s ease;
+}
+
+/* Settings / Codex / GameOver / Victory overlays on mobile — make them
+   scroll cleanly and pad for safe areas. */
+body.ls-mobile .ls-overlay {
+  padding: calc(16px + var(--ls-m-safe-top)) calc(12px + var(--ls-m-safe-right)) calc(16px + var(--ls-m-safe-bottom)) calc(12px + var(--ls-m-safe-left));
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+body.ls-mobile .ls-overlay-title {
+  font-size: 28px;
+  letter-spacing: 4px;
+  text-align: center;
+}
+body.ls-mobile .ls-overlay-subtitle { text-align: center; }
+body.ls-mobile .ls-overlay-actions { gap: 8px; }
+body.ls-mobile .ls-overlay-actions .ls-btn {
+  flex: 1 1 140px;
+  min-height: 48px;
+}
+body.ls-mobile .ls-stats {
+  min-width: 0;
+  max-width: 100%;
+  padding: 12px;
+  font-size: 12px;
+}
+
+/* Sector select & main menu — single column, big tap targets. */
+body.ls-mobile .ls-sector-grid {
+  grid-template-columns: 1fr;
+  padding: 0;
+  gap: 10px;
+}
+body.ls-mobile .ls-sector-card { padding: 12px; }
+body.ls-mobile .ls-title { font-size: 36px; letter-spacing: 4px; }
+body.ls-mobile .ls-loadout-grid {
+  grid-template-columns: 1fr;
+  padding: 0;
+  gap: 10px;
+}
+
+/* Disable hover/transform effects on all touch interactions — no mouseleave
+   on a phone means we leave stuck states otherwise. */
+body.ls-mobile .ls-btn:hover,
+body.ls-mobile .ls-tower-btn:hover,
+body.ls-mobile .ls-sector-card:hover,
+body.ls-mobile .ls-meta-node.available:hover {
+  transform: none;
+}
+
+/* Landscape phone — shorter drawer / sheet, smaller cards. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body.ls-mobile {
+    --ls-m-top-h: 48px;
+    --ls-m-bottom-h: 56px;
+  }
+  body.ls-mobile .ls-mdrawer {
+    max-height: 65vh;
+    max-height: 65dvh;
+  }
+  body.ls-mobile .ls-mdrawer-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  body.ls-mobile .ls-msheet {
+    max-height: 75vh;
+    max-height: 75dvh;
+  }
+  body.ls-mobile .ls-mhud {
+    height: var(--ls-m-top-h);
+  }
+}
+
+/* Very small phones (≤ 360px wide) — compact stats, smaller fonts. */
+@media (max-width: 360px) {
+  body.ls-mobile .ls-mhud-stat-value { font-size: 12px; }
+  body.ls-mobile .ls-mhud-core-bar { width: 64px; }
+  body.ls-mobile .ls-mhud-status { max-width: 80px; }
+  body.ls-mobile .ls-mhud-btn { min-width: 36px; padding: 0 6px; font-size: 11px; }
+  body.ls-mobile .ls-mhud-start { padding: 0 10px; font-size: 11px; }
+}
