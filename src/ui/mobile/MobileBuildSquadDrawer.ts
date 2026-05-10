@@ -17,8 +17,8 @@ const CATEGORIES = {
   ECONOMY: ["harvester"] as TowerType[],
   ELITE: ["mortar"] as TowerType[],
 } as const;
-type Category = "ALL" | keyof typeof CATEGORIES;
-const CATEGORY_ORDER: Category[] = ["ALL", "ATTACK", "CONTROL", "SUPPORT", "ECONOMY", "ELITE"];
+type Category = keyof typeof CATEGORIES;
+const CATEGORY_ORDER: Category[] = ["ATTACK", "CONTROL", "SUPPORT", "ECONOMY", "ELITE"];
 
 /**
  * MobileBuildSquadDrawer — bottom drawer that swaps between BUILD and SQUAD
@@ -36,7 +36,7 @@ export class MobileBuildSquadDrawer {
   isOpen = false;
 
   private mode: "build" | "squad" = "build";
-  private buildCategory: Category = "ALL";
+  private buildCategory: Category = "ATTACK";
 
   private handle: HTMLElement;
   private cats: HTMLElement;
@@ -178,7 +178,7 @@ export class MobileBuildSquadDrawer {
   }
 
   private towersInCategory(cat: Category): TowerType[] {
-    const candidates = cat === "ALL" ? towerOrder : CATEGORIES[cat];
+    const candidates = CATEGORIES[cat];
     // Filter out research-locked towers (railgun/flamer/barrier) the player hasn't unlocked yet.
     const metaUnlocks = new Set(this.game.meta.aggregate().unlockedTowers);
     const gated = new Set<TowerType>(["railgun", "flamer", "barrier"] as TowerType[]);

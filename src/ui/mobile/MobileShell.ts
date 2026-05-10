@@ -354,14 +354,18 @@ export class MobileShell {
     const cancelBtn = el("button", { class: "ls-mabar-cancel", text: "✕ CANCEL" });
     cancelBtn.onclick = () => this.cancelArmed();
 
+    // For tower placement we expose a CONFIRM that finalizes the ghost.
+    // For squad / relay / killzone, the player taps the map to commit; the
+    // bar shows just CANCEL plus a small "tap map to place" hint.
     if (kind === "tower") {
-      const hint = el("div", { class: "ls-mabar-armed-hint", text: "TAP MAP TO BUILD" });
-      this.confirmSlot.append(hint, cancelBtn);
+      const confirmBtn = el("button", { class: "ls-mabar-confirm", text: "✓ PLACE" });
+      confirmBtn.onclick = () => this.confirmTowerPlacement();
+      this.confirmSlot.append(confirmBtn, cancelBtn);
     } else {
       const hintLabel = kind === "squad" ? "TAP MAP TO DEPLOY"
         : kind === "relay" ? "TAP MAP FOR RELAY"
         : "TAP MAP TO MARK";
-      const hint = el("div", { class: "ls-mabar-armed-hint", text: hintLabel });
+      const hint = el("div", { class: "ls-mabar-hint", text: hintLabel });
       this.confirmSlot.append(hint, cancelBtn);
     }
 
@@ -405,7 +409,7 @@ export class MobileShell {
   private updateGhostHint(): void {
     if (!this.armedKind) { this.ghostHint.classList.remove("visible"); return; }
     let text = "DRAG ON MAP";
-    if (this.armedKind === "tower") text = "TAP MAP TO BUILD";
+    if (this.armedKind === "tower") text = "DRAG → PLACE";
     else if (this.armedKind === "squad") text = "TAP MAP TO DEPLOY";
     else if (this.armedKind === "relay") text = "TAP TO PLACE RELAY";
     else if (this.armedKind === "killzone") text = "TAP TO MARK KILL ZONE";
