@@ -2,6 +2,7 @@ import type { Game } from "../../core/Game";
 import { el, clear } from "./dom";
 import { MobileBuildSquadDrawer } from "./MobileBuildSquadDrawer";
 import { MobileTowerSheet } from "./MobileTowerSheet";
+import { enemyDefinitions } from "../../data/enemies";
 
 /**
  * MobileShell — top-level mobile UI orchestrator.
@@ -26,6 +27,9 @@ export class MobileShell {
   private mabar!: HTMLElement;
   private mmoreBackdrop!: HTMLElement;
   private mmore!: HTMLElement;
+  private minfoBackdrop!: HTMLElement;
+  private minfo!: HTMLElement;
+  private minfoBody!: HTMLElement;
   private ghostHint: HTMLElement;
 
   // Top HUD elements we mutate every frame.
@@ -68,6 +72,7 @@ export class MobileShell {
     this.buildTopHud();
     this.buildBottomBar();
     this.buildMoreMenu();
+    this.buildInfoSheet();
     this.ghostHint = el("div", { class: "ls-mghost-hint" });
 
     this.drawer = new MobileBuildSquadDrawer(game, this);
@@ -81,6 +86,8 @@ export class MobileShell {
       this.ghostHint,
       this.mmoreBackdrop,
       this.mmore,
+      this.minfoBackdrop,
+      this.minfo,
     );
 
     this.bind();
@@ -280,6 +287,18 @@ export class MobileShell {
       },
     }));
 
+    // TACTICAL INTEL
+    this.mmore.append(this.moreButton({
+      label: "TACTICAL INTEL",
+      sub: "Objectives, next wave, modifiers, map status",
+      cost: "",
+      enabled: true,
+      onClick: () => {
+        this.openInfoSheet();
+        this.closeMoreMenu();
+      },
+    }));
+
     // CODEX
     this.mmore.append(this.moreButton({
       label: "FIELD MANUAL",
@@ -316,6 +335,186 @@ export class MobileShell {
     if (opts.cost) btn.append(el("div", { class: "ls-mmore-cost", text: opts.cost }));
     btn.onclick = () => { if (opts.enabled) opts.onClick(); };
     return btn;
+  }
+
+  // Mobile tactical intel sheet: replaces desktop-only wave preview,
+  // objectives/sidebar, modifier strip, boss bar, and rift warning.
+  private buildInfoSheet(): void {
+    this.minfoBackdrop = el("div", { class: "ls-minfo-backdrop" });
+    this.minfoBackdrop.onclick = () => this.closeInfoSheet();
+
+    this.minfo = el("div", { class: "ls-minfo" });
+    const head = el("div", { class: "ls-minfo-head" });
+    const close = el("button", { class: "ls-minfo-close", text: "X" });
+    close.onclick = () => this.closeInfoSheet();
+    head.append(el("div", { class: "ls-minfo-title", text: "TACTICAL INTEL" }), close);
+    this.minfoBody = el("div", { class: "ls-minfo-body" });
+    this.minfo.append(head, this.minfoBody);
+  }
+
+  private openInfoSheet(): void {
+    this.refreshInfoSheet();
+    this.minfo.classList.add("visible");
+    this.minfoBackdrop.classList.add("visible");
+    this.drawer.close();
+    this.haptic(6);
+  }
+
+  private closeInfoSheet(): void {
+    this.minfo.classList.remove("visible");
+    this.minfoBackdrop.classList.remove("visible");
+  }
+
+  private refreshInfoSheet(): void {
+    if (!this.minfo.classList.contains("visible")) return;
+    clear(this.minfoBody);
+    this.renderInfoWave();
+    this.renderInfoObjectives();
+    this.renderInfoModifiers();
+    this.renderInfoStrategic();
+    this.renderInfoBoss();
+  }
+
+  private renderInfoWave(): void {
+    const wave = this.game.waves.nextWaveDef;
+    const section = this.infoSection("WAVE INTEL");
+    if (!wave) {
+      section.append(el("div", { class: "ls-minfo-muted", text: "No further waves." }));
+      this.minfoBody.append(section);
+      return;
+    }
+    const waveNum = Math.min(this.game.core.waveIndex + 1, this.game.waves.totalWaves);
+    section.append(el("div", { class: "ls-minfo-main", text: `${waveNum}/${this.game.waves.totalWaves} - ${wave.name}` }));
+    if (wave.description) section.append(el("div", { class: "ls-minfo-copy", text: wave.description }));
+    if (wave.warning) section.append(el("div", { class: "ls-minfo-warn", text: wave.warning }));
+
+    const summary = wave.enemySummary ?? [];
+    if (summary.length > 0) {
+      const list = el("div", { class: "ls-minfo-chiprow" });
+      for (const entry of summary) {
+        const def = enemyDefinitions[entry.type];
+        const chip = el("div", { class: "ls-minfo-chip" });
+        const swatch = el("span", { class: "ls-minfo-swatch" });
+        swatch.style.background = def.color;
+        chip.append(swatch, el("span", { text: `${def.name} x${entry.count}` }));
+        list.append(chip);
+      }
+      section.append(list);
+    }
+
+    if (wave.recommendedCounters?.length) {
+      section.append(el("div", { class: "ls-minfo-subhead", text: "Recommended" }));
+      const counters = el("div", { class: "ls-minfo-chiprow" });
+      for (const c of wave.recommendedCounters) {
+        counters.append(el("span", { class: "ls-minfo-pill", text: c }));
+      }
+      section.append(counters);
+    }
+    this.minfoBody.append(section);
+  }
+
+  private renderInfoObjectives(): void {
+    const obj = this.game.objectives.currentSectorObjectives;
+    const section = this.infoSection("OBJECTIVES");
+    if (!obj) {
+      section.append(el("div", { class: "ls-minfo-muted", text: "No active sector objectives." }));
+      this.minfoBody.append(section);
+      return;
+    }
+    const snap = this.game.objectives.snapshot();
+    const primary = this.game.objectives.evaluate(obj.primary, snap, false);
+    section.append(this.objectiveLine("PRIMARY", obj.primary.label, primary.completed, primary.progressText));
+    for (const sec of obj.secondary) {
+      const ev = this.game.objectives.evaluate(sec, snap, false);
+      const ok = ev.completed || (ev.progress != null && ev.progress >= 1);
+      section.append(this.objectiveLine("+", sec.label, ok, ev.progressText));
+    }
+    this.minfoBody.append(section);
+  }
+
+  private renderInfoModifiers(): void {
+    const mods = this.game.core.activeModifiers;
+    if (mods.length === 0) return;
+    const section = this.infoSection("RUN MODIFIERS");
+    for (const m of mods) {
+      section.append(el("div", { class: "ls-minfo-row" }, [
+        el("span", { class: "ls-minfo-row-name", text: m.name }),
+        el("span", { class: "ls-minfo-row-detail", text: m.description }),
+      ]));
+    }
+    this.minfoBody.append(section);
+  }
+
+  private renderInfoStrategic(): void {
+    const sps = this.game.strategicPoints;
+    if (!sps || sps.list.length === 0) return;
+    let captured = 0;
+    let neutral = 0;
+    let hostile = 0;
+    let imminent = 0;
+    let soonest = Infinity;
+    for (const p of sps.list) {
+      if (p.state === "captured" || p.state === "depleted") captured++;
+      else if (p.state === "neutral") neutral++;
+      else if (p.state === "enemy") hostile++;
+      if (p.type === "rift_anchor" && p.state === "enemy" && p.discovered && p.effectTimer <= 2 && p.effectTimer > 0) {
+        imminent++;
+        soonest = Math.min(soonest, p.effectTimer);
+      }
+    }
+    const section = this.infoSection("STRATEGIC MAP");
+    section.append(el("div", { class: "ls-minfo-statgrid" }, [
+      this.infoStat("Held", `${captured}`),
+      this.infoStat("Neutral", `${neutral}`),
+      this.infoStat("Hostile", `${hostile}`),
+    ]));
+    if (imminent > 0) {
+      section.append(el("div", {
+        class: "ls-minfo-warn",
+        text: `Rift pulse imminent x${imminent} (${soonest.toFixed(1)}s)`,
+      }));
+    }
+    this.minfoBody.append(section);
+  }
+
+  private renderInfoBoss(): void {
+    const boss = this.game.enemies.list.find((e) => e.isBoss && e.active);
+    if (!boss) return;
+    const section = this.infoSection("BOSS");
+    const pct = Math.max(0, boss.hp / Math.max(1, boss.maxHp));
+    const fill = el("div", { class: "ls-minfo-bar-fill" });
+    fill.style.width = `${(pct * 100).toFixed(1)}%`;
+    section.append(
+      el("div", {
+        class: "ls-minfo-main danger",
+        text: boss.bossEntranceTimer > 0 ? "LEVIATHAN - INCOMING" : `LEVIATHAN - PHASE ${Math.max(1, boss.bossPhase)}`,
+      }),
+      el("div", { class: "ls-minfo-bar" }, [fill]),
+    );
+    this.minfoBody.append(section);
+  }
+
+  private infoSection(title: string): HTMLElement {
+    return el("section", { class: "ls-minfo-section" }, [
+      el("div", { class: "ls-minfo-section-title", text: title }),
+    ]);
+  }
+
+  private objectiveLine(tag: string, label: string, ok: boolean, progress?: string): HTMLElement {
+    const row = el("div", { class: `ls-minfo-objective${ok ? " ok" : ""}` });
+    row.append(
+      el("span", { class: "ls-minfo-objective-tag", text: ok ? "OK" : tag }),
+      el("span", { class: "ls-minfo-objective-label", text: label }),
+    );
+    if (progress) row.append(el("span", { class: "ls-minfo-objective-progress", text: progress }));
+    return row;
+  }
+
+  private infoStat(label: string, value: string): HTMLElement {
+    return el("div", { class: "ls-minfo-stat" }, [
+      el("div", { class: "ls-minfo-stat-value", text: value }),
+      el("div", { class: "ls-minfo-stat-label", text: label }),
+    ]);
   }
 
   // ──────────────────────────────────────────────────────────
@@ -469,6 +668,7 @@ export class MobileShell {
       this.drawer.close();
       this.towerSheet.close();
       this.closeMoreMenu();
+      this.closeInfoSheet();
     }
 
     if (showShell) {
@@ -493,6 +693,7 @@ export class MobileShell {
       this.refreshStatusText();
       this.reflectModeFlags();
       this.refreshTabAlerts();
+      this.refreshInfoSheet();
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);

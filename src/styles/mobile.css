@@ -1092,6 +1092,177 @@ body.ls-mobile .ls-msheet { display: flex; }
   font-weight: bold;
 }
 
+.ls-minfo-backdrop {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  z-index: 72;
+  pointer-events: auto;
+}
+.ls-minfo-backdrop.visible { display: block; }
+.ls-minfo {
+  display: none;
+  position: absolute;
+  left: calc(10px + var(--ls-m-safe-left));
+  right: calc(10px + var(--ls-m-safe-right));
+  top: calc(var(--ls-m-top-h) + var(--ls-m-safe-top) + 8px);
+  bottom: calc(var(--ls-m-bottom-h) + var(--ls-m-safe-bottom) + 8px);
+  z-index: 73;
+  background: var(--ls-m-bg-solid);
+  border: 1px solid var(--ls-m-accent);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.65);
+  font-family: "Courier New", monospace;
+  color: var(--ls-m-text);
+  pointer-events: auto;
+  flex-direction: column;
+}
+.ls-minfo.visible { display: flex; }
+.ls-minfo-head {
+  min-height: 44px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--ls-m-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.ls-minfo-title {
+  flex: 1 1 auto;
+  color: var(--ls-m-accent);
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 1.8px;
+}
+.ls-minfo-close {
+  width: 34px;
+  height: 34px;
+  background: rgba(244, 67, 54, 0.12);
+  border: 1px solid var(--ls-m-danger);
+  color: var(--ls-m-danger);
+  font-family: inherit;
+  font-weight: bold;
+}
+.ls-minfo-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ls-minfo-section {
+  border: 1px solid var(--ls-m-border-dim);
+  background: rgba(8, 12, 18, 0.72);
+  padding: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ls-minfo-section-title,
+.ls-minfo-subhead {
+  color: var(--ls-m-accent);
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 1.4px;
+}
+.ls-minfo-main {
+  color: var(--ls-m-text-bright);
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.8px;
+}
+.ls-minfo-main.danger { color: var(--ls-m-danger); }
+.ls-minfo-copy,
+.ls-minfo-muted,
+.ls-minfo-row-detail {
+  color: var(--ls-m-text-dim);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.ls-minfo-warn {
+  border-left: 2px solid var(--ls-m-warning);
+  background: rgba(255, 193, 7, 0.08);
+  color: var(--ls-m-warning);
+  font-size: 10px;
+  line-height: 1.35;
+  padding: 5px 7px;
+}
+.ls-minfo-chiprow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.ls-minfo-chip,
+.ls-minfo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--ls-m-border-dim);
+  background: rgba(102, 252, 241, 0.07);
+  padding: 3px 6px;
+  font-size: 10px;
+}
+.ls-minfo-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+}
+.ls-minfo-objective,
+.ls-minfo-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 8px;
+  align-items: start;
+  font-size: 10px;
+}
+.ls-minfo-objective.ok { color: var(--ls-m-good); }
+.ls-minfo-objective-tag {
+  min-width: 42px;
+  color: var(--ls-m-accent);
+  font-weight: bold;
+}
+.ls-minfo-objective-label,
+.ls-minfo-row-name {
+  color: var(--ls-m-text-bright);
+}
+.ls-minfo-objective-progress {
+  grid-column: 2;
+  color: var(--ls-m-text-dim);
+}
+.ls-minfo-statgrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.ls-minfo-stat {
+  border: 1px solid var(--ls-m-border-dim);
+  background: rgba(0, 0, 0, 0.22);
+  padding: 6px;
+  text-align: center;
+}
+.ls-minfo-stat-value {
+  color: var(--ls-m-text-bright);
+  font-size: 16px;
+  font-weight: bold;
+}
+.ls-minfo-stat-label {
+  color: var(--ls-m-text-dim);
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+.ls-minfo-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 82, 82, 0.4);
+}
+.ls-minfo-bar-fill {
+  height: 100%;
+  background: var(--ls-m-danger);
+  box-shadow: 0 0 8px rgba(255, 82, 82, 0.45);
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
    7. Ghost-placement HUD — small floating chip near the canvas cursor that
    tells the player "drag to position, tap CONFIRM".
