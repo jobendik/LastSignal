@@ -58,6 +58,7 @@ import { ObjectivesSystem } from "../systems/ObjectivesSystem";
 import { StrategicPointSystem } from "../systems/StrategicPointSystem";
 import { MobileSquadSystem } from "../systems/MobileSquadSystem";
 import { GuidanceSystem } from "../systems/GuidanceSystem";
+import { AdsSystem } from "../systems/AdsSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
@@ -99,6 +100,7 @@ export class Game {
   strategicPoints!: StrategicPointSystem;
   squads!: MobileSquadSystem;
   guidance!: GuidanceSystem;
+  ads = new AdsSystem();
   render!: RenderSystem;
   input!: InputSystem;
   ui!: UIManager;
@@ -200,6 +202,11 @@ export class Game {
     this.ui.attach();
     this.guidance.attach();
     this.settings.applyVisualSettings();
+    // CrazyGames SDK boots lazily and is fully optional. Signal loading
+    // so the host can show its own loading shim; gameplayStart/stop fire
+    // around active waves to gate ads correctly.
+    this.ads.signalLoadingStart();
+    this.ads.init().finally(() => this.ads.signalLoadingStop());
     this.setState("MAIN_MENU");
     this.running = true;
     const loop = (now: number) => {
@@ -219,6 +226,7 @@ export class Game {
   }
 
   setState(next: GameStateId): void {
+    const prev = this.stateMachine.state;
     this.stateMachine.set(next);
     if (next === "PLANNING" && this.waves) {
       this.waves.beginPlanningCountdown();
@@ -226,6 +234,14 @@ export class Game {
     // Adaptive music intensity.
     if (next === "WAVE_ACTIVE") this.audio.setMusicIntensity(1);
     else if (next === "PLANNING" || next === "WAVE_COMPLETE" || next === "REWARD_CHOICE") this.audio.setMusicIntensity(0);
+    // SDK gameplay signals. Enter active gameplay on first wave start; stop on
+    // run-end states.
+    if (next === "WAVE_ACTIVE" && prev !== "WAVE_ACTIVE") {
+      this.ads.signalGameplayStart();
+    }
+    if ((next === "GAME_OVER" || next === "VICTORY" || next === "MAIN_MENU" || next === "SECTOR_SELECT") && prev === "WAVE_ACTIVE") {
+      this.ads.signalGameplayStop();
+    }
   }
   get state(): GameStateId {
     return this.stateMachine.state;
@@ -374,6 +390,9 @@ export class Game {
     this.audio.setMusicIntensity(0);
     this.setState("MAIN_MENU");
     this.bus.emit("menu:returned");
+    // Fire interstitial when returning to menu (cooldown-gated internally).
+    // Fire-and-forget — no need to await.
+    void this.ads.showInterstitial();
   }
 
   recordReplayEvent(event: string, data?: unknown): void {
