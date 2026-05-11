@@ -56,7 +56,17 @@ export class EndlessSystem {
     const id = `endless_${this.wave}`;
     const isBoss = this.wave % 8 === 0;
     if (isBoss && lanes.length > 0) {
-      const type: EnemyType = this.wave >= 16 ? "leviathan" : "overlord";
+      // Boss rotation: Overlord early, Harbinger mid, Leviathan late.
+      // Harbinger (artillery) is the most tactically interesting fight —
+      // it targets tower clusters and forces the player to rethink spacing.
+      let type: EnemyType;
+      if (this.wave >= 24) {
+        type = this.wave % 16 === 0 ? "leviathan" : "harbinger";
+      } else if (this.wave >= 16) {
+        type = "leviathan";
+      } else {
+        type = "overlord";
+      }
       lanes[0]!.enemies.push({ type, count: 1, interval: 0.1 });
     }
 
@@ -67,7 +77,7 @@ export class EndlessSystem {
       description: "Procedurally-generated endless anomaly surge.",
       warning: isBoss ? "BOSS ESCORT DETECTED" : "Increasing anomaly pressure.",
       recommendedCounters: [],
-      rewardCredits: 30 + this.wave * 6,
+      rewardCredits: 40 + this.wave * 10,
       rewardChoice: this.wave % 3 === 0,
       lanes,
       isBossWave: isBoss,
