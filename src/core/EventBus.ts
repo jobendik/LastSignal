@@ -17,6 +17,7 @@ export interface GameEventMap {
     consentRequested: boolean;
     adsAllowed: boolean;
     cloudSaveAllowed: boolean;
+    telemetryAllowed: boolean;
   };
   "ui:esc": void;
   "ui:cleared": void;

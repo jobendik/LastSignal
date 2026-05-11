@@ -2,6 +2,9 @@ import type { Game } from "../core/Game";
 import type { RunJournalEntry } from "../core/Types";
 import { achievementDefinitions } from "../data/achievements";
 import { el, clear } from "./dom";
+import privacyText from "../../PRIVACY.md?raw";
+import termsText from "../../TERMS.md?raw";
+import thirdPartyText from "../../THIRD_PARTY.md?raw";
 
 const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^█▓▒░▄▀■□";
 
@@ -60,6 +63,61 @@ function runEntryCard(entry: RunJournalEntry): HTMLElement {
     card.append(el("div", { class: "ls-run-mods", text: entry.modifiers.slice(0, 2).join(" / ") }));
   }
   return card;
+}
+
+const LEGAL_TABS: Array<{ label: string; text: string }> = [
+  { label: "Privacy Policy", text: privacyText },
+  { label: "Terms of Use", text: termsText },
+  { label: "Third-Party Licences", text: thirdPartyText },
+];
+
+function openLegalModal(root: HTMLElement): void {
+  const overlay = el("div", {
+    class: "ls-overlay ls-legal-modal visible",
+    attrs: {
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-label": "Legal notices",
+    },
+  });
+  overlay.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+  overlay.addEventListener("click", (ev) => ev.stopPropagation());
+
+  const title = el("div", { class: "ls-overlay-title", text: "LEGAL NOTICES" });
+
+  const tabBar = el("div", { class: "ls-legal-tabs" });
+  const contentArea = el("pre", { class: "ls-legal-content" });
+
+  let activeIndex = 0;
+  const tabBtns: HTMLButtonElement[] = [];
+
+  LEGAL_TABS.forEach(({ label, text }, i) => {
+    const btn = el("button", { class: "ls-legal-tab", text: label }) as HTMLButtonElement;
+    btn.onclick = () => {
+      activeIndex = i;
+      tabBtns.forEach((b, j) => b.classList.toggle("active", j === i));
+      contentArea.textContent = text;
+    };
+    tabBtns.push(btn);
+    tabBar.append(btn);
+  });
+
+  // Activate first tab.
+  tabBtns[0].classList.add("active");
+  contentArea.textContent = LEGAL_TABS[0].text;
+
+  const closeBtn = el("button", {
+    class: "ls-btn",
+    text: "CLOSE",
+    attrs: { "aria-label": "Close legal notices" },
+  }) as HTMLButtonElement;
+  const actions = el("div", { class: "ls-overlay-actions" });
+  actions.append(closeBtn);
+  closeBtn.onclick = () => overlay.remove();
+
+  overlay.append(title, tabBar, contentArea, actions);
+  root.append(overlay);
+  closeBtn.focus();
 }
 
 export class MainMenu {
@@ -169,6 +227,14 @@ export class MainMenu {
 
     this.el.append(el("div", { class: "ls-hint", html:
       "Hotkeys: <span>1-6</span> build, <span>U</span> upgrade, <span>S</span> sell, <span>R</span> relay deploy, <span>Y</span> command tier, <span>F1-F4</span> squads, <span>E</span> retask, <span>Q</span> evac, <span>Space</span> start wave, <span>Tab</span> wave preview, <span>P</span> pause, <span>+/-</span> speed, <span>H/?</span> codex." }));
+
+    const legalLink = el("button", {
+      class: "ls-legal-link",
+      text: "Privacy Policy · Terms · Third-Party Licences",
+      attrs: { "aria-label": "Open legal notices" },
+    });
+    legalLink.onclick = () => openLegalModal(this.el);
+    this.el.append(legalLink);
 
     // Play glitch animation on title (skip if reduce motion is on).
     if (!(this.game.core.settings.reduceMotion || this.game.core.settings.reducedMotion)) {

@@ -4,6 +4,7 @@ export interface ConsentFlags {
   consentRequested: boolean;
   adsAllowed: boolean;
   cloudSaveAllowed: boolean;
+  telemetryAllowed: boolean;
 }
 
 const CONSENT_KEY = "last_signal:consent";
@@ -12,6 +13,7 @@ const DEFAULT_CONSENT: ConsentFlags = {
   consentRequested: false,
   adsAllowed: false,
   cloudSaveAllowed: false,
+  telemetryAllowed: false,
 };
 
 export class ConsentSystem {
@@ -67,11 +69,24 @@ export class ConsentSystem {
     this.update(flags);
   }
 
+  static get telemetryAllowed(): boolean {
+    return this.flags.telemetryAllowed;
+  }
+
+  static getTelemetryAllowed(): boolean {
+    return this.flags.telemetryAllowed;
+  }
+
+  static setTelemetryAllowed(value: boolean): void {
+    this.update({ telemetryAllowed: value });
+  }
+
   static acceptAll(): void {
     this.setFlags({
       consentRequested: true,
       adsAllowed: true,
       cloudSaveAllowed: true,
+      telemetryAllowed: true,
     });
   }
 
@@ -80,6 +95,7 @@ export class ConsentSystem {
       consentRequested: true,
       adsAllowed: false,
       cloudSaveAllowed: false,
+      telemetryAllowed: false,
     });
   }
 
@@ -121,6 +137,7 @@ export class ConsentSystem {
         consentRequested: parsed.consentRequested === true,
         adsAllowed: parsed.adsAllowed === true,
         cloudSaveAllowed: parsed.cloudSaveAllowed === true,
+        telemetryAllowed: parsed.telemetryAllowed === true,
       };
     } catch {
       return { ...DEFAULT_CONSENT };

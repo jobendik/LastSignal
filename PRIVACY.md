@@ -45,3 +45,40 @@ history from that browser.
 To stop optional data features, open Settings, choose Privacy & data, and select
 Essential only. If you used CrazyGames cloud save, also manage or delete your
 CrazyGames account data through CrazyGames account or platform controls.
+
+## Data Retention
+
+Anonymous gameplay telemetry events are retained for up to 90 days, after which
+they are deleted or aggregated in a form that cannot be linked back to any
+individual session. Local browser data (localStorage) is kept until you clear
+it yourself. CrazyGames cloud save data is subject to CrazyGames data retention
+policies.
+
+## Data Controller
+
+The data controller responsible for the anonymous gameplay telemetry described
+in this notice is:
+
+Jo Bendik Westbye / Westbye Interactive, jobendik@gmail.com
+
+If you have a question or request relating to your data, please contact us at
+the address above.
+
+## Your Rights (EU / UK)
+
+If you are located in the European Union or United Kingdom, you have the
+following rights under GDPR and the UK GDPR, where applicable:
+
+- **Access:** You may request a copy of personal data we hold about you.
+- **Deletion:** You may request that we delete personal data we hold about you.
+- **Portability:** You may request that we provide your data in a machine-readable
+  format so you can transfer it to another controller.
+- **Objection:** You may object to processing where we rely on legitimate
+  interests as a legal basis.
+- **Correction:** You may request that inaccurate data be corrected.
+
+Because LAST SIGNAL is designed to collect anonymous, non-identifying data, we
+may not be able to locate specific records relating to you without additional
+identifying information. For any GDPR requests, contact us at the address above.
+You also have the right to lodge a complaint with your local data protection
+authority.

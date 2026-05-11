@@ -266,6 +266,60 @@ body.ls-kbd [tabindex]:focus-visible {
 .ls-hint { margin-top: 30px; font-size: 11px; color: #6b7078; max-width: 640px; }
 .ls-hint span { color: #ffb300; padding: 0 2px; }
 
+/* Legal link */
+.ls-legal-link {
+  background: transparent;
+  border: none;
+  color: #4a5560;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 1px;
+  margin-top: 10px;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s ease;
+}
+.ls-legal-link:hover { color: #6b7078; }
+
+/* Legal modal */
+.ls-legal-modal { justify-content: flex-start; padding: 48px 32px; }
+.ls-legal-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.ls-legal-tab {
+  background: transparent;
+  border: 1px solid #2a3540;
+  color: #6b7078;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ls-legal-tab:hover { border-color: #45a29e; color: #66fcf1; }
+.ls-legal-tab.active { border-color: #45a29e; color: #66fcf1; background: rgba(70,162,158,0.08); }
+.ls-legal-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 11px;
+  color: #8a9aa8;
+  line-height: 1.6;
+  max-width: 680px;
+  max-height: 55vh;
+  overflow-y: auto;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid #1e2830;
+  padding: 16px;
+  margin-bottom: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #45a29e transparent;
+}
+
 /* Buttons */
 .ls-btn {
   background: transparent;
@@ -1346,6 +1400,11 @@ body.ls-kbd [tabindex]:focus-visible {
 }
 
 /* ===== Form controls (settings) ===== */
+.ls-settings {
+  overflow-y: auto;
+  justify-content: flex-start;
+}
+
 .ls-form {
   display: flex;
   flex-direction: column;

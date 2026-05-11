@@ -201,6 +201,10 @@ async function boot(): Promise<void> {
   await game.start({ sdkReady });
   loadingScreen.setProgress(92);
 
+  // Boot telemetry after consent is confirmed and the game is running.
+  const { TelemetrySystem } = await import("./systems/TelemetrySystem");
+  TelemetrySystem.init(game);
+
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   loadingScreen.complete();
   void sdkReady.then(() => game?.ads.signalLoadingStop());
