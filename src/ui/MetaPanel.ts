@@ -6,21 +6,38 @@ const CARD_W = 158;
 const CARD_H = 72;
 
 // Hand-tuned tree layout: x/y = top-left of card within the tree canvas.
+// Tier I:   x=10   (2 nodes — foundation)
+// Tier II:  x=230  (13 nodes — upgrades)
+// Tier III: x=450  (7 nodes — mastery)
 const NODE_POS: Record<string, { x: number; y: number }> = {
-  logistics_1:       { x: 10,  y: 60  },
-  reinforced_core:   { x: 10,  y: 190 },
-  logistics_2:       { x: 230, y: 10  },
-  calibrated_optics: { x: 230, y: 100 },
-  plasma_metallurgy: { x: 230, y: 190 },
-  deep_mining:       { x: 230, y: 280 },
-  unlock_railgun:    { x: 230, y: 370 },
-  unlock_flamer:     { x: 230, y: 460 },
-  unlock_barrier:    { x: 230, y: 550 },
-  bountyful:         { x: 230, y: 640 },
-  unlock_endless:    { x: 450, y: 190 },
+  // ── TIER I ──────────────────────────────────────────
+  logistics_1:        { x: 10,  y: 60  },
+  reinforced_core:    { x: 10,  y: 190 },
+
+  // ── TIER II ─────────────────────────────────────────
+  logistics_2:        { x: 230, y: 10  },
+  calibrated_optics:  { x: 230, y: 100 },
+  plasma_metallurgy:  { x: 230, y: 190 },
+  deep_mining:        { x: 230, y: 280 },
+  unlock_railgun:     { x: 230, y: 370 },
+  unlock_flamer:      { x: 230, y: 460 },
+  unlock_barrier:     { x: 230, y: 550 },
+  bountyful:          { x: 230, y: 640 },
+  fortified_signal:   { x: 230, y: 730 },
+  unlock_amplifier:   { x: 230, y: 820 },
+  unlock_snare:       { x: 230, y: 910 },
+
+  // ── TIER III ────────────────────────────────────────
+  logistics_3:        { x: 450, y: 10  },
+  advanced_arsenal:   { x: 450, y: 100 },
+  unlock_endless:     { x: 450, y: 190 },
+  precision_optics:   { x: 450, y: 280 },
+  deep_reserves:      { x: 450, y: 370 },
+  supply_chain:       { x: 450, y: 460 },
+  unlock_overclock:   { x: 450, y: 550 },
 };
 const TREE_W = 620;
-const TREE_H = 730;
+const TREE_H = 1010;
 
 /** Meta-progression research tree rendered as a visual node graph. */
 export class MetaPanel {

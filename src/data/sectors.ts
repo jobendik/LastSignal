@@ -802,7 +802,7 @@ const baseSectorDefinitions: SectorDefinition[] = [
     waves: crystalScarWaves(),
     startingCredits: 195,
     coreIntegrity: 100,
-    lore: "The platform's gravity wells are failing in sequence. Every corridor has become a launch tube.",
+    lore: "Power signatures from the triangulated source trace to this platform. Whatever has been drawing resources has been here a long time.",
     // Crystal Scar: economy + power surges fit the theme; keep it tactical.
     hazards: { meteors: false, gravity: false, signalInterference: false, powerSurges: true },
   },
@@ -817,7 +817,7 @@ const baseSectorDefinitions: SectorDefinition[] = [
     waves: phantomGateWaves(),
     startingCredits: 215,
     coreIntegrity: 100,
-    lore: "Something inside the wreck is answering your pings. The reply arrives before the signal is sent.",
+    lore: "The wreck responds to your signals before they are sent. Something in there is not just receiving — it is learning.",
     darkness: true,
     // Phantom Gate: signal interference + gravity anomaly fit the disruptor theme.
     hazards: { meteors: false, gravity: true, signalInterference: true, powerSurges: false },
@@ -849,22 +849,22 @@ const baseSectorDefinitions: SectorDefinition[] = [
     waves: hostileCoreWaves(),
     startingCredits: 240,
     coreIntegrity: 110,
-    lore: "This is not a relay. It is the thing using relays to speak.",
+    lore: "The signal you followed was bait. The entity on the other end has been building toward something. This is it.",
     // Hostile Core: meteors + power surges, plus boss artillery already provides "shells".
     hazards: { meteors: true, gravity: false, signalInterference: true, powerSurges: true },
   },
   {
     id: "sector_void",
-    name: "Void - Procedural Drift",
+    name: "Sector 5 — Void",
     description:
-      "A stitched room-template layout generated from a fixed seed for replayable randomized pressure.",
+      "A replayable bonus sector with a procedurally-arranged layout. Every hazard active. A test of resilience.",
     accentColor: "#b39ddb",
     layout: voidLayout(),
     spawners: defaultSpawners,
     waves: voidWaves(),
     startingCredits: 200,
     coreIntegrity: 100,
-    lore: "The Void is a map that forgot its own shape. The route is stable only until the next run.",
+    lore: "Defeated, the entity fragments into recursive loops. The route shifts each pass. It is testing your resilience before its final stand.",
     darkness: true,
     // Void: every hazard. Combined chaos is the point.
     hazards: { meteors: true, gravity: true, signalInterference: true, powerSurges: true },
@@ -887,7 +887,7 @@ const baseSectorDefinitions: SectorDefinition[] = [
     // Sensor range shrinks past the initial signal network — taking the map
     // means rolling new relays forward to push back the dark.
     darkness: true,
-    lore: "The expanse stretches past sensor range. What you can't see, you can't defend.",
+    lore: "The entity's infrastructure spans the expanse. You push into uncharted space, relay by relay, to cut its network before the final assault.",
     hazards: { meteors: true, gravity: false, signalInterference: false, powerSurges: true },
     strategicPoints: expanseStrategicPoints,
   },
@@ -908,7 +908,7 @@ const baseSectorDefinitions: SectorDefinition[] = [
     cols: 64,
     rows: 44,
     darkness: true,
-    lore: "Three rifts and two jammer arrays form a wall across the array. Tearing them down is the mission, not a bonus.",
+    lore: "The Blackout Array is the entity's last broadcast tower. Silence it, and the signal dies forever.",
     hazards: { meteors: true, gravity: false, signalInterference: true, powerSurges: false },
     strategicPoints: blackoutStrategicPoints,
   },

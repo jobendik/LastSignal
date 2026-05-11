@@ -4,12 +4,14 @@
 
 ## Features
 
-- **Tactical Tower Defense**: Place, upgrade, and specialize towers to counter 17+ enemy types and bosses.
+- **Tactical Tower Defense**: Place, upgrade, and specialize towers to counter 19+ enemy types and bosses.
 - **Roguelite Progression**: Unlock meta-upgrades, achievements, and new loadouts across runs.
 - **Procedural Audio**: Dynamic Web Audio SFX and adaptive music.
 - **Neon CRT Visuals**: Custom Canvas 2D rendering with screen shake, chromatic aberration, and light effects.
-- **Rich Content**: 10 tower types, 17 enemy types, 3 drone types, 8+ run modifiers, curses, and more.
-- **Polished UX**: Responsive UI, animated menus, and accessibility options.
+- **Rich Content**: 13 tower types, 19 enemy types, 3 drone types, 8 run modifiers, cursed upgrades, and more.
+- **Mobile Command Squads**: Deploy Recon, Engineer, Strike, and Shield squads as tactical command abilities.
+- **Strategic Map Control**: Capture objectives, destroy hostile structures, and expand your signal network.
+- **Polished UX**: Responsive UI, animated menus, mobile touch support, and accessibility options.
 - **Data-Driven Design**: All towers, enemies, upgrades, and sectors are defined in modular TypeScript data files.
 - **Modern Tooling**: Built with Vite for fast dev, strict TypeScript, and easy deployment.
 
@@ -46,12 +48,13 @@
 
 ## Game Overview
 
-LAST SIGNAL is a dark, high-stakes defense game. You are the last line of defense for the Signal Core. Place towers, deploy drones, and adapt to randomized run modifiers and enemy waves. Survive as long as possible, unlock new upgrades, and climb the leaderboards.
+LAST SIGNAL is a dark, high-stakes defense game. You are the last line of defense for the Signal Core. Place towers, deploy drones, and adapt to randomized run modifiers and enemy waves. Survive as long as possible, unlock new upgrades, and reach the endgame sectors.
 
 ### Core Concepts
 - **Signal Core**: The heart of your defense. If it falls, the run ends.
 - **Towers**: Placeable defenses with unique abilities and upgrade paths.
 - **Drones**: Mobile units for support and offense.
+- **Mobile Squads**: Command units for scouting, capturing, repairing, and shielding.
 - **Enemies**: Diverse threats with unique behaviors and bosses.
 - **Meta-Progression**: Persistent upgrades and unlocks between runs.
 
@@ -70,8 +73,7 @@ LAST SIGNAL is a dark, high-stakes defense game. You are the last line of defens
 
 ## Credits
 
-- **Design & Code**: [Your Name]
-- **Built with**: TypeScript, Vite, Canvas 2D, Web Audio API
+- **Design & Code**: Built with TypeScript, Vite, Canvas 2D, Web Audio API
 
 ## License
 
