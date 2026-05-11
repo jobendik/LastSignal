@@ -23,6 +23,7 @@
     "allowSyntheticDefaultImports": true,
 
     "jsx": "preserve",
+    "rootDir": "./src",
     "outDir": "./dist"
   },
   "include": ["src/**/*.ts"],
