@@ -36,7 +36,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Fast scouts probe the relay perimeter.",
     warning: "Lightly armored scouts. Start with Pulse + Blaster on the spawner lane.",
     recommendedCounters: ["Pulse", "Blaster"],
-    rewardCredits: 35,
+    rewardCredits: 28,
     rewardChoice: false,
     lanes: [
       {
@@ -51,7 +51,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Standard grunts test your baseline defense.",
     warning: "Steady line of grunts. Range and DPS balance matter more than speed.",
     recommendedCounters: ["Pulse", "Blaster"],
-    rewardCredits: 50,
+    rewardCredits: 40,
     rewardChoice: true,
     lanes: [
       {
@@ -66,7 +66,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Three armored Brutes lead a grunt column.",
     warning: "Brutes are slow but very tough. Stasis or Mortar makes the difference.",
     recommendedCounters: ["Stasis", "Mortar"],
-    rewardCredits: 60,
+    rewardCredits: 48,
     rewardChoice: false,
     lanes: [
       {
@@ -84,7 +84,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "A single phantom probe shadows incoming scouts.",
     warning: "Phantoms are immune while phased — wide coverage handles them.",
     recommendedCounters: ["Tesla", "Wide coverage"],
-    rewardCredits: 65,
+    rewardCredits: 52,
     rewardChoice: true,
     lanes: [
       {
@@ -104,7 +104,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "A single carrier threatens to split into scouts.",
     warning: "Kill carriers far from the core — their scout burst can breach.",
     recommendedCounters: ["Stasis", "Mortar"],
-    rewardCredits: 75,
+    rewardCredits: 60,
     rewardChoice: false,
     lanes: [
       {
@@ -124,7 +124,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Healers protect a brute column.",
     warning: "Weavers repair nearby enemies. Prioritize them.",
     recommendedCounters: ["Tesla chain", "Mortar splash"],
-    rewardCredits: 85,
+    rewardCredits: 68,
     rewardChoice: true,
     lanes: [
       {
@@ -142,7 +142,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Phantoms hide inside a wider grunt column.",
     warning: "Phantoms blend with grunts. Detection or wide coverage required.",
     recommendedCounters: ["Tesla + Phase Disruptor", "Scanner Drone"],
-    rewardCredits: 90,
+    rewardCredits: 72,
     rewardChoice: false,
     lanes: [
       {
@@ -162,7 +162,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Tower systems offline for 5s. Pre-position your defense.",
     warning: "SILENCE WAVE: towers suppressed for 5s at start. Layout is your only defense.",
     recommendedCounters: ["Core positioning", "Kill zone", "Drones"],
-    rewardCredits: 95,
+    rewardCredits: 76,
     rewardChoice: true,
     waveEvent: "silence",
     lanes: [
@@ -183,7 +183,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Multiple carriers flood the grid if not controlled.",
     warning: "A single missed carrier can snowball into a scout breach.",
     recommendedCounters: ["Stasis", "Mortar", "Chain"],
-    rewardCredits: 100,
+    rewardCredits: 80,
     rewardChoice: true,
     lanes: [
       {
@@ -203,7 +203,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "A pure scout swarm arrives all at once.",
     warning: "BLITZ WAVE: no stagger. Volume over armor — chain and splash dominate.",
     recommendedCounters: ["Blaster", "Tesla", "Mortar"],
-    rewardCredits: 110,
+    rewardCredits: 88,
     rewardChoice: false,
     waveEvent: "blitz",
     lanes: [
@@ -224,7 +224,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Brutes and Phantoms combine pressure with immunity windows.",
     warning: "Hard checkpoint. Specialization choices matter here.",
     recommendedCounters: ["Mortar", "Tesla", "Stasis"],
-    rewardCredits: 120,
+    rewardCredits: 96,
     rewardChoice: true,
     lanes: [
       {
@@ -244,7 +244,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Slow but dangerous carrier wave.",
     warning: "Control the tempo; don't let scouts spawn near the core.",
     recommendedCounters: ["Stasis", "Mortar"],
-    rewardCredits: 130,
+    rewardCredits: 104,
     rewardChoice: false,
     lanes: [
       {
@@ -259,7 +259,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Weavers protect a large body of grunts.",
     warning: "Weavers will keep grunts alive forever. Focus them down.",
     recommendedCounters: ["Tesla", "Mortar splash"],
-    rewardCredits: 140,
+    rewardCredits: 112,
     rewardChoice: true,
     lanes: [
       {
@@ -279,7 +279,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Heavy armor and carriers.",
     warning: "Strong AoE control recommended.",
     recommendedCounters: ["Mortar", "Stasis", "Tesla"],
-    rewardCredits: 150,
+    rewardCredits: 120,
     rewardChoice: false,
     lanes: [
       {
@@ -299,7 +299,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Fast scouts and many phantoms attack together.",
     warning: "Chaos incoming. Reduced-flashing mode can help readability.",
     recommendedCounters: ["Tesla", "Blaster", "Drones"],
-    rewardCredits: 160,
+    rewardCredits: 128,
     rewardChoice: true,
     lanes: [
       {
@@ -319,7 +319,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "One of every common enemy type in sequence.",
     warning: "BOSS RUSH: every enemy type appears in sequence. Adapt and never stop firing.",
     recommendedCounters: ["Everything"],
-    rewardCredits: 220,
+    rewardCredits: 176,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "scout", count: 6, interval: 0.45 }], startDelay: 0 },
@@ -352,7 +352,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Light grunt probe. Plant your first harvesters.",
     warning: "Build a harvester or two before committing to a long line.",
     recommendedCounters: ["Pulse", "Harvester investment"],
-    rewardCredits: 45,
+    rewardCredits: 36,
     rewardChoice: false,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "grunt", count: 7, interval: 0.85 }] },
@@ -364,7 +364,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Sprinters arrive — the slow-or-die lesson.",
     warning: "Sprinters outrun static defenses. Slow them or lose them.",
     recommendedCounters: ["Stasis", "Snare", "Barrier"],
-    rewardCredits: 60,
+    rewardCredits: 48,
     rewardChoice: true,
     lanes: [
       { spawnerId: "south", enemies: [{ type: "sprinter", count: 6, interval: 0.6 }] },
@@ -377,7 +377,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Splitters break apart on death — splash damage shines.",
     warning: "Splitters split into 3 grunts on death. Use AoE.",
     recommendedCounters: ["Mortar", "Tesla", "Flamer"],
-    rewardCredits: 75,
+    rewardCredits: 60,
     rewardChoice: false,
     lanes: [
       { spawnerId: "east", enemies: [{ type: "splitter", count: 4, interval: 1.5 }] },
@@ -390,7 +390,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Brutes test sustained DPS and stasis kill zones.",
     warning: "Mortar inside Stasis is the textbook combo.",
     recommendedCounters: ["Stasis", "Mortar"],
-    rewardCredits: 85,
+    rewardCredits: 68,
     rewardChoice: true,
     lanes: [
       { spawnerId: "south", enemies: [{ type: "brute", count: 4, interval: 1.2 }] },
@@ -403,7 +403,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Light wave — safe to invest credits in harvesters.",
     warning: "Greed window. Don't over-extend.",
     recommendedCounters: ["Pulse", "Blaster"],
-    rewardCredits: 95,
+    rewardCredits: 76,
     rewardChoice: false,
     lanes: [
       { spawnerId: "west", enemies: [{ type: "grunt", count: 8, interval: 0.85 }] },
@@ -416,7 +416,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Heavy sprinter wave — slow effects mandatory.",
     warning: "If you don't have control, they'll run past everything.",
     recommendedCounters: ["Stasis", "Snare", "Barrier"],
-    rewardCredits: 110,
+    rewardCredits: 88,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "sprinter", count: 12, interval: 0.4 }] },
@@ -429,7 +429,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Brutes plus a Shielder. Burst the bubble first.",
     warning: "Shielder bubble absorbs 2 hits — use cheap shots to break it.",
     recommendedCounters: ["Blaster volume", "Tesla chain"],
-    rewardCredits: 120,
+    rewardCredits: 96,
     rewardChoice: false,
     lanes: [
       { spawnerId: "east", enemies: [{ type: "brute", count: 5, interval: 1.0 }] },
@@ -442,7 +442,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Tower systems offline for 5s.",
     warning: "SILENCE WAVE: towers suppressed for 5s. Pre-position carefully.",
     recommendedCounters: ["Core positioning", "Drones"],
-    rewardCredits: 130,
+    rewardCredits: 104,
     rewardChoice: true,
     waveEvent: "silence",
     lanes: [
@@ -456,7 +456,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Many splitters arrive at once.",
     warning: "Each Splitter fragments into 3 Grunts on death. Pack splash.",
     recommendedCounters: ["Mortar", "Flamer", "Tesla"],
-    rewardCredits: 140,
+    rewardCredits: 112,
     rewardChoice: false,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "splitter", count: 7, interval: 0.95 }] },
@@ -469,7 +469,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Two carriers — fragmentation pressure rises.",
     warning: "Kill carriers far from the core.",
     recommendedCounters: ["Stasis", "Mortar"],
-    rewardCredits: 150,
+    rewardCredits: 120,
     rewardChoice: true,
     lanes: [
       { spawnerId: "west", enemies: [{ type: "carrier", count: 2, interval: 2.0 }] },
@@ -482,7 +482,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Pure scout swarm.",
     warning: "BLITZ WAVE — no stagger.",
     recommendedCounters: ["Blaster", "Flamer", "Tesla"],
-    rewardCredits: 160,
+    rewardCredits: 128,
     rewardChoice: false,
     waveEvent: "blitz",
     lanes: [
@@ -496,7 +496,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Mixed armor and speed pressure.",
     warning: "Spread your defenses. Mixed pressure punishes all-in builds.",
     recommendedCounters: ["Mortar", "Tesla", "Stasis"],
-    rewardCredits: 170,
+    rewardCredits: 136,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "brute", count: 5, interval: 1.0 }] },
@@ -510,7 +510,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Brutes with Weaver support.",
     warning: "Weavers double brute lifetime. Focus them.",
     recommendedCounters: ["Tesla chain", "Mortar splash"],
-    rewardCredits: 180,
+    rewardCredits: 144,
     rewardChoice: false,
     lanes: [
       { spawnerId: "south", enemies: [{ type: "brute", count: 8, interval: 0.9 }] },
@@ -523,7 +523,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "An elite Overlord arrives flanked by escorts.",
     warning: "MID-BOSS: Overlord births swarms when chip-damaged. Burst it down.",
     recommendedCounters: ["Railgun", "Mortar", "Stasis"],
-    rewardCredits: 220,
+    rewardCredits: 176,
     rewardChoice: true,
     isBossWave: true,
     lanes: [
@@ -538,7 +538,7 @@ export const sector2Waves: WaveDefinition[] = [
     description: "Final test — every economy threat appears.",
     warning: "Final wave. Adapt to mixed pressure.",
     recommendedCounters: ["Everything"],
-    rewardCredits: 260,
+    rewardCredits: 208,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "scout", count: 8, interval: 0.4 }], startDelay: 0 },
@@ -566,7 +566,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Initial phantom probe.",
     warning: "Phantoms phase out — keep a wide field of fire.",
     recommendedCounters: ["Pulse + wide coverage"],
-    rewardCredits: 45,
+    rewardCredits: 36,
     rewardChoice: false,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "scout", count: 5, interval: 0.6 }] },
@@ -579,7 +579,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "A Jammer suppresses tower fire-rate in an aura.",
     warning: "Jammer auras drop tower fire rate by 30% nearby. Snipe it.",
     recommendedCounters: ["Railgun", "Focus fire"],
-    rewardCredits: 60,
+    rewardCredits: 48,
     rewardChoice: true,
     lanes: [
       { spawnerId: "south", enemies: [{ type: "jammer", count: 1, interval: 1 }] },
@@ -592,7 +592,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Phantoms in numbers.",
     warning: "Coverage matters. Detection towers shine here.",
     recommendedCounters: ["Tesla Phase Disruptor", "Scanner Drone"],
-    rewardCredits: 75,
+    rewardCredits: 60,
     rewardChoice: false,
     lanes: [
       { spawnerId: "east", enemies: [{ type: "phantom", count: 6, interval: 0.95 }] },
@@ -604,7 +604,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Saboteurs disable nearby towers for 3s.",
     warning: "A Saboteur near a cluster shuts the cluster down.",
     recommendedCounters: ["Snare", "Barrier slow", "Railgun"],
-    rewardCredits: 85,
+    rewardCredits: 68,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "saboteur", count: 3, interval: 1.4 }] },
@@ -617,7 +617,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Phantoms blend into a grunt push.",
     warning: "Detection or wide coverage required.",
     recommendedCounters: ["Tesla", "Scanner Drone"],
-    rewardCredits: 95,
+    rewardCredits: 76,
     rewardChoice: false,
     lanes: [
       { spawnerId: "east", enemies: [{ type: "phantom", count: 6, interval: 0.85 }] },
@@ -630,7 +630,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Two Jammers escort a brute column.",
     warning: "Snipe Jammers first. Brutes will eat your towers otherwise.",
     recommendedCounters: ["Railgun", "Mortar", "Focus fire"],
-    rewardCredits: 105,
+    rewardCredits: 84,
     rewardChoice: true,
     lanes: [
       { spawnerId: "west", enemies: [{ type: "jammer", count: 2, interval: 1.4 }] },
@@ -643,7 +643,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Phantom-only swarm.",
     warning: "Pure phantom rush — detection is mandatory.",
     recommendedCounters: ["Scanner Drone", "Tesla Phase Disruptor"],
-    rewardCredits: 115,
+    rewardCredits: 92,
     rewardChoice: false,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "phantom", count: 14, interval: 0.45 }] },
@@ -655,7 +655,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Towers offline for 5s.",
     warning: "SILENCE WAVE — pre-position carefully.",
     recommendedCounters: ["Layout", "Drones"],
-    rewardCredits: 125,
+    rewardCredits: 100,
     rewardChoice: true,
     waveEvent: "silence",
     lanes: [
@@ -669,7 +669,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Saboteurs flood from multiple lanes.",
     warning: "Multiple Saboteurs — defend in depth.",
     recommendedCounters: ["Snare", "Railgun", "Wide coverage"],
-    rewardCredits: 135,
+    rewardCredits: 108,
     rewardChoice: false,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "saboteur", count: 5, interval: 1.0 }] },
@@ -682,7 +682,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Brutes and Phantoms together.",
     warning: "Hard checkpoint.",
     recommendedCounters: ["Mortar", "Tesla", "Stasis"],
-    rewardCredits: 145,
+    rewardCredits: 116,
     rewardChoice: true,
     lanes: [
       { spawnerId: "east", enemies: [{ type: "brute", count: 8, interval: 0.85 }] },
@@ -695,7 +695,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Mirror units reflect tower fire.",
     warning: "Don't focus expensive towers on Mirrors. Spread fire.",
     recommendedCounters: ["Mortar splash", "Flamer", "Stasis"],
-    rewardCredits: 160,
+    rewardCredits: 128,
     rewardChoice: false,
     lanes: [
       { spawnerId: "west", enemies: [
@@ -710,7 +710,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Jammers and phantoms together.",
     warning: "Towers fire slower while Jammers live. Detection still needed.",
     recommendedCounters: ["Railgun", "Tesla Phase Disruptor"],
-    rewardCredits: 170,
+    rewardCredits: 136,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "jammer", count: 3, interval: 1.2 }] },
@@ -723,7 +723,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Carriers backed by phantoms.",
     warning: "Splash phantoms while killing carriers far from core.",
     recommendedCounters: ["Stasis + Mortar", "Tesla"],
-    rewardCredits: 185,
+    rewardCredits: 148,
     rewardChoice: false,
     lanes: [
       { spawnerId: "south", enemies: [{ type: "carrier", count: 3, interval: 1.6 }] },
@@ -736,7 +736,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "All control-themed threats together.",
     warning: "Saboteurs, Jammers, and Phantoms in one push.",
     recommendedCounters: ["Snare", "Tesla Phase Disruptor", "Railgun"],
-    rewardCredits: 200,
+    rewardCredits: 160,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "saboteur", count: 4, interval: 1.0 }] },
@@ -750,7 +750,7 @@ export const sector3Waves: WaveDefinition[] = [
     description: "Final phantom-themed test.",
     warning: "Final wave. Detection wins or loses you the run.",
     recommendedCounters: ["Tesla Phase Disruptor", "Scanner Drone"],
-    rewardCredits: 260,
+    rewardCredits: 208,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "phantom", count: 10, interval: 0.5 }], startDelay: 0 },
@@ -776,7 +776,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Heavy grunts probe the core.",
     warning: "Pre-buffed enemies. Build conservatively.",
     recommendedCounters: ["Pulse", "Mortar"],
-    rewardCredits: 60,
+    rewardCredits: 48,
     rewardChoice: false,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "grunt", count: 12, interval: 0.7 }] },
@@ -789,7 +789,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Brutes lead the assault.",
     warning: "Burst damage required.",
     recommendedCounters: ["Stasis + Mortar", "Railgun"],
-    rewardCredits: 75,
+    rewardCredits: 60,
     rewardChoice: true,
     lanes: [
       { spawnerId: "west", enemies: [{ type: "brute", count: 6, interval: 1.0 }] },
@@ -802,7 +802,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Tower-disablers approach.",
     warning: "Defend in depth — saboteurs love clusters.",
     recommendedCounters: ["Snare", "Railgun"],
-    rewardCredits: 90,
+    rewardCredits: 72,
     rewardChoice: false,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "saboteur", count: 4, interval: 1.0 }] },
@@ -815,7 +815,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Carrier splits ahead of brutes.",
     warning: "Kill carriers far from core.",
     recommendedCounters: ["Stasis", "Mortar"],
-    rewardCredits: 105,
+    rewardCredits: 84,
     rewardChoice: true,
     lanes: [
       { spawnerId: "east", enemies: [{ type: "carrier", count: 2, interval: 1.6 }] },
@@ -828,7 +828,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Phantoms with brute escort.",
     warning: "Detection or wide coverage required.",
     recommendedCounters: ["Tesla Phase Disruptor", "Scanner Drone"],
-    rewardCredits: 120,
+    rewardCredits: 96,
     rewardChoice: false,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "phantom", count: 8, interval: 0.7 }] },
@@ -841,7 +841,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Heavy armor — armor-piercer matters.",
     warning: "Juggernauts have 30% armor. Bring piercer.",
     recommendedCounters: ["Railgun", "Armor-piercer Blaster"],
-    rewardCredits: 135,
+    rewardCredits: 108,
     rewardChoice: true,
     lanes: [
       { spawnerId: "west", enemies: [{ type: "juggernaut", count: 3, interval: 1.6 }] },
@@ -854,7 +854,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Towers offline for 5s.",
     warning: "SILENCE WAVE — pre-position carefully.",
     recommendedCounters: ["Layout", "Drones"],
-    rewardCredits: 145,
+    rewardCredits: 116,
     rewardChoice: false,
     waveEvent: "silence",
     lanes: [
@@ -868,7 +868,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Pure scout swarm — chain and splash dominate.",
     warning: "BLITZ WAVE.",
     recommendedCounters: ["Tesla", "Flamer", "Mortar"],
-    rewardCredits: 160,
+    rewardCredits: 128,
     rewardChoice: true,
     waveEvent: "blitz",
     lanes: [
@@ -882,7 +882,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Mirrors among juggernauts.",
     warning: "Mirrors disable towers on reflect. Spread fire.",
     recommendedCounters: ["Mortar splash", "Flamer cones"],
-    rewardCredits: 175,
+    rewardCredits: 140,
     rewardChoice: false,
     lanes: [
       { spawnerId: "east", enemies: [
@@ -898,7 +898,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Jammers escort brutes and phantoms.",
     warning: "Snipe Jammers; tower fire is suppressed otherwise.",
     recommendedCounters: ["Railgun", "Focus fire"],
-    rewardCredits: 190,
+    rewardCredits: 152,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "jammer", count: 4, interval: 1.0 }] },
@@ -912,7 +912,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Mid-sector boss — Overlord with escorts.",
     warning: "MID-BOSS: Overlord births swarms when chip-damaged.",
     recommendedCounters: ["Railgun", "Mortar", "Stasis"],
-    rewardCredits: 220,
+    rewardCredits: 176,
     rewardChoice: false,
     isBossWave: true,
     lanes: [
@@ -927,7 +927,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Tunnelers dive beneath defenses.",
     warning: "Tunnelers surface inside your grid. Defense in depth required.",
     recommendedCounters: ["Wide coverage", "Mortar splash"],
-    rewardCredits: 200,
+    rewardCredits: 160,
     rewardChoice: true,
     lanes: [
       { spawnerId: "south", enemies: [{ type: "tunneler", count: 6, interval: 0.95 }] },
@@ -940,7 +940,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Artillery boss anchors at the perimeter.",
     warning: "BOSS: Harbinger marks tower clusters with artillery.",
     recommendedCounters: ["Railgun", "Reflector", "Spread layout"],
-    rewardCredits: 240,
+    rewardCredits: 192,
     rewardChoice: true,
     isBossWave: true,
     lanes: [
@@ -955,7 +955,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "Combined-arms onslaught before the finale.",
     warning: "Mixed pressure — every counter matters.",
     recommendedCounters: ["Everything"],
-    rewardCredits: 220,
+    rewardCredits: 176,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "juggernaut", count: 3, interval: 1.6 }] },
@@ -970,7 +970,7 @@ export const sector4Waves: WaveDefinition[] = [
     description: "The hostile core itself awakens.",
     warning: "FINAL BOSS: multi-phase. Summons escorts, disables towers.",
     recommendedCounters: ["Everything"],
-    rewardCredits: 320,
+    rewardCredits: 256,
     rewardChoice: false,
     isBossWave: true,
     lanes: [

@@ -31,7 +31,7 @@ export class EndlessSystem {
   /** Build a dynamic wave definition for the next endless wave. */
   generateWave(): WaveDefinition {
     this.wave++;
-    this.hpScale = 1 + this.wave * 0.18;
+    this.hpScale = 1 + this.wave * 0.25;
     this.speedScale = 1 + Math.min(this.wave * 0.04, 0.9);
     const pool: EnemyType[] = [
       "scout",
