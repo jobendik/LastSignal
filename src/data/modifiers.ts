@@ -53,9 +53,9 @@ const debuffs: RunModifier[] = [
   {
     id: "brittle_walls",
     name: "BRITTLE WALLS",
-    description: "Core integrity -30%. One mistake hurts.",
+    description: "Core integrity -15%. One mistake hurts.",
     kind: "debuff",
-    coreMul: 0.7,
+    coreMul: 0.85,
   },
   {
     id: "inflation",
@@ -124,9 +124,9 @@ const buffsAndMixed: RunModifier[] = [
   {
     id: "dark_matter",
     name: "DARK MATTER",
-    description: "Enemies +40% HP, award +40% credits.",
+    description: "Enemies +55% HP, award +40% credits.",
     kind: "mixed",
-    enemyHpMul: 1.4,
+    enemyHpMul: 1.55,
     enemyRewardMul: 1.4,
   },
   {
@@ -149,9 +149,9 @@ const buffsAndMixed: RunModifier[] = [
   {
     id: "bounty_targets",
     name: "BOUNTY TARGETS",
-    description: "Enemies +50% HP and award +60% credits.",
+    description: "Enemies +70% HP and award +60% credits.",
     kind: "mixed",
-    enemyHpMul: 1.5,
+    enemyHpMul: 1.7,
     enemyRewardMul: 1.6,
   },
   {
@@ -181,25 +181,26 @@ const buffsAndMixed: RunModifier[] = [
   {
     id: "glass_cannon",
     name: "GLASS CANNON",
-    description: "Tower costs -30%, core integrity -40%.",
+    description: "Tower costs -25%, tower damage +20%, core integrity -25%.",
     kind: "mixed",
-    towerCostMul: 0.7,
-    coreMul: 0.6,
+    towerCostMul: 0.75,
+    towerDamageMul: 1.20,
+    coreMul: 0.75,
   },
   {
     id: "blood_bounty",
     name: "BLOOD FOR BOUNTY",
-    description: "Kill rewards +50%, but enemies regenerate 1 HP/s.",
+    description: "Kill rewards +50%, but enemies regenerate 2 HP/s.",
     kind: "mixed",
     enemyRewardMul: 1.5,
-    enemyHealPerSec: 1,
+    enemyHealPerSec: 2,
   },
   {
     id: "ascendant_wave",
     name: "ASCENDANT WAVES",
-    description: "Enemy armor +15% but credit reward +40%.",
+    description: "Enemy armor +22% but credit reward +40%.",
     kind: "mixed",
-    enemyArmorAdd: 0.15,
+    enemyArmorAdd: 0.22,
     enemyRewardMul: 1.4,
   },
   {

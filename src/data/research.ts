@@ -7,18 +7,18 @@ export const researchNodes: ResearchNode[] = [
   {
     id: "logistics_1",
     name: "Logistics I",
-    description: "+25 starting credits for every sector.",
+    description: "+40 starting credits for every sector.",
     cost: 3,
     tier: 1,
-    effect: { startingCreditsAdd: 25 },
+    effect: { startingCreditsAdd: 40 },
   },
   {
     id: "reinforced_core",
     name: "Reinforced Core",
-    description: "+25 core integrity on every run.",
+    description: "+35 core integrity on every run.",
     cost: 4,
     tier: 1,
-    effect: { coreIntegrityAdd: 25 },
+    effect: { coreIntegrityAdd: 35 },
   },
 
   // ──────────────────────────────────────────────
@@ -27,11 +27,11 @@ export const researchNodes: ResearchNode[] = [
   {
     id: "logistics_2",
     name: "Logistics II",
-    description: "+50 starting credits (requires Logistics I).",
+    description: "+75 starting credits (requires Logistics I).",
     cost: 5,
     tier: 2,
     requires: ["logistics_1"],
-    effect: { startingCreditsAdd: 50 },
+    effect: { startingCreditsAdd: 75 },
   },
   {
     id: "calibrated_optics",
@@ -44,10 +44,10 @@ export const researchNodes: ResearchNode[] = [
   {
     id: "plasma_metallurgy",
     name: "Plasma Metallurgy",
-    description: "All towers deal +15% damage.",
+    description: "All towers deal +20% damage.",
     cost: 6,
     tier: 2,
-    effect: { towerDamageMul: 1.15 },
+    effect: { towerDamageMul: 1.20 },
   },
   {
     id: "deep_mining",
@@ -92,11 +92,11 @@ export const researchNodes: ResearchNode[] = [
   {
     id: "fortified_signal",
     name: "Fortified Signal",
-    description: "+50 core integrity on every run (requires Reinforced Core).",
+    description: "+70 core integrity on every run (requires Reinforced Core).",
     cost: 6,
     tier: 2,
     requires: ["reinforced_core"],
-    effect: { coreIntegrityAdd: 50 },
+    effect: { coreIntegrityAdd: 70 },
   },
   {
     id: "unlock_amplifier",
@@ -141,11 +141,11 @@ export const researchNodes: ResearchNode[] = [
   {
     id: "advanced_arsenal",
     name: "Advanced Arsenal",
-    description: "All towers deal an additional +20% damage.",
+    description: "All towers deal an additional +30% damage.",
     cost: 9,
     tier: 3,
     requires: ["plasma_metallurgy"],
-    effect: { towerDamageMul: 1.2 },
+    effect: { towerDamageMul: 1.3 },
   },
   {
     id: "precision_optics",
@@ -227,10 +227,10 @@ export const researchNodes: ResearchNode[] = [
   {
     id: "rapid_capacitors",
     name: "Rapid Capacitors",
-    description: "All towers fire 12% faster. Stacks multiplicatively with upgrades.",
+    description: "All towers fire 18% faster. Stacks multiplicatively with upgrades.",
     cost: 8,
     tier: 3,
     requires: ["plasma_metallurgy"],
-    effect: { towerFireRateMul: 1.12 },
+    effect: { towerFireRateMul: 1.18 },
   },
 ];

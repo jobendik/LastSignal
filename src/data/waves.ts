@@ -124,7 +124,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Healers protect a brute column.",
     warning: "Weavers repair nearby enemies. Prioritize them.",
     recommendedCounters: ["Tesla chain", "Mortar splash"],
-    rewardCredits: 68,
+    rewardCredits: 55,
     rewardChoice: true,
     lanes: [
       {
@@ -142,7 +142,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Phantoms hide inside a wider grunt column.",
     warning: "Phantoms blend with grunts. Detection or wide coverage required.",
     recommendedCounters: ["Tesla + Phase Disruptor", "Scanner Drone"],
-    rewardCredits: 72,
+    rewardCredits: 58,
     rewardChoice: false,
     lanes: [
       {
@@ -162,7 +162,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Tower systems offline for 5s. Pre-position your defense.",
     warning: "SILENCE WAVE: towers suppressed for 5s at start. Layout is your only defense.",
     recommendedCounters: ["Core positioning", "Kill zone", "Drones"],
-    rewardCredits: 76,
+    rewardCredits: 60,
     rewardChoice: true,
     waveEvent: "silence",
     lanes: [
@@ -183,7 +183,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Multiple carriers flood the grid if not controlled.",
     warning: "A single missed carrier can snowball into a scout breach.",
     recommendedCounters: ["Stasis", "Mortar", "Chain"],
-    rewardCredits: 80,
+    rewardCredits: 65,
     rewardChoice: true,
     lanes: [
       {
@@ -203,7 +203,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "A pure scout swarm arrives all at once.",
     warning: "BLITZ WAVE: no stagger. Volume over armor — chain and splash dominate.",
     recommendedCounters: ["Blaster", "Tesla", "Mortar"],
-    rewardCredits: 88,
+    rewardCredits: 70,
     rewardChoice: false,
     waveEvent: "blitz",
     lanes: [
@@ -224,7 +224,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Brutes and Phantoms combine pressure with immunity windows.",
     warning: "Hard checkpoint. Specialization choices matter here.",
     recommendedCounters: ["Mortar", "Tesla", "Stasis"],
-    rewardCredits: 96,
+    rewardCredits: 78,
     rewardChoice: true,
     lanes: [
       {
@@ -244,7 +244,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Slow but dangerous carrier wave.",
     warning: "Control the tempo; don't let scouts spawn near the core.",
     recommendedCounters: ["Stasis", "Mortar"],
-    rewardCredits: 104,
+    rewardCredits: 82,
     rewardChoice: false,
     lanes: [
       {
@@ -259,7 +259,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Weavers protect a large body of grunts.",
     warning: "Weavers will keep grunts alive forever. Focus them down.",
     recommendedCounters: ["Tesla", "Mortar splash"],
-    rewardCredits: 112,
+    rewardCredits: 88,
     rewardChoice: true,
     lanes: [
       {
@@ -279,7 +279,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Heavy armor and carriers.",
     warning: "Strong AoE control recommended.",
     recommendedCounters: ["Mortar", "Stasis", "Tesla"],
-    rewardCredits: 120,
+    rewardCredits: 92,
     rewardChoice: false,
     lanes: [
       {
@@ -299,7 +299,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "Fast scouts and many phantoms attack together.",
     warning: "Chaos incoming. Reduced-flashing mode can help readability.",
     recommendedCounters: ["Tesla", "Blaster", "Drones"],
-    rewardCredits: 128,
+    rewardCredits: 98,
     rewardChoice: true,
     lanes: [
       {
@@ -319,7 +319,7 @@ export const defaultWaves: WaveDefinition[] = [
     description: "One of every common enemy type in sequence.",
     warning: "BOSS RUSH: every enemy type appears in sequence. Adapt and never stop firing.",
     recommendedCounters: ["Everything"],
-    rewardCredits: 176,
+    rewardCredits: 140,
     rewardChoice: true,
     lanes: [
       { spawnerId: "north", enemies: [{ type: "scout", count: 6, interval: 0.45 }], startDelay: 0 },

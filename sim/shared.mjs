@@ -49,10 +49,10 @@ export const TOWERS = {
   blaster:   { cost:  40, range:  88, damage:  1.15, cd: 0.12, combat: true },
   stasis:    { cost:  50, range: 132, damage:  0,    cd: 1.35, slow: true,  slowFactor: 0.45 },
   mortar:    { cost:  80, range: 165, damage: 15.00, cd: 2.15, combat: true, splashMul: 1.45 },
-  tesla:     { cost: 120, range: 102, damage:  6.00, cd: 0.95, combat: true, chainMul: 1.5 },
-  harvester: { cost:  60, range:   0, damage:  0,    cd: 5.00, isEco: true,  income: 15 },
+  tesla:     { cost:  90, range: 102, damage:  7.00, cd: 0.80, combat: true, chainMul: 2.0 },
+  harvester: { cost:  45, range:   0, damage:  0,    cd: 5.00, isEco: true,  income: 17 },
   railgun:   { cost: 150, range: 260, damage: 42.00, cd: 2.60, combat: true, buildLimit: 3 },
-  flamer:    { cost:  70, range:  74, damage:  1.80, cd: 0.09, combat: true },
+  flamer:    { cost:  70, range:  74, damage:  1.20, cd: 0.09, combat: true },
   barrier:   { cost:  90, range: 120, damage:  0,    cd: 0.60, slow: true,  slowFactor: 0.65 },
   amplifier: { cost: 110, range:  48, damage:  0,    cd: 99999 },
   snare:     { cost:  65, range: 118, damage:  0,    cd: 2.40, slow: true,  slowFactor: 0.40 },
@@ -69,15 +69,15 @@ export const DIFFICULTIES = {
   },
   standard: {
     id: "standard", label: "Standard",
-    enemyHpMul: 1.00, enemySpeedMul: 1.00, rewardMul: 1.0, coreIntegrityMul: 1.00,
+    enemyHpMul: 1.15, enemySpeedMul: 1.00, rewardMul: 1.0, coreIntegrityMul: 1.00,
   },
   veteran: {
     id: "veteran", label: "Veteran",
-    enemyHpMul: 1.35, enemySpeedMul: 1.10, rewardMul: 1.1, coreIntegrityMul: 0.85,
+    enemyHpMul: 1.65, enemySpeedMul: 1.15, rewardMul: 1.1, coreIntegrityMul: 0.80,
   },
   nightmare: {
     id: "nightmare", label: "Nightmare",
-    enemyHpMul: 1.80, enemySpeedMul: 1.25, rewardMul: 1.2, coreIntegrityMul: 0.65,
+    enemyHpMul: 2.40, enemySpeedMul: 1.30, rewardMul: 1.1, coreIntegrityMul: 0.55,
   },
 };
 
@@ -90,7 +90,7 @@ export const DEBUFFS = [
   { id: "armored",       name: "HARDENED CARAPACE",  enemyArmorAdd: 0.20 },
   { id: "turbulent",     name: "TURBULENT FLOW",     enemySpeedMul: 1.30 },
   { id: "bleeding",      name: "BLEEDING SIGNAL",    enemyHealPerSec: 4 },
-  { id: "brittle_walls", name: "BRITTLE WALLS",      coreMul: 0.70 },
+  { id: "brittle_walls", name: "BRITTLE WALLS",      coreMul: 0.85 },
   { id: "inflation",     name: "INFLATION",          towerCostMul: 1.35 },
   { id: "heavy_hull",    name: "HEAVY HULL",         enemyHpMul: 1.60 },
   { id: "drought",       name: "ECONOMY DROUGHT",    harvesterIncomeMul: 0.50 },
@@ -102,31 +102,31 @@ export const DEBUFFS = [
 export const BUFFS_MIXED = [
   { id: "signal_boost",    name: "SIGNAL BOOST",      coreMul: 1.30 },
   { id: "overclock",       name: "OVERCLOCK",          towerCooldownMul: 0.75, towerCostMul: 1.25 },
-  { id: "dark_matter",     name: "DARK MATTER",        enemyHpMul: 1.40, enemyRewardMul: 1.40 },
+  { id: "dark_matter",     name: "DARK MATTER",        enemyHpMul: 1.55, enemyRewardMul: 1.40 },
   { id: "credit_flood",    name: "CREDIT OVERFLOW",    harvesterIncomeMul: 2.00, towerCostMul: 1.25 },
   { id: "rapid_response",  name: "RAPID RESPONSE",     towerCooldownMul: 0.70, coreMul: 0.85 },
-  { id: "bounty_targets",  name: "BOUNTY TARGETS",     enemyHpMul: 1.50, enemyRewardMul: 1.60 },
+  { id: "bounty_targets",  name: "BOUNTY TARGETS",     enemyHpMul: 1.70, enemyRewardMul: 1.60 },
   { id: "supply_line",     name: "SUPPLY LINE",        harvesterIncomeMul: 1.50, towerCostMul: 1.10 },
   { id: "crystal_rush",    name: "CRYSTAL RUSH",       harvesterIncomeMul: 1.75, enemySpeedMul: 1.15 },
   { id: "reinforced_hull", name: "REINFORCED HULL",    coreMul: 1.50, enemyHpMul: 1.25 },
-  { id: "glass_cannon",    name: "GLASS CANNON",       towerCostMul: 0.70, coreMul: 0.60 },
-  { id: "blood_bounty",    name: "BLOOD FOR BOUNTY",   enemyRewardMul: 1.50, enemyHealPerSec: 1 },
-  { id: "ascendant_wave",  name: "ASCENDANT WAVES",    enemyArmorAdd: 0.15, enemyRewardMul: 1.40 },
+  { id: "glass_cannon",   name: "GLASS CANNON",      towerCostMul: 0.75, towerDamageMul: 1.20, coreMul: 0.75 },
+  { id: "blood_bounty",    name: "BLOOD FOR BOUNTY",   enemyRewardMul: 1.50, enemyHealPerSec: 2 },
+  { id: "ascendant_wave",  name: "ASCENDANT WAVES",    enemyArmorAdd: 0.22, enemyRewardMul: 1.40 },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RESEARCH NODES  (src/data/research.ts — sim-relevant effects only)
 // ─────────────────────────────────────────────────────────────────────────────
 export const RESEARCH_NODES = [
-  { id: "logistics_1",      tier: 1, cost: 3, label: "Logistics I",       effect: { startingCreditsAdd: 25 } },
-  { id: "reinforced_core",  tier: 1, cost: 4, label: "Reinforced Core",   effect: { coreIntegrityAdd: 25 } },
-  { id: "logistics_2",      tier: 2, cost: 5, label: "Logistics II",      effect: { startingCreditsAdd: 50 } },
+  { id: "logistics_1",      tier: 1, cost: 3, label: "Logistics I",       effect: { startingCreditsAdd: 40 } },
+  { id: "reinforced_core",  tier: 1, cost: 4, label: "Reinforced Core",   effect: { coreIntegrityAdd: 35 } },
+  { id: "logistics_2",      tier: 2, cost: 5, label: "Logistics II",      effect: { startingCreditsAdd: 75 } },
   { id: "calibrated_optics",tier: 2, cost: 4, label: "Calibrated Optics", effect: { towerRangeAdd: 12 } },
-  { id: "plasma_metallurgy",tier: 2, cost: 6, label: "Plasma Metallurgy", effect: { towerDamageMul: 1.15 } },
+  { id: "plasma_metallurgy",tier: 2, cost: 6, label: "Plasma Metallurgy", effect: { towerDamageMul: 1.20 } },
   { id: "deep_mining",      tier: 2, cost: 5, label: "Deep Mining",       effect: { harvesterIncomeMul: 1.25 } },
   { id: "bountyful",        tier: 2, cost: 4, label: "Bountyful Hunt",    effect: { rewardMul: 1.15 } },
-  { id: "fortified_signal", tier: 2, cost: 6, label: "Fortified Signal",  effect: { coreIntegrityAdd: 50 } },
-  { id: "advanced_arsenal", tier: 3, cost: 9, label: "Advanced Arsenal",  effect: { towerDamageMul: 1.20 } },
+  { id: "fortified_signal", tier: 2, cost: 6, label: "Fortified Signal",  effect: { coreIntegrityAdd: 70 } },
+  { id: "advanced_arsenal", tier: 3, cost: 9, label: "Advanced Arsenal",  effect: { towerDamageMul: 1.30 } },
   { id: "precision_optics", tier: 3, cost: 7, label: "Precision Optics",  effect: { towerRangeAdd: 20 } },
   { id: "deep_reserves",    tier: 3, cost: 8, label: "Deep Reserves",     effect: { harvesterIncomeMul: 1.25 } },
   { id: "supply_chain",     tier: 3, cost: 7, label: "Supply Chain",      effect: { rewardMul: 1.15 } },
@@ -151,17 +151,17 @@ export const SECTOR1_WAVES = [
   W( 48, "Iron Wall",          [L(E("brute",3), E("grunt",8))]),
   W( 52, "Phase Echo",         [L(E("scout",7)), L(E("phantom",2))]),
   W( 60, "Carrier Breach",     [L(E("carrier",1)), L(E("scout",8))]),
-  W( 68, "Weaver Escort",      [L(E("brute",4), E("weaver",2))]),
-  W( 72, "Ghost Column",       [L(E("phantom",6)), L(E("grunt",12))]),
-  W( 76, "Silence Protocol",   [L(E("brute",5)), L(E("grunt",12))], { waveEvent: "silence" }),
-  W( 80, "Nest Splitters",     [L(E("carrier",3)), L(E("weaver",2))]),
-  W( 88, "Blitz Swarm",        [L(E("scout",18)), L(E("scout",18))], { waveEvent: "blitz" }),
-  W( 96, "Armored Ghosts",     [L(E("brute",9)), L(E("phantom",5))]),
-  W(104, "Carrier Tide",       [L(E("carrier",4))]),
-  W(112, "Repair Swarm",       [L(E("grunt",26)), L(E("weaver",5))]),
-  W(120, "Crushing Mass",      [L(E("brute",13)), L(E("carrier",4))]),
-  W(128, "Fractured Reality",  [L(E("phantom",16)), L(E("scout",18))]),
-  W(176, "The Gauntlet",       [L(E("scout",6),E("grunt",6),E("sprinter",5),E("brute",4),
+  W( 55, "Weaver Escort",      [L(E("brute",4), E("weaver",2))]),
+  W( 58, "Ghost Column",       [L(E("phantom",6)), L(E("grunt",12))]),
+  W( 60, "Silence Protocol",   [L(E("brute",5)), L(E("grunt",12))], { waveEvent: "silence" }),
+  W( 65, "Nest Splitters",     [L(E("carrier",3)), L(E("weaver",2))]),
+  W( 70, "Blitz Swarm",        [L(E("scout",18)), L(E("scout",18))], { waveEvent: "blitz" }),
+  W( 78, "Armored Ghosts",     [L(E("brute",9)), L(E("phantom",5))]),
+  W( 82, "Carrier Tide",       [L(E("carrier",4))]),
+  W( 88, "Repair Swarm",       [L(E("grunt",26)), L(E("weaver",5))]),
+  W( 92, "Crushing Mass",      [L(E("brute",13)), L(E("carrier",4))]),
+  W( 98, "Fractured Reality",  [L(E("phantom",16)), L(E("scout",18))]),
+  W(140, "The Gauntlet",       [L(E("scout",6),E("grunt",6),E("sprinter",5),E("brute",4),
                                    E("phantom",4),E("weaver",3),E("shielder",4),E("jammer",3),
                                    E("splitter",3),E("carrier",3),E("juggernaut",2))]),
 ];
@@ -236,6 +236,12 @@ export const CORE_INTEGRITY_STANDARD = 100;
 export const STARTING_CREDITS_S1 = 250;
 // Estimated enemy path length in pixels (see balance-sim.mjs for derivation)
 export const PATH_LENGTH = 390;
+
+// Realistic placement cap: how many combat towers can practically cover the path.
+// Real maps have finite buildable cells; without this cap, "spam" strategies
+// stack unlimited towers and trivially win every difficulty. Tuned to match
+// the buildable footprint of Sector 1 along its primary lane.
+export const MAX_COMBAT_TOWERS = 20;
 // Estimated wave duration in seconds (used for harvester income calculation)
 export const WAVE_DURATION_SECS = 30;
 // Silence wave model: fraction of enemies that auto-breach while towers are offline
@@ -273,8 +279,10 @@ export function towerDamageVsEnemy(tDef, eDef, opts = {}) {
  * @param {string[]} towerList  Array of tower-type keys
  * @param {object}  [override]  Override fields on the enemy (hp, speed, etc.)
  * @param {object}  [modOpts]   Combat modifier options forwarded to towerDamageVsEnemy
+ * @param {number[]} [shotsRemaining]  Per-tower per-wave shot budget (drains as enemies absorb fire).
+ *                                     Pass null/undefined to skip the budget cap (legacy behaviour).
  */
-export function simulateEnemyVsTowers(eType, towerList, override = null, modOpts = {}) {
+export function simulateEnemyVsTowers(eType, towerList, override = null, modOpts = {}, shotsRemaining = null) {
   const base = ENEMIES[eType];
   if (!base) return { killed: false, breachDmg: 0 };
 
@@ -295,12 +303,34 @@ export function simulateEnemyVsTowers(eType, towerList, override = null, modOpts
     if (tDef?.slow) speedMul = Math.min(speedMul, tDef.slowFactor ?? 0.5);
   }
 
-  // Sum damage from all combat towers
-  for (const t of towerList) {
-    const tDef = TOWERS[t];
+  // Sum damage from all combat towers (subject to per-tower per-wave shot budget)
+  for (let ti = 0; ti < towerList.length; ti++) {
+    const tDef = TOWERS[towerList[ti]];
     if (!tDef?.combat) continue;
-    const dmg = towerDamageVsEnemy(tDef, eDef, { speedMul, cooldownMul, damageMul, armorAdd, rangeAdd }) * phaseFactor;
-    hp -= dmg;
+
+    const speed        = (eDef.speed ?? 60) * speedMul;
+    const range        = tDef.range + rangeAdd;
+    const timeInRange  = (range * 2) / speed;
+    const effectiveCd  = tDef.cd * cooldownMul;
+    const aoeMul       = tDef.splashMul ?? tDef.chainMul ?? 1.0;
+    const armor        = Math.min(0.90, (eDef.armor ?? 0) + armorAdd);
+
+    let shotsAtEnemy = Math.floor(timeInRange / effectiveCd) + 1;
+
+    if (shotsRemaining) {
+      // AoE/chain shots count as fractional consumption (1 shot = aoeMul enemy hits)
+      const shotsAvailable = Math.max(0, shotsRemaining[ti]) * aoeMul;
+      shotsAtEnemy = Math.min(shotsAtEnemy, Math.floor(shotsAvailable));
+      if (shotsAtEnemy <= 0) continue;
+    }
+
+    const rawDmg = shotsAtEnemy * tDef.damage * aoeMul * damageMul * phaseFactor;
+    hp -= rawDmg * (1 - armor);
+
+    if (shotsRemaining) {
+      shotsRemaining[ti] -= shotsAtEnemy / aoeMul;
+    }
+
     if (hp <= 0) return { killed: true, breachDmg: 0 };
   }
 
@@ -417,13 +447,24 @@ export function simulateCampaign(strategyFn, opts = {}) {
       const cost = def.cost * towerCostMul;
       if (credits < cost) continue;
       if (def.buildLimit != null && towers.filter(x => x === t).length >= def.buildLimit) continue;
+      // Realistic placement cap on combat towers (eco/support unlimited).
+      if (def.combat && towers.filter(x => TOWERS[x]?.combat).length >= MAX_COMBAT_TOWERS) continue;
       credits -= cost;
       towers.push(t);
     }
 
     // ── Harvester income ────────────────────────────────────────────────────
     const harvCount  = towers.filter(t => t === "harvester").length;
-    const harvIncome = harvCount * Math.floor(WAVE_DURATION_SECS / 5) * 15 * harvesterIncomeMul;
+    const harvIncome = harvCount * Math.floor(WAVE_DURATION_SECS / 5)
+                       * (TOWERS.harvester.income ?? 15) * harvesterIncomeMul;
+
+    // ── Per-tower per-wave shot budget (caps spam compositions) ────────────
+    const shotsRemaining = towers.map(t => {
+      const tDef = TOWERS[t];
+      if (!tDef?.combat) return 0;
+      const cd = tDef.cd * (modOpts.cooldownMul ?? 1.0);
+      return WAVE_DURATION_SECS / cd;
+    });
 
     // ── Wave phase ──────────────────────────────────────────────────────────
     const waveDef   = wavesArr[wi];
@@ -449,7 +490,7 @@ export function simulateCampaign(strategyFn, opts = {}) {
       const override = (enemyHpMul !== 1.0 || enemySpeedMul !== 1.0)
         ? { hp: base.hp * enemyHpMul, speed: base.speed * enemySpeedMul } : null;
 
-      const { killed, breachDmg } = simulateEnemyVsTowers(eType, towers, override, modOpts);
+      const { killed, breachDmg } = simulateEnemyVsTowers(eType, towers, override, modOpts, shotsRemaining);
       if (killed) {
         killCredits += (base.reward ?? 0) * rewardMul * enemyRewardMul;
       } else {
@@ -635,6 +676,10 @@ export const strategies = {
       }
       if (!has("mortar") && budget >= cost("mortar")) {
         result.push("mortar"); budget -= cost("mortar");
+      }
+      // Add 2 flamers for swarm clearing (waves 3+)
+      if (waveIndex >= 3 && currentTowers.filter(t => t === "flamer").length < 2 && budget >= cost("flamer")) {
+        result.push("flamer"); budget -= cost("flamer");
       }
       if (waveIndex >= 4 && currentTowers.filter(t => t === "tesla").length < 2 && budget >= cost("tesla")) {
         result.push("tesla"); budget -= cost("tesla");
