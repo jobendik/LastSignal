@@ -62,6 +62,26 @@ export const MIN_RELAY_SPACING_CELLS = 6;
 export const MIN_RELAY_TO_SPAWNER_CELLS = 3;
 
 // ──────────────────────────────────────────────────────────
+// Relay vulnerability & specialisation
+// Signal Relays are the standard expandable node; Hardened Relays trade
+// smaller coverage for a much larger HP pool, functioning as a mini-fort.
+// Both types take damage when enemies breach to their cluster and are
+// permanently destroyed at 0 HP (with a salvage credit refund).
+// ──────────────────────────────────────────────────────────
+/** HP pool for a standard Signal Relay. */
+export const RELAY_MAX_HP = 120;
+/** HP pool for a Hardened Relay variant. */
+export const HARDENED_RELAY_MAX_HP = 280;
+/** Signal coverage radius (cells) for the Hardened Relay variant. */
+export const HARDENED_RELAY_SIGNAL_RADIUS_CELLS = 5;
+/** Cost multiplier applied to the Hardened Relay variant. */
+export const HARDENED_RELAY_COST_MULTIPLIER = 1.4;
+/** Fraction of the relay's original cost refunded when it is destroyed. */
+export const RELAY_SALVAGE_FRACTION = 0.55;
+/** Passive range bonus (multiplicative, per relay cluster covering the tower). */
+export const RELAY_PASSIVE_RANGE_BONUS = 0.05;
+
+// ──────────────────────────────────────────────────────────
 // Strategic map points
 // Capturable nodes (signal node, radar dish, data cache, abandoned turret) and
 // hostile structures (rift anchor, jammer) live on the grid. They give the

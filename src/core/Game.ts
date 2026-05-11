@@ -10,9 +10,11 @@ import {
   type SignalInterference,
 } from "./GameState";
 import {
+  HARDENED_RELAY_COST_MULTIPLIER,
   MAX_DT,
   RELAY_CORE_SIGNAL_RADIUS_CELLS,
   RELAY_DEPLOY_RADIUS_CELLS,
+  RELAY_SALVAGE_FRACTION,
   SPEED_MULTIPLIERS,
   TILE_SIZE,
   VIEW_HEIGHT,
@@ -26,6 +28,7 @@ import type {
   SpeedMultiplier,
   UpgradeDefinition,
 } from "./Types";
+import { CellKind } from "./Types";
 
 import { AudioSystem } from "../systems/AudioSystem";
 import { loadoutDefinitions } from "../data/loadouts";
@@ -163,6 +166,7 @@ export class Game {
       coreNodesBuilt: 0,
       commandTier: 1,
       militiaPulseTimer: 12,
+      relayDeployVariant: "signal",
     };
 
     // Wire systems that need `this`.
@@ -273,6 +277,7 @@ export class Game {
     this.core.coreNodesBuilt = 0;
     this.core.commandTier = 1;
     this.core.militiaPulseTimer = 12;
+    this.core.relayDeployVariant = "signal";
     this.core.speed = 1;
     this.time.timeScale = 1;
 
@@ -551,11 +556,19 @@ export class Game {
     return Math.max(0, Math.min(tierCap, earned));
   }
 
-  /** Cost to deploy the next relay core. Slight discount at higher tiers. */
-  relayCoreCost(): number {
+  /** Base cost for a Signal Relay at the current command tier. */
+  relayCoreCostBase(): number {
     if (this.core.commandTier >= 3) return 150;
     if (this.core.commandTier >= 2) return 165;
     return 180;
+  }
+
+  /** Actual cost for the currently-selected relay variant. */
+  relayCoreCost(): number {
+    const base = this.relayCoreCostBase();
+    return this.core.relayDeployVariant === "hardened"
+      ? Math.round(base * HARDENED_RELAY_COST_MULTIPLIER)
+      : base;
   }
 
   canDeployRelayCore(): boolean {
@@ -597,22 +610,84 @@ export class Game {
       this.audio.sfxShoot(0.45, 0.06);
       return false;
     }
+    const variant = this.core.relayDeployVariant;
     const cost = this.relayCoreCost();
     if (!this.spendCredits(cost)) return false;
-    this.grid.placeCoreCluster(c, r);
+    this.grid.placeCoreCluster(c, r, variant);
     this.core.coreNodesBuilt++;
     this.core.coreMax += 40;
     this.core.coreIntegrity = Math.min(this.core.coreMax, this.core.coreIntegrity + 40);
     const x = (c + 1) * TILE_SIZE;
     const y = (r + 1) * TILE_SIZE;
-    this.particles.spawnRing(x, y, 46, "#66fcf1");
-    this.particles.spawnRing(x, y, this.grid.relaySignalRadiusCells * TILE_SIZE, "#66fcf1", 0.4);
-    this.particles.spawnBurst(x, y, "#66fcf1", 18, { speed: 160, life: 0.55, size: 2.5 });
-    this.particles.spawnFloatingText(x, y - 24, "RELAY CORE ONLINE", "#66fcf1", 1.2, 11);
+    const color = variant === "hardened" ? "#ff9800" : "#66fcf1";
+    this.particles.spawnRing(x, y, 46, color);
+    this.particles.spawnRing(x, y, this.grid.relaySignalRadiusCells * TILE_SIZE, color, 0.4);
+    this.particles.spawnBurst(x, y, color, 18, { speed: 160, life: 0.55, size: 2.5 });
+    const label = variant === "hardened" ? "HARDENED RELAY ONLINE" : "RELAY CORE ONLINE";
+    this.particles.spawnFloatingText(x, y - 24, label, color, 1.2, 11);
     this.audio.sfxReward();
     this.core.coreDeployMode = false;
     this.bus.emit("core:relayBuilt", { c, r, built: this.core.coreNodesBuilt, max: this.maxRelayCoresForRun() });
     return true;
+  }
+
+  /**
+   * Apply damage to a relay cluster (not the primary core). When HP reaches
+   * zero the relay is destroyed: its cells are cleared, coverage is lost, and
+   * the player receives a salvage credit refund.
+   */
+  damageRelayCluster(cluster: import("../systems/GridSystem").CoreCluster, amount: number, byType?: import("./Types").EnemyType): void {
+    if (cluster.isPrimary || cluster.destroyed) return;
+    cluster.hp = Math.max(0, cluster.hp - amount);
+    // Visual feedback on relay HP damage.
+    const rx = cluster.center.x;
+    const ry = cluster.center.y;
+    const color = cluster.variant === "hardened" ? "#ff9800" : "#66fcf1";
+    this.particles.spawnFloatingText(rx, ry - 20, `-${Math.round(amount)} RELAY`, "#ef9a9a", 0.9, 10);
+    if (cluster.hp <= 0) {
+      this.destroyRelayCluster(cluster, byType);
+    } else {
+      // Small shake to signal the relay took a hit.
+      this.core.shake = Math.min(14, this.core.shake + 6);
+      this.core.shakeRot = Math.min(0.03, this.core.shakeRot + 0.008);
+      this.particles.spawnRing(rx, ry, 32, color, 0.5);
+    }
+  }
+
+  /**
+   * Permanently destroy a relay cluster: clear its cells, remove coverage,
+   * decrement the deployed count, and give the player a salvage refund.
+   */
+  private destroyRelayCluster(cluster: import("../systems/GridSystem").CoreCluster, byType?: import("./Types").EnemyType): void {
+    cluster.destroyed = true;
+    // Free the occupied cells so pathing and future relay placement work.
+    for (const i of cluster.cells) {
+      if (this.grid.cells[i] === CellKind.Core) this.grid.cells[i] = CellKind.Empty;
+      const idx = this.grid.coreCells.indexOf(i);
+      if (idx !== -1) this.grid.coreCells.splice(idx, 1);
+    }
+    this.grid.rebuildFlowPublic();
+    this.core.coreNodesBuilt = Math.max(0, this.core.coreNodesBuilt - 1);
+    this.core.coreMax = Math.max(100, this.core.coreMax - 40);
+    this.core.coreIntegrity = Math.min(this.core.coreMax, this.core.coreIntegrity);
+
+    // Salvage refund.
+    const baseCost = this.relayCoreCostBase();
+    const refund = Math.round(baseCost * (cluster.variant === "hardened" ? HARDENED_RELAY_COST_MULTIPLIER : 1) * RELAY_SALVAGE_FRACTION);
+    this.addCredits(refund);
+
+    // Dramatic destruction FX.
+    const rx = cluster.center.x;
+    const ry = cluster.center.y;
+    this.particles.spawnScreenFlash("#ff5252", 0.3, 0.5);
+    this.particles.spawnRing(rx, ry, 60, "#f44336");
+    this.particles.spawnBurst(rx, ry, "#f44336", 24, { speed: 200, life: 0.65, size: 3 });
+    this.particles.spawnFloatingText(rx, ry - 36, "RELAY LOST", "#f44336", 2.0, 13);
+    this.particles.spawnFloatingText(rx, ry - 56, `+${refund}CR SALVAGE`, "#ffd54f", 2.0, 11);
+    this.core.shake = Math.min(18, this.core.shake + 12);
+    this.core.shakeRot = Math.min(0.05, this.core.shakeRot + 0.015);
+    this.audio.sfxCoreHit({ x: rx });
+    this.bus.emit("core:relayDestroyed", { cluster, byType });
   }
 
   nextCommandTierCost(): number {
@@ -663,9 +738,11 @@ export class Game {
     // Apply the new radius to existing relay clusters so they actually grow.
     // Synthetic clusters (e.g. captured signal nodes — cells.length === 0)
     // keep their authored radius so they don't bloat into full-size relays.
+    // Hardened relay variant keeps its fixed, smaller radius.
     for (const cluster of this.grid.coreClusters) {
       if (cluster.isPrimary) continue;
       if (cluster.cells.length === 0) continue;
+      if (cluster.variant === "hardened") continue;
       cluster.signalRadiusCells = this.grid.relaySignalRadiusCells;
     }
   }

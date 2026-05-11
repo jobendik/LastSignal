@@ -5,7 +5,7 @@ import { Tower } from "../entities/Tower";
 import type { Drone } from "../entities/Drone";
 import type { Projectile } from "../entities/Projectile";
 import type { Squad } from "../entities/Squad";
-import { ABANDONED_TURRET_RANGE, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
+import { ABANDONED_TURRET_RANGE, HARDENED_RELAY_SIGNAL_RADIUS_CELLS, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
 import { towerDefinitions } from "../data/towers";
 import type { TowerType, StrategicPointState, StrategicPointType } from "../core/Types";
 import type { StrategicPoint } from "../entities/StrategicPoint";
@@ -868,28 +868,69 @@ export class RenderSystem {
       if (cluster.cells.length === 0) continue;
       const rx = cluster.center.x;
       const ry = cluster.center.y;
+      const isHardened = cluster.variant === "hardened";
+      const relayColor = isHardened ? "#ff9800" : "#66fcf1";
+      const relayRgb = isHardened ? "255,152,0" : "102,252,241";
+
       ctx.save();
+
+      if (cluster.destroyed) {
+        // Destroyed relay: dim wreck indicator.
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = "#f44336";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.arc(rx, ry, 22, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#f44336";
+        ctx.font = "10px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("✗", rx, ry);
+        ctx.restore();
+        continue;
+      }
+
       ctx.shadowBlur = 12;
-      ctx.shadowColor = "#66fcf1";
-      ctx.strokeStyle = "rgba(102, 252, 241, 0.55)";
+      ctx.shadowColor = relayColor;
+      ctx.strokeStyle = `rgba(${relayRgb}, 0.55)`;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(rx, ry, 22, 0, Math.PI * 2);
       ctx.stroke();
       // Spinning short arms (smaller than the main core).
-      ctx.strokeStyle = "rgba(102, 252, 241, 0.85)";
+      ctx.strokeStyle = `rgba(${relayRgb}, 0.85)`;
       ctx.lineWidth = 1.5;
-      for (let i = 0; i < 3; i++) {
-        const angle = (i / 3) * Math.PI * 2 + elapsed * 0.6;
+      const armCount = isHardened ? 4 : 3;
+      for (let i = 0; i < armCount; i++) {
+        const angle = (i / armCount) * Math.PI * 2 + elapsed * (isHardened ? 0.4 : 0.6);
         ctx.beginPath();
         ctx.moveTo(rx + Math.cos(angle) * 8, ry + Math.sin(angle) * 8);
         ctx.lineTo(rx + Math.cos(angle) * 14, ry + Math.sin(angle) * 14);
         ctx.stroke();
       }
-      ctx.fillStyle = "rgba(102, 252, 241, 0.85)";
+      ctx.fillStyle = `rgba(${relayRgb}, 0.85)`;
       ctx.beginPath();
       ctx.arc(rx, ry, 3, 0, Math.PI * 2);
       ctx.fill();
+
+      // Relay HP bar (drawn only when HP < max, i.e. has taken damage).
+      if (cluster.maxHp > 0 && cluster.hp < cluster.maxHp) {
+        const hpPct = cluster.hp / cluster.maxHp;
+        const barW = 32;
+        const barH = 3;
+        const barX = rx - barW / 2;
+        const barY = ry + 26;
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(barX, barY, barW, barH);
+        const barColor = hpPct < 0.3 ? "#f44336" : hpPct < 0.6 ? "#ffb300" : relayColor;
+        ctx.fillStyle = barColor;
+        ctx.fillRect(barX, barY, barW * hpPct, barH);
+      }
+
       ctx.restore();
     }
 
@@ -2961,8 +3002,9 @@ export class RenderSystem {
 
   /**
    * Subtle blue tint over every cell that's inside the active signal network.
-   * Drawn during PLANNING / WAVE_COMPLETE / when the player is in build mode
-   * so the player can see "where can I build right now?" at a glance.
+   * During PLANNING / WAVE_COMPLETE the overlay is more opaque to help with
+   * build decisions. A very subtle version persists during WAVE_ACTIVE so the
+   * player always knows what territory they own at a glance.
    */
   private drawSignalCoverage(ctx: CanvasRenderingContext2D): void {
     const grid = this.game.grid;
@@ -2970,14 +3012,16 @@ export class RenderSystem {
     const state = this.game.state;
     const isBuilding = Boolean(this.game.input?.placementTowerType) || this.game.core.coreDeployMode;
     const showAlways = state === "PLANNING" || state === "WAVE_COMPLETE";
-    if (!showAlways && !isBuilding) return;
+    const showSubtle = state === "WAVE_ACTIVE";
+    if (!showAlways && !isBuilding && !showSubtle) return;
 
     const elapsed = this.game.time.elapsed;
-    const baseAlpha = isBuilding ? 0.16 : 0.07;
-    const pulse = baseAlpha + Math.sin(elapsed * 1.6) * (isBuilding ? 0.04 : 0.015);
+    const baseAlpha = isBuilding ? 0.16 : showAlways ? 0.07 : 0.025;
+    const pulse = baseAlpha + Math.sin(elapsed * 1.6) * (isBuilding ? 0.04 : showAlways ? 0.015 : 0.005);
     ctx.save();
     ctx.fillStyle = `rgba(102, 252, 241, ${pulse.toFixed(3)})`;
     for (const cluster of grid.coreClusters) {
+      if (cluster.destroyed) continue;
       const cx = cluster.center.x;
       const cy = cluster.center.y;
       const radius = cluster.signalRadiusCells * TILE_SIZE;
@@ -2986,11 +3030,13 @@ export class RenderSystem {
       ctx.fill();
     }
     // Soft outer rim for each cluster.
-    ctx.strokeStyle = `rgba(102, 252, 241, ${(isBuilding ? 0.5 : 0.26).toFixed(2)})`;
+    const strokeAlpha = isBuilding ? 0.5 : showAlways ? 0.26 : 0.10;
+    ctx.strokeStyle = `rgba(102, 252, 241, ${strokeAlpha.toFixed(2)})`;
     ctx.lineWidth = 1.2;
     ctx.setLineDash([6, 5]);
     ctx.lineDashOffset = -elapsed * 12;
     for (const cluster of grid.coreClusters) {
+      if (cluster.destroyed) continue;
       ctx.beginPath();
       ctx.arc(cluster.center.x, cluster.center.y, cluster.signalRadiusCells * TILE_SIZE, 0, Math.PI * 2);
       ctx.stroke();
@@ -3004,6 +3050,7 @@ export class RenderSystem {
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 6]);
       for (const cluster of grid.coreClusters) {
+        if (cluster.destroyed) continue;
         ctx.beginPath();
         ctx.arc(cluster.center.x, cluster.center.y, grid.relayDeployRadiusCells * TILE_SIZE, 0, Math.PI * 2);
         ctx.stroke();
@@ -3073,22 +3120,40 @@ export class RenderSystem {
         }
       }
       // Friendly captured signal node: render its added coverage so the player
-      // can see the new build territory.
+      // can see the new build territory. When contested by enemies the fill
+      // flickers orange to warn the player the node might be lost.
       if (p.state === "captured" && p.type === "signal_node") {
         const radiusPx = p.radiusCells * TILE_SIZE;
-        const pulse = 0.08 + Math.sin(elapsed * 1.6) * 0.025;
-        ctx.fillStyle = `rgba(102, 252, 241, ${pulse.toFixed(3)})`;
+        const isContested = p.contested;
+        // Contested: flicker between teal and orange to signal danger.
+        const flickerPhase = isContested && (elapsed * 4) % 1 < 0.5;
+        const fillRgb = (isContested && !flickerPhase) ? "255, 152, 0" : "102, 252, 241";
+        const strokeRgba = (isContested && !flickerPhase) ? "rgba(255, 152, 0, 0.65)" : "rgba(102, 252, 241, 0.45)";
+        const pulse = isContested
+          ? 0.10 + Math.sin(elapsed * 8) * 0.04
+          : 0.08 + Math.sin(elapsed * 1.6) * 0.025;
+        ctx.fillStyle = `rgba(${fillRgb}, ${pulse.toFixed(3)})`;
         ctx.beginPath();
         ctx.arc(p.pos.x, p.pos.y, radiusPx, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "rgba(102, 252, 241, 0.45)";
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = strokeRgba;
+        ctx.lineWidth = isContested ? 1.4 : 1;
         ctx.setLineDash([4, 5]);
-        ctx.lineDashOffset = -elapsed * 12;
+        ctx.lineDashOffset = -elapsed * (isContested ? 22 : 12);
         ctx.beginPath();
         ctx.arc(p.pos.x, p.pos.y, radiusPx, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+        if (isContested) {
+          // Small "CONTESTED" label above the node.
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = "#ff9800";
+          ctx.fillStyle = "#ff9800";
+          ctx.font = "9px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("CONTESTED", p.pos.x, p.pos.y - radiusPx - 6);
+          ctx.shadowBlur = 0;
+        }
       }
     }
     ctx.restore();
@@ -3254,21 +3319,27 @@ export class RenderSystem {
   /**
    * Visual feedback while placing a relay core: a 2x2 footprint preview that
    * turns red on invalid placement and shows the projected signal radius.
+   * Hardened relays use an orange tint and show the smaller coverage radius.
    */
   private drawRelayPlacementPreview(ctx: CanvasRenderingContext2D): void {
     if (!this.game.core.coreDeployMode) return;
     const cell = this.game.input.hoverCell;
     if (!cell) return;
     const grid = this.game.grid;
+    const variant = this.game.core.relayDeployVariant;
+    const isHardened = variant === "hardened";
 
     const c = cell.c;
     const r = cell.r;
     const placement = this.game.canPlaceRelayAt(c, r);
     const elapsed = this.game.time.elapsed;
     const pulse = 0.65 + Math.sin(elapsed * 4) * 0.2;
-    const color = placement.ok ? "#66fcf1" : "#ff5252";
+    const accentOk = isHardened ? "#ff9800" : "#66fcf1";
+    const color = placement.ok ? accentOk : "#ff5252";
     const fillColor = placement.ok
-      ? `rgba(102, 252, 241, ${(0.18 * pulse).toFixed(2)})`
+      ? isHardened
+        ? `rgba(255, 152, 0, ${(0.18 * pulse).toFixed(2)})`
+        : `rgba(102, 252, 241, ${(0.18 * pulse).toFixed(2)})`
       : `rgba(255, 82, 82, ${(0.22 * pulse).toFixed(2)})`;
 
     ctx.save();
@@ -3295,12 +3366,14 @@ export class RenderSystem {
       ctx.stroke();
     }
 
-    // Projected signal/build radius.
+    // Projected signal/build radius — uses HARDENED_RELAY_SIGNAL_RADIUS_CELLS for hardened variant.
     const px = (c + 1) * TILE_SIZE;
     const py = (r + 1) * TILE_SIZE;
-    const radius = grid.relaySignalRadiusCells * TILE_SIZE;
+    const radius = isHardened
+      ? HARDENED_RELAY_SIGNAL_RADIUS_CELLS * TILE_SIZE
+      : grid.relaySignalRadiusCells * TILE_SIZE;
     ctx.strokeStyle = placement.ok
-      ? "rgba(102, 252, 241, 0.55)"
+      ? isHardened ? "rgba(255, 152, 0, 0.65)" : "rgba(102, 252, 241, 0.55)"
       : "rgba(255, 82, 82, 0.45)";
     ctx.lineWidth = 1.2;
     ctx.setLineDash([6, 4]);
@@ -3311,7 +3384,10 @@ export class RenderSystem {
     ctx.setLineDash([]);
     if (placement.ok) {
       // Semi-transparent fill of projected coverage so additive territory reads.
-      ctx.fillStyle = `rgba(102, 252, 241, ${(0.05 + Math.sin(elapsed * 2) * 0.02).toFixed(3)})`;
+      const fillAlpha = (0.05 + Math.sin(elapsed * 2) * 0.02).toFixed(3);
+      ctx.fillStyle = isHardened
+        ? `rgba(255, 152, 0, ${fillAlpha})`
+        : `rgba(102, 252, 241, ${fillAlpha})`;
       ctx.beginPath();
       ctx.arc(px, py, radius, 0, Math.PI * 2);
       ctx.fill();
