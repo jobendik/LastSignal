@@ -18,6 +18,8 @@
  *
  * SDK reference: https://docs.crazygames.com/sdk/html5/
  */
+import { ConsentSystem } from "./ConsentSystem";
+
 export class AdsSystem {
   private sdkScriptInjected = false;
   private sdkReady = false;
@@ -135,6 +137,7 @@ export class AdsSystem {
    * available, when on cooldown, or after the ad finishes / errors.
    */
   async showInterstitial(): Promise<void> {
+    if (!ConsentSystem.adsAllowed) return;
     const sdk = this.getSdk();
     if (!sdk) return;
     const now = Date.now();
@@ -156,6 +159,7 @@ export class AdsSystem {
    * watched it to completion, otherwise `{ rewarded: false }`.
    */
   async showRewarded(): Promise<{ rewarded: boolean }> {
+    if (!ConsentSystem.adsAllowed) return { rewarded: false };
     const sdk = this.getSdk();
     if (!sdk) return { rewarded: false };
     try {

@@ -1,11 +1,14 @@
 import type { Game } from "../core/Game";
 import type { GameSettings } from "../core/Types";
+import { ConsentSystem } from "../systems/ConsentSystem";
+import { ConsentModal } from "./ConsentModal";
 import { el, clear } from "./dom";
 
 export class SettingsPanel {
   el: HTMLElement;
   constructor(private readonly game: Game) {
     this.el = el("div", { class: "ls-overlay ls-settings" });
+    this.game.bus.on("consent:changed", () => this.build());
     this.build();
   }
 
@@ -42,6 +45,7 @@ export class SettingsPanel {
         ["high", "Full Retro"],
         ["custom", "Custom"],
       ]),
+      this.privacyRow(),
     );
     // Per-effect graphics toggles. Picking a preset above sets all of these,
     // but the player can also override any individual effect.
@@ -185,6 +189,30 @@ export class SettingsPanel {
     };
     row.append(select);
     return row;
+  }
+
+  private privacyRow(): HTMLElement {
+    const row = el("div", { class: "ls-form-row ls-privacy-row" });
+    row.append(el("span", { class: "ls-form-label", text: "Privacy & data" }));
+    const state = el("span", {
+      class: "ls-form-value ls-consent-state",
+      text: this.consentSummary(),
+    });
+    const btn = el("button", { class: "ls-btn ls-keybind-btn", text: "OPEN" });
+    btn.onclick = async () => {
+      await ConsentModal.open(this.game.uiRoot, { force: true });
+      this.build();
+    };
+    row.append(state, btn);
+    return row;
+  }
+
+  private consentSummary(): string {
+    const flags = ConsentSystem.getFlags();
+    const asked = flags.consentRequested ? "Yes" : "No";
+    const ads = flags.adsAllowed ? "Yes" : "No";
+    const cloud = flags.cloudSaveAllowed ? "Yes" : "No";
+    return `Asked ${asked} / Ads ${ads} / Cloud ${cloud}`;
   }
 
   private keybindRow(action: string, code: string): HTMLElement {

@@ -13,6 +13,11 @@ export interface GameEventMap {
   "game:victory": void;
   "sector:started": unknown;
   "speed:changed": unknown;
+  "consent:changed": {
+    consentRequested: boolean;
+    adsAllowed: boolean;
+    cloudSaveAllowed: boolean;
+  };
   "ui:esc": void;
   "ui:cleared": void;
 }

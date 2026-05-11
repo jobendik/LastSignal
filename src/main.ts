@@ -3,6 +3,8 @@ import "./styles/ui.css";
 import "./styles/mobile.css";
 import { Game } from "./core/Game";
 import { VIEW_HEIGHT, VIEW_WIDTH } from "./core/Config";
+import { ConsentSystem } from "./systems/ConsentSystem";
+import { ConsentModal } from "./ui/ConsentModal";
 
 const appRoot =
   document.getElementById("ls-app") ??
@@ -78,7 +80,7 @@ document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("gesturechange", (e) => e.preventDefault());
 
 const game = new Game(gameCanvas, gameUiRoot, isMobile);
-game.start();
+ConsentSystem.bindBus(game.bus);
 
 // Resize canvas to fit viewport while preserving aspect ratio.
 function fit(): void {
@@ -155,3 +157,12 @@ try {
 } catch {
   /* non-Vite env */
 }
+
+async function startAfterConsent(): Promise<void> {
+  if (!ConsentSystem.consentRequested) {
+    void ConsentModal.open(gameUiRoot);
+  }
+  await ConsentSystem.ensure();
+  game.start();
+}
+void startAfterConsent();

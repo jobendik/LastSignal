@@ -56,6 +56,22 @@
   max-width: 520px;
 }
 .ls-overlay-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.ls-consent-modal { z-index: 240; }
+.ls-consent-copy {
+  max-width: 560px;
+  color: #c5c6c7;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+.ls-consent-current {
+  color: #8a9099;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.ls-consent-modal .ls-overlay-actions .ls-btn {
+  min-width: 168px;
+}
 
 .ls-stats {
   background: rgba(10, 14, 20, 0.7);
@@ -1316,6 +1332,15 @@
   letter-spacing: 3px;
   font-size: 11px;
   margin-top: 8px;
+}
+.ls-privacy-row {
+  flex-wrap: wrap;
+}
+.ls-consent-state {
+  flex: 1 1 176px;
+  min-width: 176px;
+  line-height: 1.35;
+  text-align: left;
 }
 .ls-keybind-btn {
   min-width: 82px;
