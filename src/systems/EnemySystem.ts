@@ -837,17 +837,19 @@ export class EnemySystem {
         }
       }
 
-      // Carrier/Splitter: generic spawn ability.
+      // Splitter: binary fission — splits into 2 weakened grunts on death.
+      // Distinct from Carrier (which spawns 3 Scouts): Splitter's spawn is
+      // tougher per unit but slower and more manageable with AoE.
       if (e.ability === "spawn" && e.type === "splitter") {
         this.game.audio.sfxEnemyAbility("spawn", e.pos);
-        this.game.particles.spawnRing(e.pos.x, e.pos.y, 58, "#ff8a65", 0.26);
-        for (let i = 0; i < 3; i++) {
+        this.game.particles.spawnRing(e.pos.x, e.pos.y, 52, "#ce93d8", 0.3);
+        for (let i = 0; i < 2; i++) {
           const ang = rnd(0, Math.PI * 2);
-          const x = e.pos.x + Math.cos(ang) * 12;
-          const y = e.pos.y + Math.sin(ang) * 12;
-          const scout = this.spawn("scout", x, y);
-          scout.spawnFxTimer = scout.spawnFxMax;
-          this.game.particles.spawnInwardBurst(x, y, scout.color, 10, 22);
+          const x = e.pos.x + Math.cos(ang) * 10;
+          const y = e.pos.y + Math.sin(ang) * 10;
+          const grunt = this.spawn("grunt", x, y, 0.6);
+          grunt.spawnFxTimer = grunt.spawnFxMax;
+          this.game.particles.spawnInwardBurst(x, y, grunt.color, 8, 20);
         }
       }
 
@@ -906,16 +908,29 @@ export class EnemySystem {
     if (!shouldAnnounce) return;
     this.lastKillStreakAnnounced = streak;
 
+    // Skill reward: chain kills grant a small credit bonus so rapid combos
+    // feel tangibly valuable — not just visual feedback.
+    const bonus = streak >= 8 ? 10 : 5;
+    this.game.addCredits(bonus);
+
     const cx = this.game.grid.corePos.x;
     const cy = this.game.grid.corePos.y;
     const color = streak >= 8 ? "#ff5252" : "#ffeb3b";
     this.game.particles.spawnFloatingText(
       cx,
-      cy - 26,
+      cy - 40,
       `CHAIN KILL ×${streak}`,
       color,
       1.2,
       streak >= 8 ? 22 : 18
+    );
+    this.game.particles.spawnFloatingText(
+      cx,
+      cy - 22,
+      `+${bonus}CR CHAIN BONUS`,
+      "#ffd54f",
+      1.0,
+      11
     );
     this.game.particles.spawnRing(cx, cy, streak >= 8 ? 180 : 130, color);
     this.game.particles.spawnBurst(cx, cy, color, streak >= 8 ? 28 : 18, {

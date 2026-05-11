@@ -152,7 +152,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     name: "Splitter",
     role: "Binary fission hostile",
     description:
-      "Splits into two smaller Grunts on death. Kill it cleanly with splash.",
+      "Splits into two weakened Grunts on death. Unlike the Carrier, its spawn is slow and armored — prioritize it, then chase the fragments.",
     hp: 72,
     speed: 36,
     reward: 14,
