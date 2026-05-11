@@ -1,6 +1,10 @@
 import type { Game } from "../core/Game";
 import type { SectorDefinition } from "../core/Types";
-import { sectorDefinitions } from "../data/sectors";
+import {
+  loadTrainingSectorDefinition,
+  sectorDefinitions,
+  trainingSectorCardDefinition,
+} from "../data/sectors";
 import { difficultyDefinitions, difficultyOrder } from "../data/difficulty";
 import { loadoutDefinitions, type LoadoutDefinition } from "../data/loadouts";
 import { sectorObjectives } from "../data/objectives";
@@ -26,10 +30,7 @@ export class SectorSelect {
     // Training simulation banner — rendered above the campaign grid so it
     // never has to compete with locked sectors for attention. Always
     // available, never gates progression.
-    const trainingDef = sectorDefinitions.find((s) => s.isTraining);
-    if (trainingDef) {
-      this.el.append(this.buildTrainingCard(trainingDef));
-    }
+    this.el.append(this.buildTrainingCard(trainingSectorCardDefinition));
 
     const grid = el("div", { class: "ls-sector-grid ls-sector-starmap" });
     const bestCleared = this.game.core.profile.bestSectorCleared;
@@ -213,7 +214,7 @@ export class SectorSelect {
    * this one is always available, never numbered, and skips the loadout
    * picker — the player launches directly into a fixed training run.
    */
-  private buildTrainingCard(sector: SectorDefinition): HTMLElement {
+  private buildTrainingCard(sector: typeof trainingSectorCardDefinition): HTMLElement {
     const wrap = el("div", { class: "ls-training-card" });
     wrap.style.borderColor = sector.accentColor;
     const completed = this.game.core.profile.trainingCompleted;
@@ -242,9 +243,12 @@ export class SectorSelect {
     });
     startBtn.title =
       "Launch the optional training simulation. Eight short drills. No campaign progress required.";
-    startBtn.onclick = () => {
+    startBtn.onclick = async () => {
       // Skip the loadout picker — training uses a fixed starting setup.
-      this.game.beginSector(sector, { endless: false });
+      startBtn.disabled = true;
+      startBtn.textContent = "LOADING TRAINING";
+      const trainingSector = await loadTrainingSectorDefinition();
+      this.game.beginSector(trainingSector, { endless: false });
     };
     const codexBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "FIELD MANUAL (H)" });
     codexBtn.title = "Open the codex for system reference before starting.";

@@ -7,7 +7,6 @@ import type {
 import { defaultWaves, sector2Waves, sector3Waves, sector4Waves, summarize } from "./waves";
 import { COLS, ROWS } from "../core/Config";
 import { mulberry32 } from "../core/Random";
-import { trainingSectorDefinition } from "./training";
 
 /**
  * Base layouts are authored in a compact format, then auto-expanded to the runtime map size.
@@ -1015,6 +1014,39 @@ function blackoutWaves(): WaveDefinition[] {
   ];
 }
 
+type TrainingSectorCardDefinition = Pick<
+  SectorDefinition,
+  "id" | "name" | "description" | "accentColor" | "isTraining"
+>;
+
+export const trainingSectorCardDefinition: TrainingSectorCardDefinition = {
+  id: "sector_00_operator_training",
+  name: "Sector 0 - Operator Training",
+  description:
+    "Optional simulation. Learn tower placement, signal expansion, strategic capture, mobile squads, tower repair, and hostile structure suppression in a low-pressure environment.",
+  accentColor: "#ffeb3b",
+  isTraining: true,
+};
+
+let trainingSectorPromise: Promise<SectorDefinition> | null = null;
+
+export function loadTrainingSectorDefinition(): Promise<SectorDefinition> {
+  trainingSectorPromise ??= import("./training").then((mod) =>
+    normalizeSectorDefinition(mod.trainingSectorDefinition)
+  );
+  return trainingSectorPromise;
+}
+
+function normalizeSectorDefinition(s: SectorDefinition): SectorDefinition {
+  if (s.cols && s.rows) return { ...s };
+  return {
+    ...s,
+    layout: expandLayout(s.layout),
+    spawners: expandSpawners(s.spawners, s.layout),
+    strategicPoints: expandStrategicPoints(s.strategicPoints, s.layout),
+  };
+}
+
 const baseSectorDefinitions: SectorDefinition[] = [
   {
     id: "sector_01_broken_relay",
@@ -1152,21 +1184,6 @@ const baseSectorDefinitions: SectorDefinition[] = [
     hazards: { meteors: true, gravity: false, signalInterference: true, powerSurges: false },
     strategicPoints: blackoutStrategicPoints,
   },
-  // Operator Training is appended at the end so it does NOT disturb the
-  // sector index used for modifier rolls or campaign progression. Sector
-  // Select renders it first via the trainingSectorDefinition.isTraining flag.
-  trainingSectorDefinition,
 ];
 
-export const sectorDefinitions: SectorDefinition[] = baseSectorDefinitions.map((s) => {
-  // Large sectors (those that specify cols/rows) use their layout as-is.
-  if (s.cols && s.rows) return { ...s };
-  // Legacy sectors get centered/expanded to COLS×ROWS, including their
-  // authored strategic points so source-layout coords stay accurate.
-  return {
-    ...s,
-    layout: expandLayout(s.layout),
-    spawners: expandSpawners(s.spawners, s.layout),
-    strategicPoints: expandStrategicPoints(s.strategicPoints, s.layout),
-  };
-});
+export const sectorDefinitions: SectorDefinition[] = baseSectorDefinitions.map(normalizeSectorDefinition);

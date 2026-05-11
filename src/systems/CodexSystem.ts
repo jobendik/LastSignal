@@ -1,5 +1,4 @@
 import type { Game } from "../core/Game";
-import { codexEntries } from "../data/codex";
 import type { CodexEntry, EnemyType } from "../core/Types";
 
 export class CodexSystem {
@@ -24,7 +23,8 @@ export class CodexSystem {
     return [...this.seen];
   }
 
-  entry(id: EnemyType): CodexEntry {
+  async entry(id: EnemyType): Promise<CodexEntry> {
+    const { codexEntries } = await import("../data/codex");
     return codexEntries[id];
   }
 

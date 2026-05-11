@@ -66,6 +66,10 @@ import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
 import { rollModifiers } from "../data/modifiers";
 
+interface GameStartOptions {
+  sdkReady?: Promise<void>;
+}
+
 export class Game {
   bus = new EventBus();
   stateMachine = new StateMachine(this.bus);
@@ -199,18 +203,15 @@ export class Game {
     this.ui = new UIManager(this);
   }
 
-  async start(): Promise<void> {
+  async start(options: GameStartOptions = {}): Promise<void> {
     this.audio.applySettings(this.core.settings);
-    // CrazyGames SDK boots lazily and is fully optional. Signal loading
-    // so the host can show its own loading shim; gameplayStart/stop fire
-    // around active waves to gate ads correctly.
-    this.ads.signalLoadingStart();
-    const sdkReady = this.ads.init();
+    // CrazyGames SDK boots lazily and is fully optional. gameplayStart/stop
+    // fire around active waves to gate ads correctly.
+    const sdkReady = options.sdkReady ?? this.ads.init();
     const loadedProfile = await this.persistence.loadProfileAtStartup(
       ConsentSystem.cloudSaveAllowed ? sdkReady : undefined
     );
     this.core.profile = loadedProfile;
-    sdkReady.finally(() => this.ads.signalLoadingStop());
     this.input.attach();
     this.ui.attach();
     this.guidance.attach();

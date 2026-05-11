@@ -10,7 +10,6 @@ import { PauseMenu } from "./PauseMenu";
 import { GameOverScreen } from "./GameOverScreen";
 import { VictoryScreen } from "./VictoryScreen";
 import { SettingsPanel } from "./SettingsPanel";
-import { CodexPanel } from "./CodexPanel";
 import { MetaPanel } from "./MetaPanel";
 import { AchievementToast } from "./AchievementToast";
 import { KillFeed } from "./KillFeed";
@@ -19,6 +18,17 @@ import { TutorialOverlay } from "./TutorialOverlay";
 import { SectorBriefingOverlay } from "./SectorBriefingOverlay";
 import { GuidanceOverlay } from "./GuidanceOverlay";
 import { MobileShell } from "./mobile/MobileShell";
+import { el, clear } from "./dom";
+import type { CodexPanel } from "./CodexPanel";
+import type { HelpCategoryId } from "../data/help";
+
+type CodexTab = HelpCategoryId | "threats";
+
+interface CodexPanelHandle {
+  el: HTMLElement;
+  openAt(tab: CodexTab): void;
+  refresh(): void;
+}
 
 /**
  * Orchestrates all UI panels. Each panel is a small DOM component that
@@ -37,7 +47,7 @@ export class UIManager {
   gameOver: GameOverScreen;
   victory: VictoryScreen;
   settingsPanel: SettingsPanel;
-  codexPanel: CodexPanel;
+  codexPanel: CodexPanelHandle;
   metaPanel: MetaPanel;
   achievementToast: AchievementToast;
   killFeed: KillFeed;
@@ -46,6 +56,8 @@ export class UIManager {
   sectorBriefing: SectorBriefingOverlay;
   guidanceOverlay: GuidanceOverlay;
   mobileShell: MobileShell | null = null;
+  private loadedCodexPanel: CodexPanel | null = null;
+  private codexPanelPromise: Promise<CodexPanel> | null = null;
 
   constructor(private readonly game: Game) {
     this.root = game.uiRoot;
@@ -61,7 +73,7 @@ export class UIManager {
     this.gameOver = new GameOverScreen(game);
     this.victory = new VictoryScreen(game);
     this.settingsPanel = new SettingsPanel(game);
-    this.codexPanel = new CodexPanel(game);
+    this.codexPanel = this.createCodexPanelHandle();
     this.metaPanel = new MetaPanel(game);
     this.achievementToast = new AchievementToast(game);
     this.killFeed = new KillFeed(game);
@@ -190,7 +202,14 @@ export class UIManager {
       this.game.squads.cancelCommand();
     }
     this.codexPanel.el.classList.add("visible");
-    this.codexPanel.refresh();
+    if (this.loadedCodexPanel) {
+      this.loadedCodexPanel.refresh();
+    } else {
+      this.renderCodexPanelLoading();
+      void this.ensureCodexPanel().then((panel) => {
+        if (panel.el.classList.contains("visible")) panel.refresh();
+      });
+    }
     this.game.audio.sfxPanel(true);
   }
   closeCodex(): void {
@@ -205,5 +224,62 @@ export class UIManager {
   closeMeta(): void {
     this.metaPanel.el.classList.remove("visible");
     this.game.audio.sfxPanel(false);
+  }
+
+  private createCodexPanelHandle(): CodexPanelHandle {
+    return {
+      el: el("div", { class: "ls-overlay ls-codex" }),
+      openAt: (tab) => {
+        void this.openCodexAt(tab);
+      },
+      refresh: () => {
+        if (this.loadedCodexPanel) this.loadedCodexPanel.refresh();
+        else this.renderCodexPanelLoading();
+      },
+    };
+  }
+
+  private async openCodexAt(tab: CodexTab): Promise<void> {
+    this.openCodex();
+    const panel = await this.ensureCodexPanel();
+    panel.openAt(tab);
+  }
+
+  private ensureCodexPanel(): Promise<CodexPanel> {
+    if (this.loadedCodexPanel) return Promise.resolve(this.loadedCodexPanel);
+    this.codexPanelPromise ??= import("./CodexPanel").then(({ CodexPanel }) => {
+      const panel = new CodexPanel(this.game);
+      const wasVisible = this.codexPanel.el.classList.contains("visible");
+      this.codexPanel.el.replaceWith(panel.el);
+      this.codexPanel.el = panel.el;
+      if (wasVisible) panel.el.classList.add("visible");
+      this.loadedCodexPanel = panel;
+      return panel;
+    });
+    return this.codexPanelPromise;
+  }
+
+  private renderCodexPanelLoading(): void {
+    clear(this.codexPanel.el);
+    const card = el("div", { class: "ls-codex-card-root" });
+    const header = el("div", { class: "ls-codex-header" });
+    header.append(
+      el("div", { class: "ls-overlay-title", text: "FIELD MANUAL" }),
+      el("div", { class: "ls-codex-subtitle", text: "Loading reference interface..." })
+    );
+    const closeRow = el("div", { class: "ls-codex-close-row" });
+    const close = el("button", { class: "ls-btn ls-btn-ghost", text: "CLOSE" });
+    close.title = "Close (Esc / H)";
+    close.onclick = () => this.closeCodex();
+    closeRow.append(close);
+    header.append(closeRow);
+    card.append(
+      header,
+      el("div", {
+        class: "ls-codex-body",
+        html: `<div class="ls-help-section"><div class="ls-help-section-title">LINKING</div><div class="ls-help-section-subtitle">Opening the field manual module.</div></div>`,
+      })
+    );
+    this.codexPanel.el.append(card);
   }
 }

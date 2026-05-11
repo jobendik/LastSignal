@@ -1,12 +1,13 @@
 import type { Game } from "../core/Game";
 import { enemyDefinitions, enemyOrder } from "../data/enemies";
-import { codexEntries } from "../data/codex";
-import {
-  helpCategories,
-  type HelpCategoryId,
-  type HelpCategory,
-} from "../data/help";
+import type { CodexEntry, EnemyType } from "../core/Types";
+import type { HelpCategoryId, HelpCategory } from "../data/help";
 import { el, clear } from "./dom";
+
+interface CodexPanelData {
+  codexEntries: Record<EnemyType, CodexEntry>;
+  helpCategories: HelpCategory[];
+}
 
 /**
  * Codex / Help screen.
@@ -26,6 +27,8 @@ import { el, clear } from "./dom";
 export class CodexPanel {
   el: HTMLElement;
   private activeTab: HelpCategoryId | "threats" = "basics";
+  private data: CodexPanelData | null = null;
+  private dataPromise: Promise<CodexPanelData> | null = null;
 
   constructor(private readonly game: Game) {
     this.el = el("div", { class: "ls-overlay ls-codex" });
@@ -38,11 +41,19 @@ export class CodexPanel {
   /** Open at a specific tab (used by tutorial 'Open Codex' shortcuts). */
   openAt(tab: HelpCategoryId | "threats"): void {
     this.activeTab = tab;
-    this.game.ui.openCodex();
+    this.refresh();
   }
 
   refresh(): void {
     clear(this.el);
+
+    if (!this.data) {
+      this.renderLoading();
+      void this.loadData().then(() => {
+        if (this.el.classList.contains("visible")) this.refresh();
+      });
+      return;
+    }
 
     // Inner card so click-outside-to-close works without the entire body
     // counting as the close target.
@@ -67,7 +78,7 @@ export class CodexPanel {
 
     // Tab strip — help categories first, then threats.
     const tabs = el("div", { class: "ls-codex-tabs" });
-    for (const cat of helpCategories) {
+    for (const cat of this.data.helpCategories) {
       const tab = el("button", {
         class: `ls-codex-tab${this.activeTab === cat.id ? " active" : ""}`,
         text: cat.label,
@@ -100,11 +111,53 @@ export class CodexPanel {
     if (this.activeTab === "threats") {
       body.append(this.renderThreats());
     } else {
-      const cat = helpCategories.find((c) => c.id === this.activeTab);
+      const cat = this.data.helpCategories.find((c) => c.id === this.activeTab);
       if (cat) body.append(this.renderHelpCategory(cat));
     }
     card.append(body);
 
+    this.el.append(card);
+  }
+
+  private loadData(): Promise<CodexPanelData> {
+    if (this.data) return Promise.resolve(this.data);
+    this.dataPromise ??= Promise.all([
+      import("../data/codex"),
+      import("../data/help"),
+    ]).then(([codex, help]) => {
+      const data = {
+        codexEntries: codex.codexEntries,
+        helpCategories: help.helpCategories,
+      };
+      this.data = data;
+      return data;
+    });
+    return this.dataPromise;
+  }
+
+  private renderLoading(): void {
+    const card = el("div", { class: "ls-codex-card-root" });
+    const header = el("div", { class: "ls-codex-header" });
+    header.append(
+      el("div", { class: "ls-overlay-title", text: "FIELD MANUAL" }),
+      el("div", {
+        class: "ls-codex-subtitle",
+        text: "Loading reference archive...",
+      })
+    );
+    const closeRow = el("div", { class: "ls-codex-close-row" });
+    const close = el("button", { class: "ls-btn ls-btn-ghost", text: "CLOSE" });
+    close.title = "Close (Esc / H)";
+    close.onclick = () => this.game.ui.closeCodex();
+    closeRow.append(close);
+    header.append(closeRow);
+    card.append(
+      header,
+      el("div", {
+        class: "ls-codex-body",
+        html: `<div class="ls-help-section"><div class="ls-help-section-title">DECRYPTING</div><div class="ls-help-section-subtitle">Fetching codex and field manual data.</div></div>`,
+      })
+    );
     this.el.append(card);
   }
 
@@ -161,7 +214,7 @@ export class CodexPanel {
     for (const id of enemyOrder) {
       const def = enemyDefinitions[id];
       const seen = this.game.codex.has(id);
-      const entry = codexEntries[id];
+      const entry = this.data!.codexEntries[id];
       const cardEl = el("div", { class: `ls-codex-card${seen ? "" : " locked"}` });
       cardEl.style.borderColor = seen ? def.color : "#444";
       if (seen) {

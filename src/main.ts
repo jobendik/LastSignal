@@ -1,10 +1,10 @@
 import "./styles/main.css";
 import "./styles/ui.css";
 import "./styles/mobile.css";
-import { Game } from "./core/Game";
 import { VIEW_HEIGHT, VIEW_WIDTH } from "./core/Config";
-import { ConsentSystem } from "./systems/ConsentSystem";
-import { ConsentModal } from "./ui/ConsentModal";
+import { LoadingScreen } from "./ui/LoadingScreen";
+
+import type { Game } from "./core/Game";
 
 const appRoot =
   document.getElementById("ls-app") ??
@@ -36,6 +36,8 @@ uiRoot.classList.add("ls-ui-root");
 
 const gameCanvas = canvas!;
 const gameUiRoot = uiRoot!;
+const loadingScreen = new LoadingScreen(appRoot);
+let game: Game | null = null;
 
 // ──────────────────────────────────────────────────────────
 // Mobile / touch device detection.
@@ -79,9 +81,6 @@ gameUiRoot.style.touchAction = "manipulation";
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("gesturechange", (e) => e.preventDefault());
 
-const game = new Game(gameCanvas, gameUiRoot, isMobile);
-ConsentSystem.bindBus(game.bus);
-
 // Resize canvas to fit viewport while preserving aspect ratio.
 function fit(): void {
   applyDeviceClasses();
@@ -117,7 +116,7 @@ function fit(): void {
     gameCanvas.width = backingW;
     gameCanvas.height = backingH;
   }
-  game.render.dpr = dpr;
+  if (game) game.render.dpr = dpr;
   gameCanvas.style.width = `${Math.floor(VIEW_WIDTH * scale)}px`;
   gameCanvas.style.height = `${Math.floor(VIEW_HEIGHT * scale)}px`;
 }
@@ -140,6 +139,7 @@ try {
 
 // Attempt to unlock audio on first user interaction.
 function unlockAudio(): void {
+  if (!game) return;
   game.audio.init();
   game.audio.resume();
   window.removeEventListener("pointerdown", unlockAudio);
@@ -150,19 +150,47 @@ window.addEventListener("keydown", unlockAudio);
 
 // Expose game instance in dev for debugging.
 declare global { interface Window { __game?: Game } }
-try {
-  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
-    window.__game = game;
-  }
-} catch {
-  /* non-Vite env */
-}
 
-async function startAfterConsent(): Promise<void> {
+async function boot(): Promise<void> {
+  loadingScreen.setPhase("Booting systems");
+  loadingScreen.setProgress(8);
+  const [{ ConsentSystem }, { ConsentModal }] = await Promise.all([
+    import("./systems/ConsentSystem"),
+    import("./ui/ConsentModal"),
+  ]);
+  loadingScreen.setProgress(28);
+
   if (!ConsentSystem.consentRequested) {
     void ConsentModal.open(gameUiRoot);
   }
   await ConsentSystem.ensure();
-  await game.start();
+
+  loadingScreen.setPhase("Loading sector data");
+  await import("./data/sectors");
+  loadingScreen.setProgress(58);
+
+  loadingScreen.setPhase("Preparing UI");
+  const { Game } = await import("./core/Game");
+  game = new Game(gameCanvas, gameUiRoot, isMobile);
+  ConsentSystem.bindBus(game.bus);
+  fit();
+
+  try {
+    if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+      window.__game = game;
+    }
+  } catch {
+    /* non-Vite env */
+  }
+
+  const sdkReady = game.ads.init();
+  void sdkReady.then(() => game?.ads.signalLoadingStart());
+  await game.start({ sdkReady });
+  loadingScreen.setProgress(92);
+
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  loadingScreen.complete();
+  void sdkReady.then(() => game?.ads.signalLoadingStop());
 }
-void startAfterConsent();
+
+void boot();
