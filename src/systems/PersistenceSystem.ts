@@ -4,6 +4,19 @@ const SETTINGS_KEY = "last_signal:settings";
 const PROFILE_KEY = "last_signal:profile";
 const RUN_KEY = "last_signal:run_snapshot";
 const REPLAY_KEY = "last_signal:latest_replay";
+const SDK_SYNC_TIMEOUT_MS = 5000;
+
+interface CloudSavePort {
+  init(): Promise<void>;
+  loadRemote(): Promise<PersistedProfile | null>;
+  saveRemote(profile: PersistedProfile): Promise<void>;
+  merge(local: PersistedProfile, remote: PersistedProfile | null): PersistedProfile;
+}
+
+interface SaveProfileOptions {
+  touch?: boolean;
+  remote?: boolean;
+}
 
 export const defaultSettings: GameSettings = {
   masterVolume: 0.8,
@@ -77,9 +90,40 @@ export const defaultProfile: PersistedProfile = {
   contextualHintsEnabled: true,
   trainingCompleted: false,
   trainingStagesCompleted: 0,
+  lastPlayedAt: 0,
 };
 
+export function hydrateProfile(value: unknown): PersistedProfile {
+  const parsed = value && typeof value === "object"
+    ? value as Partial<PersistedProfile>
+    : {};
+
+  return {
+    ...defaultProfile,
+    ...parsed,
+    codexSeen: Array.isArray(parsed.codexSeen) ? parsed.codexSeen : [],
+    researchUnlocked: Array.isArray(parsed.researchUnlocked) ? parsed.researchUnlocked : [],
+    achievementsUnlocked: Array.isArray(parsed.achievementsUnlocked) ? parsed.achievementsUnlocked : [],
+    runHistory: Array.isArray(parsed.runHistory) ? parsed.runHistory.slice(0, 12) : [],
+    prestigeLevel: parsed.prestigeLevel ?? 0,
+    prestigeMultiplier: parsed.prestigeMultiplier ?? 1,
+    dailyBestScore: parsed.dailyBestScore ?? 0,
+    dailyBestDate: parsed.dailyBestDate ?? "",
+    commanderBriefingSeen: parsed.commanderBriefingSeen ?? false,
+    guidanceSeen: Array.isArray(parsed.guidanceSeen) ? parsed.guidanceSeen : [],
+    tutorialHintsEnabled: parsed.tutorialHintsEnabled ?? true,
+    contextualHintsEnabled: parsed.contextualHintsEnabled ?? true,
+    trainingCompleted: parsed.trainingCompleted ?? false,
+    trainingStagesCompleted: parsed.trainingStagesCompleted ?? 0,
+    lastPlayedAt: typeof parsed.lastPlayedAt === "number" && Number.isFinite(parsed.lastPlayedAt)
+      ? parsed.lastPlayedAt
+      : 0,
+  };
+}
+
 export class PersistenceSystem {
+  constructor(private readonly cloudSave: CloudSavePort | null = null) {}
+
   loadSettings(): GameSettings {
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
@@ -107,35 +151,43 @@ export class PersistenceSystem {
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
       if (!raw) return this.emptyProfile();
-      const parsed = JSON.parse(raw) as Partial<PersistedProfile>;
-      return {
-        ...defaultProfile,
-        ...parsed,
-        codexSeen: parsed.codexSeen ?? [],
-        researchUnlocked: parsed.researchUnlocked ?? [],
-        achievementsUnlocked: parsed.achievementsUnlocked ?? [],
-        runHistory: (parsed.runHistory ?? []).slice(0, 12),
-        prestigeLevel: parsed.prestigeLevel ?? 0,
-        prestigeMultiplier: parsed.prestigeMultiplier ?? 1,
-        dailyBestScore: parsed.dailyBestScore ?? 0,
-        dailyBestDate: parsed.dailyBestDate ?? "",
-        commanderBriefingSeen: parsed.commanderBriefingSeen ?? false,
-        guidanceSeen: parsed.guidanceSeen ?? [],
-        tutorialHintsEnabled: parsed.tutorialHintsEnabled ?? true,
-        contextualHintsEnabled: parsed.contextualHintsEnabled ?? true,
-        trainingCompleted: parsed.trainingCompleted ?? false,
-        trainingStagesCompleted: parsed.trainingStagesCompleted ?? 0,
-      };
+      return hydrateProfile(JSON.parse(raw));
     } catch {
       return this.emptyProfile();
     }
   }
 
-  saveProfile(p: PersistedProfile): void {
+  async loadProfileAtStartup(sdkReady?: Promise<unknown>): Promise<PersistedProfile> {
+    const local = this.loadProfile();
+    if (!this.cloudSave) return local;
+
+    await this.waitForSdk(sdkReady);
+
+    try {
+      await this.cloudSave.init();
+      const remote = await this.cloudSave.loadRemote();
+      const merged = this.cloudSave.merge(local, remote);
+      this.saveProfile(merged, { touch: false, remote: false });
+      void this.cloudSave.saveRemote(merged);
+      return merged;
+    } catch {
+      return local;
+    }
+  }
+
+  saveProfile(p: PersistedProfile, options: SaveProfileOptions = {}): void {
+    if (options.touch !== false) {
+      p.lastPlayedAt = Date.now();
+    } else if (typeof p.lastPlayedAt !== "number" || !Number.isFinite(p.lastPlayedAt)) {
+      p.lastPlayedAt = 0;
+    }
     try {
       localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
     } catch {
       /* ignore */
+    }
+    if (options.remote !== false) {
+      void this.cloudSave?.saveRemote(p);
     }
   }
 
@@ -181,6 +233,15 @@ export class PersistenceSystem {
       contextualHintsEnabled: true,
       trainingCompleted: false,
       trainingStagesCompleted: 0,
+      lastPlayedAt: 0,
     };
+  }
+
+  private async waitForSdk(sdkReady?: Promise<unknown>): Promise<void> {
+    if (!sdkReady) return;
+    await Promise.race([
+      sdkReady.catch(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, SDK_SYNC_TIMEOUT_MS)),
+    ]);
   }
 }

@@ -118,6 +118,30 @@
 }
 @keyframes ls-pulse { 50% { text-shadow: 0 0 30px #66fcf1, 0 0 60px #45a29e; } }
 .ls-subtitle { font-size: 14px; color: #8a9099; letter-spacing: 3px; }
+.ls-sync-chips {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.ls-sync-chip {
+  border: 1px solid rgba(138, 144, 153, 0.28);
+  color: #6f7884;
+  background: rgba(10, 14, 20, 0.56);
+  padding: 3px 7px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.ls-sync-chip.synced.active {
+  border-color: rgba(105, 240, 174, 0.45);
+  color: #69f0ae;
+  background: rgba(8, 24, 16, 0.68);
+}
+.ls-sync-chip.offline.active {
+  border-color: rgba(255, 179, 0, 0.42);
+  color: #ffb300;
+  background: rgba(24, 18, 8, 0.68);
+}
 .ls-profile { background: rgba(10,14,20,.65); border: 1px solid rgba(102,252,241,.25); padding: 12px 18px; font-size: 12px; }
 .ls-profile strong { color: #66fcf1; }
 .ls-last-run {

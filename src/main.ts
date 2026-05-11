@@ -163,6 +163,6 @@ async function startAfterConsent(): Promise<void> {
     void ConsentModal.open(gameUiRoot);
   }
   await ConsentSystem.ensure();
-  game.start();
+  await game.start();
 }
 void startAfterConsent();

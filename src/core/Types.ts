@@ -641,6 +641,8 @@ export interface PersistedProfile {
   trainingCompleted: boolean;
   /** Number of training-stage objectives reached (for the summary screen). */
   trainingStagesCompleted: number;
+  /** Last durable profile write. Used for whole-profile cloud conflict resolution. */
+  lastPlayedAt: number;
 }
 
 // ---------- Difficulty ----------

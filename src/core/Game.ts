@@ -59,6 +59,8 @@ import { StrategicPointSystem } from "../systems/StrategicPointSystem";
 import { MobileSquadSystem } from "../systems/MobileSquadSystem";
 import { GuidanceSystem } from "../systems/GuidanceSystem";
 import { AdsSystem } from "../systems/AdsSystem";
+import { CloudSaveSystem } from "../systems/CloudSaveSystem";
+import { ConsentSystem } from "../systems/ConsentSystem";
 
 import { UIManager } from "../ui/UIManager";
 import { sectorDefinitions } from "../data/sectors";
@@ -76,7 +78,8 @@ export class Game {
   public isMobile = false;
 
   // Systems
-  persistence = new PersistenceSystem();
+  cloudSaves = new CloudSaveSystem();
+  persistence = new PersistenceSystem(this.cloudSaves);
   settings!: SettingsSystem;
   audio = new AudioSystem();
   camera = new Camera();
@@ -196,17 +199,22 @@ export class Game {
     this.ui = new UIManager(this);
   }
 
-  start(): void {
+  async start(): Promise<void> {
     this.audio.applySettings(this.core.settings);
-    this.input.attach();
-    this.ui.attach();
-    this.guidance.attach();
-    this.settings.applyVisualSettings();
     // CrazyGames SDK boots lazily and is fully optional. Signal loading
     // so the host can show its own loading shim; gameplayStart/stop fire
     // around active waves to gate ads correctly.
     this.ads.signalLoadingStart();
-    this.ads.init().finally(() => this.ads.signalLoadingStop());
+    const sdkReady = this.ads.init();
+    const loadedProfile = await this.persistence.loadProfileAtStartup(
+      ConsentSystem.cloudSaveAllowed ? sdkReady : undefined
+    );
+    this.core.profile = loadedProfile;
+    sdkReady.finally(() => this.ads.signalLoadingStop());
+    this.input.attach();
+    this.ui.attach();
+    this.guidance.attach();
+    this.settings.applyVisualSettings();
     this.setState("MAIN_MENU");
     this.running = true;
     const loop = (now: number) => {

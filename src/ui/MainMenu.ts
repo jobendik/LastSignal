@@ -72,9 +72,14 @@ export class MainMenu {
     const p = this.game.core.profile;
 
     const titleEl = el("div", { class: "ls-title", text: "LAST SIGNAL" });
+    const synced = this.game.cloudSaves.status === "synced";
     this.el.append(
       titleEl,
       el("div", { class: "ls-subtitle", text: "Tactical Sci-Fi Roguelite Tower Defense" }),
+      el("div", { class: "ls-sync-chips" }, [
+        el("span", { class: `ls-sync-chip synced ${synced ? "active" : ""}`, text: "Synced" }),
+        el("span", { class: `ls-sync-chip offline ${synced ? "" : "active"}`, text: "Offline" }),
+      ]),
       el("div", { class: "ls-profile", html:
         `<div>Best sector cleared: <strong>${p.bestSectorCleared}</strong></div>` +
         `<div>Best wave reached: <strong>${p.bestWaveReached}</strong></div>` +
