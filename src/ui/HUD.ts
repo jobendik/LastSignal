@@ -17,6 +17,8 @@ export class HUD {
   private repairBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "REPAIR 30" });
   private commandTierBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "COMMAND T1" });
   private relayCoreBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "RELAY 0/1 (R)" });
+  /** Toggles between Signal and Hardened relay variant before deploying. */
+  private relayVariantBtn = el("button", { class: "ls-btn ls-btn-ghost ls-relay-variant-btn", text: "SIG" });
   private empBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "EMP" });
   private pauseBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "PAUSE (P)" });
   private settingsBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "⚙" });
@@ -84,6 +86,7 @@ export class HUD {
     bus.on("boss:killed", () => this.refresh());
     bus.on("core:repaired", () => this.refresh());
     bus.on("core:relayBuilt", () => this.refresh());
+    bus.on("core:relayDestroyed", () => this.refresh());
     bus.on("command:tierUp", () => this.refresh());
     bus.on("core:ability", () => this.refresh());
     bus.on("core:emergency", () => this.refresh());
@@ -137,6 +140,7 @@ export class HUD {
       this.repairBtn,
       this.commandTierBtn,
       this.relayCoreBtn,
+      this.relayVariantBtn,
       this.empBtn,
       speedDown, this.speedEl, speedUp,
       this.pauseBtn,
@@ -156,6 +160,9 @@ export class HUD {
     this.relayCoreBtn.title =
       "Relay Core: extends signal coverage so you can build farther from the home core. " +
       "Click to enter deploy mode (R), then click a valid spot. Esc cancels.";
+    this.relayVariantBtn.title =
+      "Toggle relay variant: Signal Relay (SIG) has wide coverage; " +
+      "Hardened Relay (HRD) has smaller coverage but a much larger HP pool and costs more.";
     this.commandTierBtn.title =
       "Command Tier: upgrades your command network. Higher tiers unlock new squads " +
       "(Engineer at T2, Strike + Shield at T3) and increase relay caps and coverage. (Y)";
@@ -165,6 +172,11 @@ export class HUD {
     this.empBtn.title = "Core EMP: stuns all active enemies for 2 seconds (1 minute cooldown).";
     this.pauseBtn.title = "Pause / resume the simulation (P).";
     this.settingsBtn.title = "Settings: audio, graphics, hotkeys, tutorial toggles.";
+    this.relayVariantBtn.onclick = () => {
+      const v = this.game.core.relayDeployVariant;
+      this.game.core.relayDeployVariant = v === "signal" ? "hardened" : "signal";
+      this.refresh();
+    };
     this.relayCoreBtn.onclick = () => {
       if (!this.game.canDeployRelayCore()) return;
       this.game.core.coreDeployMode = !this.game.core.coreDeployMode;
@@ -562,12 +574,25 @@ export class HUD {
     this.commandTierBtn.style.display = this.repairBtn.style.display;
     this.commandTierBtn.classList.toggle("disabled", !canTierUp);
     const relayCost = this.game.relayCoreCost();
-    this.relayCoreBtn.textContent = this.game.core.coreDeployMode
-      ? `PLACE RELAY (ESC)`
-      : `RELAY ${relayBuilds} • ${relayCost}CR (R)`;
+    const atRelayCap = this.game.core.coreNodesBuilt >= this.game.maxRelayCoresForRun();
+    if (this.game.core.coreDeployMode) {
+      const variantLabel = this.game.core.relayDeployVariant === "hardened" ? "HARDENED" : "SIGNAL";
+      this.relayCoreBtn.textContent = `PLACE ${variantLabel} RELAY (ESC)`;
+    } else if (atRelayCap && this.game.core.commandTier < 3) {
+      this.relayCoreBtn.textContent = `RELAY CAP ${relayBuilds} — upgrade Command Tier for more`;
+    } else {
+      this.relayCoreBtn.textContent = `RELAY ${relayBuilds} • ${relayCost}CR (R)`;
+    }
     this.relayCoreBtn.style.display = this.repairBtn.style.display;
-    this.relayCoreBtn.classList.toggle("disabled", !canRelay);
+    this.relayCoreBtn.classList.toggle("disabled", !canRelay && !this.game.core.coreDeployMode);
     this.relayCoreBtn.classList.toggle("active", this.game.core.coreDeployMode);
+
+    // Relay variant toggle: only visible during planning phases, hidden during waves.
+    const showRelayButtons = this.game.state === "PLANNING" || this.game.state === "WAVE_COMPLETE";
+    this.relayVariantBtn.style.display = showRelayButtons ? "" : "none";
+    const v = this.game.core.relayDeployVariant;
+    this.relayVariantBtn.textContent = v === "hardened" ? "HRD" : "SIG";
+    this.relayVariantBtn.classList.toggle("ls-relay-variant-hardened", v === "hardened");
 
     const cd = c.coreAbilityCooldown;
     this.empBtn.textContent = cd > 0 ? `EMP ${Math.ceil(cd)}s` : "EMP READY";
@@ -644,15 +669,20 @@ export class HUD {
     const built = game.core.coreNodesBuilt;
     const max = game.maxRelayCoresForRun();
     const cost = game.relayCoreCost();
+    const variant = game.core.relayDeployVariant;
     let text: string;
     let ok = false;
     if (game.core.coreDeployMode) {
-      text = "Place a relay on signal-network edge to expand build zone.";
+      const vLabel = variant === "hardened" ? "hardened relay" : "signal relay";
+      text = `Place a ${vLabel} on signal-network edge to expand build zone.`;
+    } else if (built >= max && game.core.commandTier < 3) {
+      text = `Relay cap ${built}/${max} — upgrade Command Tier to unlock more.`;
     } else if (built >= max) {
-      text = `Relay cap ${built}/${max} — raise Command Tier for more.`;
+      text = `Relay network at maximum capacity (${built}/${max}).`;
       ok = true;
     } else if (game.canDeployRelayCore()) {
-      text = `Relay ready — extend signal range for ${cost}CR (R).`;
+      const vLabel = variant === "hardened" ? "hardened relay" : "relay";
+      text = `${vLabel.charAt(0).toUpperCase() + vLabel.slice(1)} ready — extend signal range for ${cost}CR (R).`;
       ok = true;
     } else if (game.core.waveIndex < 2) {
       text = "Relay cores extend signal range and unlock new build zones.";

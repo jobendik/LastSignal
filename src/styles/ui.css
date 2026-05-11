@@ -405,6 +405,11 @@
 .ls-start-wave { background: rgba(255, 179, 0, 0.1); border-color: #ffb300; color: #ffb300; }
 .ls-start-wave:hover { background: rgba(255, 179, 0, 0.25); }
 
+/* Relay variant toggle button: SIG (teal) / HRD (orange) */
+.ls-relay-variant-btn { min-width: 38px; font-weight: bold; letter-spacing: 0.03em; }
+.ls-relay-variant-btn.ls-relay-variant-hardened { border-color: #ff9800; color: #ff9800; }
+.ls-relay-variant-btn.ls-relay-variant-hardened:hover { border-color: #ffa726; color: #ffa726; background: rgba(255, 152, 0, 0.12); }
+
 /* Critical core overlay: pulsing red border on full screen */
 .ls-critical-overlay {
   display: none;

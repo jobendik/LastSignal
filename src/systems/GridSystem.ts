@@ -4,6 +4,8 @@ import type { SectorDefinition, SpawnerDefinition, TowerType } from "../core/Typ
 import {
   DEFAULT_COLS,
   DEFAULT_ROWS,
+  HARDENED_RELAY_MAX_HP,
+  HARDENED_RELAY_SIGNAL_RADIUS_CELLS,
   MAIN_CORE_SIGNAL_RADIUS_CELLS,
   MAX_COLS,
   MAX_ROWS,
@@ -11,6 +13,7 @@ import {
   MIN_RELAY_TO_SPAWNER_CELLS,
   RELAY_CORE_SIGNAL_RADIUS_CELLS,
   RELAY_DEPLOY_RADIUS_CELLS,
+  RELAY_MAX_HP,
   TILE_SIZE,
 } from "../core/Config";
 import { clamp } from "../core/Random";
@@ -33,6 +36,14 @@ export interface CoreCluster {
   isPrimary: boolean;
   /** Build / signal coverage radius in cells. Tunable per-cluster. */
   signalRadiusCells: number;
+  /** Current relay HP. Primary core uses Infinity (invulnerable). */
+  hp: number;
+  /** Maximum relay HP. Primary core uses Infinity. */
+  maxHp: number;
+  /** True when this relay has been destroyed (HP reached 0). Prevents coverage. */
+  destroyed: boolean;
+  /** Which variant was deployed: "signal" (standard) or "hardened" (tankier, smaller radius). */
+  variant: "signal" | "hardened";
 }
 
 /** Grid + BFS flow-field. Recomputes flow only when the walkable map changes. */
@@ -302,6 +313,11 @@ export class GridSystem {
     this.placementCacheDirty = true;
     this.placementCache.clear();
   }
+
+  /** Public rebuild trigger (used when relay clusters are modified externally). */
+  rebuildFlowPublic(): void {
+    this.rebuildFlow();
+  }
   get isPlacementCacheDirty(): boolean {
     return this.placementCacheDirty;
   }
@@ -376,7 +392,7 @@ export class GridSystem {
     return { ok: true };
   }
 
-  placeCoreCluster(c: number, r: number): boolean {
+  placeCoreCluster(c: number, r: number, variant: "signal" | "hardened" = "signal"): boolean {
     if (!this.canPlaceCoreCluster(c, r).ok) return false;
     const cells = [
       this.idx(c, r),
@@ -390,13 +406,21 @@ export class GridSystem {
     }
     const centerCol = c + 1;
     const centerRow = r + 1;
+    const maxHp = variant === "hardened" ? HARDENED_RELAY_MAX_HP : RELAY_MAX_HP;
+    const signalRadius = variant === "hardened"
+      ? HARDENED_RELAY_SIGNAL_RADIUS_CELLS
+      : this.relaySignalRadiusCells;
     this.coreClusters.push({
       cells: cells.slice(),
       center: new Vector2(centerCol * TILE_SIZE, centerRow * TILE_SIZE),
       centerCol,
       centerRow,
       isPrimary: false,
-      signalRadiusCells: this.relaySignalRadiusCells,
+      signalRadiusCells: signalRadius,
+      hp: maxHp,
+      maxHp,
+      destroyed: false,
+      variant,
     });
     this.rebuildFlow();
     return true;
@@ -452,6 +476,23 @@ export class GridSystem {
     return best;
   }
 
+  /** Nearest real CoreCluster to a world-space point (includes primary). */
+  getNearestRealCluster(x: number, y: number): CoreCluster | null {
+    let best: CoreCluster | null = null;
+    let bestSq = Infinity;
+    for (const cluster of this.coreClusters) {
+      if (!this.isRealCluster(cluster)) continue;
+      const dx = x - cluster.center.x;
+      const dy = y - cluster.center.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestSq) {
+        bestSq = d;
+        best = cluster;
+      }
+    }
+    return best;
+  }
+
   /** Distance (px) to the nearest real core/relay center. */
   getNearestCoreDistance(x: number, y: number): number {
     const c = this.getNearestCoreCenter(x, y);
@@ -464,6 +505,7 @@ export class GridSystem {
     const cx = c + 0.5;
     const cy = r + 0.5;
     for (const cluster of this.coreClusters) {
+      if (cluster.destroyed) continue;
       const dc = cx - cluster.centerCol;
       const dr = cy - cluster.centerRow;
       if (Math.hypot(dc, dr) <= cluster.signalRadiusCells) return true;
@@ -536,6 +578,10 @@ export class GridSystem {
         centerRow,
         isPrimary: false,
         signalRadiusCells: primaryRadiusCells,
+        hp: Infinity,
+        maxHp: Infinity,
+        destroyed: false,
+        variant: "signal" as const,
       };
     });
 

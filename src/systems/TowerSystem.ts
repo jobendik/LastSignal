@@ -11,9 +11,11 @@ import {
   ENGINEER_REPAIR_STACK_FACTOR,
   ENGINEER_TOWER_REPAIR_RATE,
   JAMMER_REPAIR_PENALTY,
+  RELAY_PASSIVE_RANGE_BONUS,
   SABOTEUR_DISABLE_DURATION,
   SHIELD_TOWER_DAMAGE_REDUCTION,
   STRUCTURE_TARGET_PRIORITY,
+  TILE_SIZE,
   TOWER_BASE_HP,
   TOWER_CRITICAL_DAMAGE_MUL,
   TOWER_CRITICAL_FIRE_RATE_MUL,
@@ -889,6 +891,19 @@ export class TowerSystem {
     if (si) {
       const dx = t.pos.x - si.x, dy = t.pos.y - si.y;
       if (dx * dx + dy * dy < si.radius * si.radius) range *= 0.6;
+    }
+
+    // Relay passive: +5% range per non-primary relay whose coverage contains this tower.
+    const grid = this.game.grid;
+    const tc = t.c + 0.5;
+    const tr = t.r + 0.5;
+    for (const cluster of grid.coreClusters) {
+      if (cluster.isPrimary || cluster.destroyed || cluster.cells.length === 0) continue;
+      const dc = tc - cluster.centerCol;
+      const dr = tr - cluster.centerRow;
+      if (Math.hypot(dc, dr) <= cluster.signalRadiusCells) {
+        range *= 1 + RELAY_PASSIVE_RANGE_BONUS;
+      }
     }
 
     let splashRadius = base.splashRadius * up.mortarSplashMul;

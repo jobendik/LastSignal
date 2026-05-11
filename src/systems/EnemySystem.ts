@@ -239,31 +239,37 @@ export class EnemySystem {
       // Check breach (near the nearest core/relay center). Enemies route to
       // whichever core/relay is closest via the BFS flow-field, so testing
       // distance to nearest cluster is the right semantic.
-      const nearestCore = this.game.grid.getNearestCoreCenter(e.pos.x, e.pos.y);
-      const distToCore = e.pos.dist(nearestCore);
+      const nearestCluster = this.game.grid.getNearestRealCluster(e.pos.x, e.pos.y);
+      if (!nearestCluster) continue;
+      const distToCore = e.pos.dist(nearestCluster.center);
       if (distToCore < 20) {
         if (e.type === "cache") {
           // Data Cache just escapes — no core damage, no reward.
           e.breached = true;
           e.active = false;
         } else {
-          this.game.damageCore(e.breach, e.type, e.pos.x, e.pos.y);
           e.breached = true;
           e.active = false;
-          // Breach impact FX: localize at the breached cluster center.
-          const cx = nearestCore.x;
-          const cy = nearestCore.y;
-          this.game.particles.spawnBurst(cx, cy, e.color, 10, { speed: 90, life: 0.45, size: 2.2 });
-          this.game.particles.spawnRing(cx, cy, 44, e.color, 0.45);
-          if (e.breach >= 2) {
-            this.game.particles.spawnRing(cx, cy, 70, e.color, 0.6);
-          }
-          this.game.particles.spawnFloatingText(cx, cy - 28, `-${e.breach} BREACH`, "#ef9a9a", 1.0, 13);
-          // Salvage drop: enemy slipped through — 40% chance to leave a collectible.
-          if (!e.isBoss && Math.random() < 0.4) {
-            const sv = 8 + Math.floor(Math.random() * 14);
-            this.game.core.salvagePickups.push({ x: e.pos.x, y: e.pos.y, value: sv, timer: 9 });
-            this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 18, `+${sv}CR SALVAGE`, "#ffd54f", 1.5, 10);
+          const cx = nearestCluster.center.x;
+          const cy = nearestCluster.center.y;
+          if (!nearestCluster.isPrimary) {
+            // Enemy reached a relay — damage relay HP instead of home core.
+            this.game.damageRelayCluster(nearestCluster, e.breach, e.type);
+          } else {
+            this.game.damageCore(e.breach, e.type, e.pos.x, e.pos.y);
+            // Breach impact FX: localize at the breached cluster center.
+            this.game.particles.spawnBurst(cx, cy, e.color, 10, { speed: 90, life: 0.45, size: 2.2 });
+            this.game.particles.spawnRing(cx, cy, 44, e.color, 0.45);
+            if (e.breach >= 2) {
+              this.game.particles.spawnRing(cx, cy, 70, e.color, 0.6);
+            }
+            this.game.particles.spawnFloatingText(cx, cy - 28, `-${e.breach} BREACH`, "#ef9a9a", 1.0, 13);
+            // Salvage drop: enemy slipped through — 40% chance to leave a collectible.
+            if (!e.isBoss && Math.random() < 0.4) {
+              const sv = 8 + Math.floor(Math.random() * 14);
+              this.game.core.salvagePickups.push({ x: e.pos.x, y: e.pos.y, value: sv, timer: 9 });
+              this.game.particles.spawnFloatingText(e.pos.x, e.pos.y - 18, `+${sv}CR SALVAGE`, "#ffd54f", 1.5, 10);
+            }
           }
         }
         continue;

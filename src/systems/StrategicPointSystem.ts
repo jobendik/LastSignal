@@ -305,6 +305,10 @@ export class StrategicPointSystem {
       centerRow: p.r + 0.5,
       isPrimary: false,
       signalRadiusCells: radiusCells,
+      hp: Infinity,
+      maxHp: Infinity,
+      destroyed: false,
+      variant: "signal",
     });
     grid.markCacheDirty();
   }

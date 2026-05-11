@@ -211,6 +211,8 @@ export interface GameCoreState {
   commandTier: 1 | 2 | 3;
   /** Timer for periodic militia squad spawns unlocked by command tiers. */
   militiaPulseTimer: number;
+  /** Which relay variant the player has selected for the next deployment. */
+  relayDeployVariant: "signal" | "hardened";
 }
 
 export interface GravityAnomaly {
