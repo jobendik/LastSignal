@@ -249,6 +249,11 @@ export class Game {
     this.core.upgrades.towerDamageMul *= meta.towerDamageMul;
     this.core.upgrades.towerRangeAdd += meta.towerRangeAdd;
     this.core.upgrades.harvesterIncomeMul *= meta.harvesterIncomeMul;
+    // Newer research effects fold into existing upgrade aggregate fields so
+    // every downstream system already respects them.
+    this.core.upgrades.towerHpMul *= meta.towerHpMul;
+    this.core.upgrades.towerFireRateMul *= meta.towerFireRateMul;
+    this.core.upgrades.squadCapAdd += meta.squadCapAdd;
     this.core.stats = createEmptyStats();
     this.core.shake = 0;
     this.core.slowMo = 0;

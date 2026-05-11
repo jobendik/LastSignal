@@ -767,6 +767,11 @@ export class EnemySystem {
       }
       const reward = Math.round(e.reward * rewardMul);
       this.game.addCredits(reward);
+      // Salvage Protocol: flat per-kill credit bonus from research.
+      const perKill = this.game.meta?.aggregate().creditsPerKill ?? 0;
+      if (perKill > 0) {
+        this.game.addCredits(perKill);
+      }
 
       // Cryo Echo: slowed enemies emit a brief slow pulse on death.
       const up = this.game.core.upgrades;

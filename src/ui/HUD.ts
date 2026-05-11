@@ -474,9 +474,17 @@ export class HUD {
     clear(this.modifierStrip);
     this.modifierStrip.append(el("span", { class: "ls-hud-label", text: "MODIFIERS" }));
     for (const m of mods) {
-      const isDebuff = Boolean(m.enemyHealPerSec || m.harvestDisabled || m.enemyArmorAdd || m.enemySpeedMul);
-      const isBuff = Boolean(m.coreMul || (m.harvesterIncomeMul && !m.towerCostMul));
-      const cls = `ls-modifier-chip${isDebuff ? " debuff" : isBuff ? " buff" : " mixed"}`;
+      // Prefer explicit modifier kind; fall back to the legacy heuristic for
+      // curse-generated modifiers that don't set one.
+      let cssKind: "debuff" | "buff" | "mixed";
+      if (m.kind) {
+        cssKind = m.kind;
+      } else {
+        const isDebuff = Boolean(m.enemyHealPerSec || m.harvestDisabled || m.enemyArmorAdd || m.enemySpeedMul);
+        const isBuff = Boolean(m.coreMul || (m.harvesterIncomeMul && !m.towerCostMul));
+        cssKind = isDebuff ? "debuff" : isBuff ? "buff" : "mixed";
+      }
+      const cls = `ls-modifier-chip ${cssKind}`;
       const chip = el("div", { class: cls });
       chip.title = m.description;
       chip.append(

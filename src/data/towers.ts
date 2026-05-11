@@ -161,7 +161,7 @@ export const towerDefinitions: Record<TowerType, TowerDefinition> = {
     name: "Reflector",
     role: "Rail mirror",
     description:
-      "Projects a mirror plane. Nearby Railgun beams can redirect through it for angled secondary shots.",
+      "Projects a mirror plane. REQUIRES an adjacent Railgun: railgun beams redirect through this tower for angled secondary hits and +25% damage. Useless without a Railgun nearby.",
     cost: 95,
     range: 84,
     damage: 0,

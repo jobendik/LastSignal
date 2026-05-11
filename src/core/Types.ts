@@ -681,6 +681,16 @@ export interface ResearchEffect {
   unlocksTower?: TowerType;
   unlocksMode?: "endless";
   rewardMul?: number;
+  /** Multiplier on tower max HP (e.g. 1.3 = +30% tower durability). */
+  towerHpMul?: number;
+  /** Multiplier on tower fire rate (>1 = faster). */
+  towerFireRateMul?: number;
+  /** Flat bonus to global squad slot cap. */
+  squadCapAdd?: number;
+  /** Multiplier applied to per-wave completion credit reward. */
+  waveRewardMul?: number;
+  /** Flat bonus credits awarded for every enemy kill (stacks with reward). */
+  creditsPerKill?: number;
 }
 
 // ---------- Achievements ----------
@@ -708,6 +718,12 @@ export interface RunModifier {
   id: string;
   name: string;
   description: string;
+  /**
+   * Classification used by the HUD to color the modifier chip. Optional for
+   * backwards compatibility — curse-generated modifiers (in /data/upgrades)
+   * omit it and fall back to the heuristic in HUD.renderModifierStrip().
+   */
+  kind?: "debuff" | "buff" | "mixed";
   /** Each active enemy heals this many HP per second. */
   enemyHealPerSec?: number;
   /** Multiplier on enemy movement speed applied at spawn. */

@@ -198,7 +198,7 @@ export class WaveSystem {
     const wave = this.currentWaveDef;
     if (!wave) return;
 
-    this.game.addCredits(wave.rewardCredits);
+    this.game.addCredits(Math.round(wave.rewardCredits * (this.game.meta.aggregate().waveRewardMul ?? 1)));
     // Reserve Interest: % of unspent credits, capped per wave.
     const up = this.game.core.upgrades;
     if (up.unspentInterestPct > 0) {
