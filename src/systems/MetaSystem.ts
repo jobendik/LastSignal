@@ -11,6 +11,16 @@ export interface ResearchAggregate {
   rewardMul: number;
   unlockedTowers: string[];
   hasEndless: boolean;
+  /** Tower durability multiplier (e.g. 1.3 = +30% max HP). */
+  towerHpMul: number;
+  /** Tower fire-rate multiplier (>1 = faster). */
+  towerFireRateMul: number;
+  /** Flat bonus to global squad cap. */
+  squadCapAdd: number;
+  /** Multiplier on per-wave completion bonus. */
+  waveRewardMul: number;
+  /** Flat credits per kill (in addition to enemy.reward). */
+  creditsPerKill: number;
 }
 
 /** Meta progression / research tree. Research points persist across runs. */
@@ -81,6 +91,11 @@ export class MetaSystem {
       rewardMul: 1,
       unlockedTowers: [],
       hasEndless: false,
+      towerHpMul: 1,
+      towerFireRateMul: 1,
+      squadCapAdd: 0,
+      waveRewardMul: 1,
+      creditsPerKill: 0,
     };
     for (const id of this.game.core.profile.researchUnlocked) {
       const node = researchNodes.find((n) => n.id === id);
@@ -94,6 +109,11 @@ export class MetaSystem {
       if (e.rewardMul) out.rewardMul *= e.rewardMul;
       if (e.unlocksTower) out.unlockedTowers.push(e.unlocksTower);
       if (e.unlocksMode === "endless") out.hasEndless = true;
+      if (e.towerHpMul) out.towerHpMul *= e.towerHpMul;
+      if (e.towerFireRateMul) out.towerFireRateMul *= e.towerFireRateMul;
+      if (e.squadCapAdd) out.squadCapAdd += e.squadCapAdd;
+      if (e.waveRewardMul) out.waveRewardMul *= e.waveRewardMul;
+      if (e.creditsPerKill) out.creditsPerKill += e.creditsPerKill;
     }
     return out;
   }

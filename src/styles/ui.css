@@ -1141,6 +1141,11 @@
   background: rgba(244, 67, 54, 0.10);
   border-left-color: #ff5252;
 }
+.ls-tp-hint-ok {
+  color: #9be7a7;
+  background: rgba(76, 175, 80, 0.10);
+  border-left-color: #66bb6a;
+}
 @keyframes ls-jam-flicker {
   0%, 100% { opacity: 0.95; }
   50% { opacity: 0.65; }
@@ -2618,6 +2623,96 @@ body.ls-mobile .ls-tower-btn:hover {
   padding: 6px 10px;
   font-size: 11px;
   letter-spacing: 1.5px;
+}
+
+/* ===== Campaign-Complete (Sector 7 final-victory) screen ===== */
+.ls-campaign-complete .ls-training-complete-eyebrow {
+  color: #ff5252;
+  font-size: 11px;
+  letter-spacing: 6px;
+  margin-bottom: -8px;
+  text-shadow:
+    0 0 12px rgba(255, 82, 82, 0.6),
+    0 0 24px rgba(255, 82, 82, 0.3);
+}
+.ls-campaign-complete .ls-overlay-title {
+  color: #ff8a80;
+  letter-spacing: 8px;
+  text-shadow:
+    0 0 22px rgba(255, 138, 128, 0.55),
+    0 0 44px rgba(255, 82, 82, 0.35);
+}
+.ls-campaign-complete .ls-overlay-subtitle {
+  max-width: 560px;
+  color: #ffcdd2;
+}
+.ls-campaign-complete .ls-stats {
+  text-align: left;
+  background: rgba(14, 6, 6, 0.78);
+  border-color: rgba(255, 82, 82, 0.28);
+  max-width: 560px;
+}
+.ls-campaign-transmission {
+  margin: 8px auto 4px auto;
+  padding: 12px 18px;
+  max-width: 560px;
+  background: rgba(8, 4, 4, 0.7);
+  border: 1px solid rgba(255, 82, 82, 0.25);
+  border-radius: 4px;
+  color: #ffe0e0;
+  font-family: "Share Tech Mono", "Consolas", monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  letter-spacing: 0.4px;
+  text-align: center;
+  animation: ls-campaign-fadein 1.4s ease-out both;
+}
+.ls-campaign-transmission > div:first-child,
+.ls-campaign-transmission > div:last-child {
+  color: #ff5252;
+  letter-spacing: 2.5px;
+  font-size: 11px;
+}
+.ls-campaign-hooks {
+  margin: 6px auto 0 auto;
+  padding: 10px 14px;
+  max-width: 560px;
+  background: rgba(6, 12, 18, 0.7);
+  border: 1px dashed rgba(128, 222, 234, 0.35);
+  border-radius: 4px;
+  color: #b3e5fc;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+}
+.ls-campaign-hooks .ls-campaign-hook-title {
+  color: #80deea;
+  letter-spacing: 3px;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.ls-final-ring {
+  border-color: rgba(255, 82, 82, 0.55) !important;
+}
+@keyframes ls-campaign-fadein {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* CrazyGames rewarded-ad button (only visible when SDK loaded). */
+.ls-btn-ad {
+  background: linear-gradient(180deg, rgba(255, 193, 7, 0.18), rgba(255, 152, 0, 0.12));
+  border: 1px solid rgba(255, 193, 7, 0.55);
+  color: #ffe082;
+  letter-spacing: 1.2px;
+}
+.ls-btn-ad:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 193, 7, 0.28), rgba(255, 152, 0, 0.18));
+  border-color: rgba(255, 213, 79, 0.8);
+}
+.ls-btn-ad:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 /* ===== Mobile / responsive overrides for guidance and codex ===== */

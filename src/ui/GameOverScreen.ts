@@ -202,6 +202,26 @@ export class GameOverScreen {
       const menu = el("button", { class: "ls-btn", text: "Main Menu" });
       menu.onclick = () => this.game.returnToMenu();
       row.append(retry, menu);
+      // Rewarded-ad opt-in: visible only when the CrazyGames SDK has loaded
+      // successfully. Outside CrazyGames the button never appears, keeping
+      // the screen clean for itch.io / direct hosting.
+      if (!isTraining && this.game.ads.isAvailable) {
+        const adBtn = el("button", {
+          class: "ls-btn ls-btn-ad",
+          text: "▶ Watch Ad: +2 Research",
+        }) as HTMLButtonElement;
+        adBtn.onclick = async () => {
+          adBtn.disabled = true;
+          const { rewarded } = await this.game.ads.showRewarded();
+          if (rewarded) {
+            this.game.meta.addResearchPoints(2);
+            adBtn.textContent = "✓ Research awarded";
+          } else {
+            adBtn.disabled = false;
+          }
+        };
+        row.append(adBtn);
+      }
       this.el.append(row);
     };
 
@@ -234,6 +254,16 @@ export class VictoryScreen {
     // a "Training Complete" badge, and a stage-by-stage breakdown.
     if (this.game.core.sector?.isTraining) {
       this.renderTrainingComplete();
+      return;
+    }
+
+    // Final campaign sector cleared → render the full "Signal Dies Forever"
+    // ending sequence instead of the standard victory screen. We detect this
+    // by the active sector id and the player's *new* best-cleared counter
+    // having just ticked up to (or past) the last campaign index.
+    const isFinalSector = this.game.core.sector?.id === "sector_07_blackout_array";
+    if (isFinalSector) {
+      this.renderCampaignComplete();
       return;
     }
 
@@ -279,6 +309,106 @@ export class VictoryScreen {
     again.onclick = () => this.game.setState("SECTOR_SELECT");
     const menu = el("button", { class: "ls-btn", text: "Main Menu" });
     menu.onclick = () => this.game.returnToMenu();
+    row.append(again, menu);
+    // Rewarded-ad opt-in (campaign victory only; campaign-complete and
+    // training have their own renderers).
+    if (this.game.ads.isAvailable) {
+      const adBtn = el("button", {
+        class: "ls-btn ls-btn-ad",
+        text: "▶ Watch Ad: +2 Research",
+      }) as HTMLButtonElement;
+      adBtn.onclick = async () => {
+        adBtn.disabled = true;
+        const { rewarded } = await this.game.ads.showRewarded();
+        if (rewarded) {
+          this.game.meta.addResearchPoints(2);
+          adBtn.textContent = "✓ Research awarded";
+        } else {
+          adBtn.disabled = false;
+        }
+      };
+      row.append(adBtn);
+    }
+    content.append(row);
+    this.el.append(content);
+  }
+
+  /**
+   * Final-campaign-cleared ending: shown after Sector 7 (Blackout Array)
+   * victory. Plays a scrolling transmission, then the standard stats summary
+   * with a "CAMPAIGN COMPLETE" badge. Always available afterwards (the player
+   * can re-clear S7 and see it again).
+   */
+  private renderCampaignComplete(): void {
+    const g = this.game;
+
+    // Outer container.
+    const content = el("div", { class: "ls-victory-content ls-campaign-complete" });
+
+    // Ripple rings — same as the regular victory, but red-shifted.
+    if (!g.core.settings.reducedMotion) {
+      const ripples = el("div", { class: "ls-victory-ripples ls-final-ripples" });
+      for (let i = 0; i < 4; i++) {
+        const ring = el("div", { class: "ls-victory-ring ls-final-ring" });
+        ring.style.animationDelay = `${i * 0.35}s`;
+        ripples.append(ring);
+      }
+      this.el.append(ripples);
+    }
+
+    // Eyebrow + title.
+    content.append(
+      el("div", { class: "ls-training-complete-eyebrow", text: "CAMPAIGN COMPLETE" }),
+      el("div", { class: "ls-overlay-title", text: "THE SIGNAL DIES" }),
+      el("div", {
+        class: "ls-overlay-subtitle",
+        text: "The Blackout Array is silent. The entity's broadcast tower has gone dark forever.",
+      }),
+      el("div", { class: "ls-run-grade", text: `GRADE ${runGrade(g)}` }),
+    );
+
+    // Transmission / finale text. Reads like a recovered log fragment.
+    const transmission = el("div", { class: "ls-campaign-transmission" });
+    const lines: string[] = [
+      "[FINAL TRANSMISSION — ARCHIVED]",
+      "",
+      "Seven sectors. Seven cores held.",
+      "The entity's relay network is dismantled. Its carrier wave collapses into noise.",
+      "",
+      "No more pulses through the dark.",
+      "No more rifts opening behind the line.",
+      "No more waves rolling out of the static.",
+      "",
+      "The signal is yours, Operator.",
+      "",
+      "[ARCHIVE END · RETURN TO COMMAND]",
+    ];
+    transmission.innerHTML = lines.map((line) => `<div>${line || "&nbsp;"}</div>`).join("");
+    content.append(transmission);
+
+    // Full stats summary (same renderer as regular victory).
+    content.append(el("div", { class: "ls-stats", html: statsSummary(g) }));
+    const objs = objectivesSummary(g, true);
+    if (objs) content.append(objs);
+
+    // Post-campaign hooks: Void mode and Endless are the replayable endgame.
+    const hasEndless = g.core.profile.researchUnlocked.includes("unlock_endless");
+    const hooks = el("div", { class: "ls-campaign-hooks" });
+    hooks.innerHTML =
+      `<div class="ls-campaign-hook-title">WHAT'S NEXT</div>` +
+      `<div>· Replay any sector with new run modifiers and curses.</div>` +
+      `<div>· Tackle <b>Void Sector</b> — a hand-authored 15-wave remix featuring all three bosses.</div>` +
+      (hasEndless
+        ? `<div>· <b>Endless Mode</b> is unlocked on cleared sectors via Research.</div>`
+        : `<div>· Unlock <b>Endless Mode</b> in the Research Array for infinite scaling waves.</div>`);
+    content.append(hooks);
+
+    // Actions.
+    const row = el("div", { class: "ls-overlay-actions" });
+    const again = el("button", { class: "ls-btn ls-btn-primary", text: "Sector Select" });
+    again.onclick = () => g.setState("SECTOR_SELECT");
+    const menu = el("button", { class: "ls-btn", text: "Main Menu" });
+    menu.onclick = () => g.returnToMenu();
     row.append(again, menu);
     content.append(row);
     this.el.append(content);

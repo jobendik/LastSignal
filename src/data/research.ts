@@ -183,4 +183,54 @@ export const researchNodes: ResearchNode[] = [
     requires: ["unlock_amplifier", "unlock_flamer"],
     effect: { unlocksTower: "overclock" },
   },
+
+  // ──────────────────────────────────────────────
+  // TIER II — Mechanical (non-stat) bonuses
+  // ──────────────────────────────────────────────
+  {
+    id: "reinforced_construction",
+    name: "Reinforced Construction",
+    description: "All towers gain +30% max HP. Saboteurs and rift pulses sting less.",
+    cost: 5,
+    tier: 2,
+    effect: { towerHpMul: 1.3 },
+  },
+  {
+    id: "salvage_protocol",
+    name: "Salvage Protocol",
+    description: "Recover +2 credits from every enemy kill (stacks with kill rewards).",
+    cost: 5,
+    tier: 2,
+    effect: { creditsPerKill: 2 },
+  },
+  {
+    id: "squad_bandwidth_research",
+    name: "Tactical Bandwidth",
+    description: "+1 global squad slot. Field one more squad at any time.",
+    cost: 6,
+    tier: 2,
+    effect: { squadCapAdd: 1 },
+  },
+
+  // ──────────────────────────────────────────────
+  // TIER III — Mechanical capstones
+  // ──────────────────────────────────────────────
+  {
+    id: "wave_bounty_network",
+    name: "Wave Bounty Network",
+    description: "Per-wave completion bonus +30%. Compounds with kill rewards.",
+    cost: 8,
+    tier: 3,
+    requires: ["bountyful"],
+    effect: { waveRewardMul: 1.3 },
+  },
+  {
+    id: "rapid_capacitors",
+    name: "Rapid Capacitors",
+    description: "All towers fire 12% faster. Stacks multiplicatively with upgrades.",
+    cost: 8,
+    tier: 3,
+    requires: ["plasma_metallurgy"],
+    effect: { towerFireRateMul: 1.12 },
+  },
 ];

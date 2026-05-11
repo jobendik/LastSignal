@@ -224,17 +224,257 @@ function hostileCoreWaves(): WaveDefinition[] {
 
 // Void waves: take a deterministically scrambled & buffed Sector-4 wave list
 // to give post-game / endless runs combined-arms pressure.
+/**
+ * Void Sector — hand-authored 15-wave finale.
+ *
+ * The Void is the post-campaign replayable bonus. Unlike Sectors 1–7 which
+ * teach mechanics in order, the Void is a remix where every threat the
+ * campaign introduced shows up reshuffled, every wave event is exercised at
+ * least once, and three boss encounters split the run into clear acts:
+ *
+ *   ACT 1 (waves 1–5):  Recursive shadow — all four spawners hot from wave 2.
+ *   ACT 2 (waves 6–10): Splinter assault — saboteurs, mirrors, weavers, hostile rifts.
+ *                        Wave 8 = HARBINGER mid-act boss.
+ *   ACT 3 (waves 11–15): Collapsing loop — accelerating pressure ending in a
+ *                        coordinated dual-boss finale (Overlord + Leviathan).
+ *
+ * Numbers are tuned around 200 starting credits and 100 core integrity. Every
+ * Void hazard is active so the run rewards spread placement, fast adaptation,
+ * and aggressive use of squads / drones.
+ */
 function voidWaves(): WaveDefinition[] {
-  const out = cloneWaves(sector4Waves);
-  for (const w of out) {
-    for (const lane of w.lanes) {
-      for (const g of lane.enemies) {
-        g.count = Math.ceil(g.count * 1.15);
-      }
-    }
-    w.rewardCredits = Math.round(w.rewardCredits * 1.1);
-  }
-  return out;
+  return [
+    // ── ACT 1 ────────────────────────────────────────────────────────────
+    summarize({
+      id: "void_w01_recursion",
+      name: "Wave 1: Recursive Static",
+      description: "The Void wakes. Scouts circle the perimeter.",
+      warning: "Light scout pressure to read the procedural layout. Build wide, not deep.",
+      recommendedCounters: ["Pulse", "Blaster"],
+      rewardCredits: 55,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "west", enemies: [{ type: "scout", count: 8, interval: 0.7 }] },
+        { spawnerId: "east", enemies: [{ type: "scout", count: 6, interval: 0.8 }], startDelay: 1.2 },
+      ],
+    }),
+    summarize({
+      id: "void_w02_four_lanes",
+      name: "Wave 2: Four-Lane Probe",
+      description: "All four gates open at once. The Void tests your reach.",
+      warning: "Multi-lane scouts and grunts. Expand coverage before damage.",
+      recommendedCounters: ["Pulse", "Blaster", "Wide coverage"],
+      rewardCredits: 80,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "north", enemies: [{ type: "scout", count: 6, interval: 0.55 }] },
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 7, interval: 0.7 }], startDelay: 1.0 },
+        { spawnerId: "east", enemies: [{ type: "scout", count: 6, interval: 0.6 }], startDelay: 2.0 },
+        { spawnerId: "west", enemies: [{ type: "grunt", count: 6, interval: 0.75 }], startDelay: 3.0 },
+      ],
+    }),
+    summarize({
+      id: "void_w03_iron_echo",
+      name: "Wave 3: Iron Echo",
+      description: "Brutes anchor a sprinter-laced column.",
+      warning: "Brutes are armored; sprinters punish soft flanks.",
+      recommendedCounters: ["Mortar", "Stasis", "Railgun"],
+      rewardCredits: 110,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "south", enemies: [{ type: "brute", count: 4, interval: 1.2 }] },
+        { spawnerId: "north", enemies: [{ type: "sprinter", count: 6, interval: 0.45 }], startDelay: 1.4 },
+      ],
+    }),
+    summarize({
+      id: "void_w04_phase_swarm",
+      name: "Wave 4: Phase Swarm",
+      description: "Phantoms blend into a multi-lane probe.",
+      warning: "Phantoms are immune while phased. Capture nodes for vision; field a Tesla.",
+      recommendedCounters: ["Tesla", "Scanner Drone", "Wide coverage"],
+      rewardCredits: 135,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "phantom", count: 5, interval: 1.1 }] },
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 9, interval: 0.55 }], startDelay: 1.2 },
+        { spawnerId: "west", enemies: [{ type: "scout", count: 6, interval: 0.45 }], startDelay: 2.5 },
+      ],
+    }),
+    summarize({
+      id: "void_w05_silence_loop",
+      name: "Wave 5: Silence Loop",
+      description: "Tower systems offline for 5s. Layout is your only defense.",
+      warning: "SILENCE WAVE: pre-position. Drones and squads still operate.",
+      recommendedCounters: ["Layout discipline", "Drones", "Shield Squad"],
+      rewardCredits: 160,
+      rewardChoice: false,
+      waveEvent: "silence",
+      lanes: [
+        { spawnerId: "west", enemies: [{ type: "grunt", count: 9, interval: 0.55 }] },
+        { spawnerId: "east", enemies: [{ type: "brute", count: 3, interval: 1.1 }], startDelay: 1.5 },
+        { spawnerId: "south", enemies: [{ type: "scout", count: 8, interval: 0.4 }], startDelay: 3.0 },
+      ],
+    }),
+
+    // ── ACT 2 ────────────────────────────────────────────────────────────
+    summarize({
+      id: "void_w06_saboteur_rain",
+      name: "Wave 6: Saboteur Rain",
+      description: "Tower-disabler infiltrators with weaver escort.",
+      warning: "Saboteurs damage and disable towers. Engineer to repair; Shield exposed assets.",
+      recommendedCounters: ["Engineer Squad", "Shield Squad", "Stasis"],
+      rewardCredits: 185,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "saboteur", count: 5, interval: 0.85 }] },
+        { spawnerId: "west", enemies: [{ type: "weaver", count: 3, interval: 1.3 }], startDelay: 1.8 },
+        { spawnerId: "north", enemies: [{ type: "grunt", count: 8, interval: 0.55 }], startDelay: 3.0 },
+      ],
+    }),
+    summarize({
+      id: "void_w07_mirror_static",
+      name: "Wave 7: Mirror Static",
+      description: "Mirror units reflect projectiles. Splitters mid-pack.",
+      warning: "Mirrors absorb three projectile hits then disable the firing tower. Use AoE.",
+      recommendedCounters: ["Tesla chain", "Mortar splash", "Flamer"],
+      rewardCredits: 210,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "north", enemies: [{ type: "mirror", count: 5, interval: 1.4 }] },
+        { spawnerId: "south", enemies: [{ type: "splitter", count: 5, interval: 1.0 }], startDelay: 1.5 },
+        { spawnerId: "west", enemies: [{ type: "grunt", count: 10, interval: 0.5 }], startDelay: 3.0 },
+      ],
+    }),
+    summarize({
+      id: "void_w08_harbinger",
+      name: "Wave 8: HARBINGER",
+      description: "An artillery boss leads a coordinated assault.",
+      warning: "HARBINGER INCOMING. Spread your towers — its shell clusters are lethal.",
+      recommendedCounters: ["Spread placement", "Shield Squad", "Snare"],
+      rewardCredits: 280,
+      rewardChoice: true,
+      isBossWave: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "harbinger", count: 1, interval: 1 }] },
+        { spawnerId: "south", enemies: [{ type: "brute", count: 6, interval: 1.0 }], startDelay: 2.0 },
+        { spawnerId: "north", enemies: [{ type: "phantom", count: 4, interval: 0.9 }], startDelay: 3.5 },
+        { spawnerId: "west", enemies: [{ type: "jammer", count: 3, interval: 1.1 }], startDelay: 5.0 },
+      ],
+    }),
+    summarize({
+      id: "void_w09_blitz",
+      name: "Wave 9: Void Blitz",
+      description: "Every gate spawns at once with no stagger.",
+      warning: "BLITZ WAVE: pre-place a kill zone (K). Volume hits all four spawners simultaneously.",
+      recommendedCounters: ["Tesla", "Mortar", "Pre-set kill zone"],
+      rewardCredits: 250,
+      rewardChoice: false,
+      waveEvent: "blitz",
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "sprinter", count: 12, interval: 0.18 }] },
+        { spawnerId: "west", enemies: [{ type: "phantom", count: 6, interval: 0.4 }] },
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 12, interval: 0.22 }] },
+        { spawnerId: "north", enemies: [{ type: "saboteur", count: 4, interval: 0.5 }] },
+      ],
+    }),
+    summarize({
+      id: "void_w10_armored_tide",
+      name: "Wave 10: Armored Tide",
+      description: "Juggernauts and brutes wall up two lanes.",
+      warning: "Heavy armor across two lanes. Railguns and pierce specs earn their cost.",
+      recommendedCounters: ["Railgun", "Reflector", "Armor-pierce"],
+      rewardCredits: 285,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "juggernaut", count: 5, interval: 1.2 }] },
+        { spawnerId: "west", enemies: [{ type: "brute", count: 6, interval: 1.0 }], startDelay: 1.8 },
+        { spawnerId: "south", enemies: [{ type: "tunneler", count: 3, interval: 1.5 }], startDelay: 3.5 },
+      ],
+    }),
+
+    // ── ACT 3 ────────────────────────────────────────────────────────────
+    summarize({
+      id: "void_w11_weaver_dance",
+      name: "Wave 11: Weaver Dance",
+      description: "Healers and tunnelers stitch the line back together.",
+      warning: "Weavers heal nearby enemies — focus them. Tunnelers bypass towers underground.",
+      recommendedCounters: ["Tesla chain", "Mortar splash", "Drone coverage"],
+      rewardCredits: 305,
+      rewardChoice: false,
+      lanes: [
+        { spawnerId: "north", enemies: [{ type: "weaver", count: 5, interval: 1.2 }] },
+        { spawnerId: "south", enemies: [{ type: "tunneler", count: 4, interval: 1.3 }], startDelay: 1.5 },
+        { spawnerId: "east", enemies: [{ type: "brute", count: 5, interval: 1.1 }], startDelay: 2.8 },
+        { spawnerId: "west", enemies: [{ type: "splitter", count: 5, interval: 1.0 }], startDelay: 4.0 },
+      ],
+    }),
+    summarize({
+      id: "void_w12_carrier_storm",
+      name: "Wave 12: Carrier Storm",
+      description: "Carriers feed an HP-dense assault.",
+      warning: "Carriers split into scouts on death — kill them far from the core.",
+      recommendedCounters: ["Stasis", "Mortar", "Tesla chain"],
+      rewardCredits: 330,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "carrier", count: 5, interval: 1.7 }] },
+        { spawnerId: "west", enemies: [{ type: "phantom", count: 6, interval: 0.9 }], startDelay: 1.5 },
+        { spawnerId: "south", enemies: [{ type: "weaver", count: 4, interval: 1.2 }], startDelay: 3.0 },
+        { spawnerId: "north", enemies: [{ type: "sprinter", count: 8, interval: 0.4 }], startDelay: 4.5 },
+      ],
+    }),
+    summarize({
+      id: "void_w13_overlord",
+      name: "Wave 13: OVERLORD",
+      description: "The first sentinel of the Void emerges.",
+      warning: "OVERLORD INCOMING. Concentrate fire on the boss; ignore escorts.",
+      recommendedCounters: ["Railgun", "Boss damage", "Shield Squad on core"],
+      rewardCredits: 360,
+      rewardChoice: false,
+      isBossWave: true,
+      lanes: [
+        { spawnerId: "north", enemies: [{ type: "overlord", count: 1, interval: 1 }] },
+        { spawnerId: "south", enemies: [{ type: "saboteur", count: 5, interval: 0.9 }], startDelay: 2.0 },
+        { spawnerId: "east", enemies: [{ type: "mirror", count: 4, interval: 1.3 }], startDelay: 3.5 },
+        { spawnerId: "west", enemies: [{ type: "brute", count: 6, interval: 1.0 }], startDelay: 5.0 },
+      ],
+    }),
+    summarize({
+      id: "void_w14_collapse",
+      name: "Wave 14: Recursive Collapse",
+      description: "Everything spawns. Coordination dissolves.",
+      warning: "Final preparation wave. Spend everything — there's no point banking credits.",
+      recommendedCounters: ["Tesla", "Mortar", "Stasis on chokes"],
+      rewardCredits: 420,
+      rewardChoice: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "sprinter", count: 10, interval: 0.3 }] },
+        { spawnerId: "west", enemies: [{ type: "phantom", count: 7, interval: 0.7 }], startDelay: 1.0 },
+        { spawnerId: "south", enemies: [{ type: "juggernaut", count: 5, interval: 1.2 }], startDelay: 2.0 },
+        { spawnerId: "north", enemies: [{ type: "carrier", count: 4, interval: 1.8 }], startDelay: 3.5 },
+      ],
+    }),
+    summarize({
+      id: "void_w15_leviathan",
+      name: "Wave 15: LEVIATHAN AWAKENS",
+      description: "The Void's deepest signal answers. The Leviathan rises.",
+      warning: "FINAL ASSAULT. Shield the core, Strike the spawners, save nothing for next wave.",
+      recommendedCounters: ["Boss damage", "Shield Squad on core", "All-in"],
+      rewardCredits: 600,
+      rewardChoice: false,
+      isBossWave: true,
+      lanes: [
+        { spawnerId: "east", enemies: [{ type: "leviathan", count: 1, interval: 1 }] },
+        { spawnerId: "east", enemies: [{ type: "phantom", count: 6, interval: 0.85 }], startDelay: 4.0 },
+        { spawnerId: "west", enemies: [{ type: "mirror", count: 5, interval: 1.3 }], startDelay: 1.0 },
+        { spawnerId: "west", enemies: [{ type: "brute", count: 6, interval: 1.0 }], startDelay: 5.0 },
+        { spawnerId: "north", enemies: [{ type: "sprinter", count: 10, interval: 0.35 }], startDelay: 2.0 },
+        { spawnerId: "north", enemies: [{ type: "saboteur", count: 5, interval: 0.9 }], startDelay: 6.5 },
+        { spawnerId: "south", enemies: [{ type: "grunt", count: 12, interval: 0.45 }], startDelay: 1.5 },
+        { spawnerId: "south", enemies: [{ type: "splitter", count: 5, interval: 1.0 }], startDelay: 7.0 },
+      ],
+    }),
+  ];
 }
 
 

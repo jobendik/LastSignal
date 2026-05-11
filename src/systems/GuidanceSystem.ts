@@ -96,8 +96,12 @@ export class GuidanceSystem {
     bus.on("squad:destroyed", () => this.maybeShowEvacHint());
     bus.on("tower:sabotaged", () => this.onTowerSabotaged());
     bus.on("tower:disabled", () => this.onTowerDisabled());
-    bus.on("command:tierUp", () => this.dismissHint("command_tier_available"));
+    bus.on("command:tierUp", (ev: unknown) => {
+      this.dismissHint("command_tier_available");
+      this.onCommandTierUp(ev);
+    });
     bus.on("build:tool", (type: unknown) => this.onBuildToolChange(type));
+    bus.on("tower:built", (ev: unknown) => this.onTowerBuiltCheckReflector(ev));
     // Training-specific stage cards fire on wave-complete so the player gets
     // a beat to read between drills.
     bus.on("wave:complete", () => this.onWaveCompleteTraining());
@@ -353,6 +357,68 @@ export class GuidanceSystem {
     // No tutorial here yet; the build-tool tutorial covers it. Fire the first
     // strategic-discovery prompt the moment any strategic point becomes visible
     // (handled separately in strategic:discovered).
+  }
+
+  /**
+   * Fired on every tower:built event. Specifically detects the case where a
+   * Reflector is placed with no Railgun in range — without a Railgun the
+   * Reflector does nothing, so we surface a soft hint pointing the player at
+   * the synergy.
+   */
+  private onTowerBuiltCheckReflector(ev: unknown): void {
+    const t = ev as { type?: string; range?: number; pos?: { x: number; y: number } } | null;
+    if (!t || t.type !== "reflector") return;
+    const towers = this.game.towers?.list;
+    if (!towers || !t.pos) return;
+    const tx = t.pos.x;
+    const ty = t.pos.y;
+    const r = (t.range ?? 84) + 96; // generous detection radius
+    const r2 = r * r;
+    const hasRailgun = towers.some((other) => {
+      if (other.type !== "railgun") return false;
+      const dx = other.pos.x - tx;
+      const dy = other.pos.y - ty;
+      return dx * dx + dy * dy <= r2;
+    });
+    if (hasRailgun) return;
+    this.queueHint({
+      id: "hint_reflector_no_railgun",
+      title: "Reflector idle",
+      body: "Reflectors only work next to a Railgun. Build a Railgun within range, or sell the Reflector and try a different tower.",
+      kind: "hint",
+      priority: 65,
+      ttl: 9,
+    });
+  }
+
+  /**
+   * Command Tier upgrade celebration / squad-onboarding card.
+   * Tier 2 unlocks Engineer + Strike; Tier 3 unlocks Shield and raises caps.
+   * Each card fires at most once per profile (persisted) so veterans aren't
+   * pestered on repeat runs.
+   */
+  private onCommandTierUp(ev: unknown): void {
+    const e = ev as { tier?: number } | null;
+    const tier = e?.tier ?? this.game.core.commandTier;
+    if (tier === 2) {
+      this.queueTutorial({
+        id: "tut_command_tier_2",
+        title: "Command Tier II",
+        body: "Engineer (F2) and Strike (F3) squads are now available. Engineer repairs damaged towers and accelerates capture; Strike cracks hostile structures.",
+        kind: "tutorial",
+        hint: "F2 / F3",
+        codexTab: "squads",
+      });
+    } else if (tier === 3) {
+      this.queueTutorial({
+        id: "tut_command_tier_3",
+        title: "Command Tier III",
+        body: "Shield (F4) is now available. Squad cap +1. Use Shield on the core or exposed relays before rift pulses and boss waves.",
+        kind: "tutorial",
+        hint: "F4",
+        codexTab: "squads",
+      });
+    }
   }
 
   private onRelayBuilt(): void {

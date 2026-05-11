@@ -26,6 +26,9 @@ const NODE_POS: Record<string, { x: number; y: number }> = {
   fortified_signal:   { x: 230, y: 730 },
   unlock_amplifier:   { x: 230, y: 820 },
   unlock_snare:       { x: 230, y: 910 },
+  reinforced_construction: { x: 230, y: 1000 },
+  salvage_protocol:        { x: 230, y: 1090 },
+  squad_bandwidth_research:{ x: 230, y: 1180 },
 
   // ── TIER III ────────────────────────────────────────
   logistics_3:        { x: 450, y: 10  },
@@ -35,9 +38,11 @@ const NODE_POS: Record<string, { x: number; y: number }> = {
   deep_reserves:      { x: 450, y: 370 },
   supply_chain:       { x: 450, y: 460 },
   unlock_overclock:   { x: 450, y: 550 },
+  wave_bounty_network:{ x: 450, y: 640 },
+  rapid_capacitors:   { x: 450, y: 730 },
 };
 const TREE_W = 620;
-const TREE_H = 1010;
+const TREE_H = 1280;
 
 /** Meta-progression research tree rendered as a visual node graph. */
 export class MetaPanel {
