@@ -472,6 +472,8 @@ export class TowerSystem {
   buildLimit(type: TowerType): number | null {
     if (type === "railgun") return 3;
     if (type === "tesla") return 4;
+    if (type === "pulse") return 8;
+    if (type === "blaster") return 6;
     return null;
   }
 

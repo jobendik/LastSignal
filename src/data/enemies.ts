@@ -7,7 +7,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Fast, weak recon unit",
     description:
       "Low HP and no abilities, but moves quickly in swarms. Blasters and Tesla shine here.",
-    hp: 8,
+    hp: 10,
     speed: 82,
     reward: 2,
     breach: 4,
@@ -21,7 +21,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Baseline attacker",
     description:
       "Average speed and HP. The workhorse anomaly. Almost any tower can counter it.",
-    hp: 20,
+    hp: 25,
     speed: 50,
     reward: 4,
     breach: 8,
@@ -35,7 +35,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Slow armored unit",
     description:
       "Very high HP and lightly armored. Stasis + Mortar is the classic counter.",
-    hp: 82,
+    hp: 104,
     speed: 30,
     reward: 12,
     breach: 18,
@@ -50,7 +50,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Repairs nearby enemies",
     description:
       "Periodically heals anomalies within a short radius. Eliminate them first!",
-    hp: 28,
+    hp: 36,
     speed: 45,
     reward: 8,
     breach: 10,
@@ -64,7 +64,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Phases in and out of reality",
     description:
       "Immune to damage while phased. Tesla Phase Disruptor and Scanner Drones counter them.",
-    hp: 16,
+    hp: 20,
     speed: 61,
     reward: 10,
     breach: 9,
@@ -78,7 +78,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Splits into Scouts on death",
     description:
       "Large and slow, but releases a swarm of Scouts when destroyed. Kill it in a kill zone.",
-    hp: 124,
+    hp: 155,
     speed: 20,
     reward: 20,
     breach: 22,
@@ -93,7 +93,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Final boss anomaly",
     description:
       "A multi-phase boss that summons escorts, disables towers and emits corruption pulses.",
-    hp: 850,
+    hp: 1060,
     speed: 15,
     reward: 100,
     breach: 45,
@@ -109,7 +109,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Ultra-fast courier",
     description:
       "Faster than a Scout and just as fragile. Slow effects matter most here.",
-    hp: 6,
+    hp: 8,
     speed: 130,
     reward: 3,
     breach: 5,
@@ -123,7 +123,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Armored siege engine",
     description:
       "Thicker armor than a Brute. Requires armor-piercing and focus fire.",
-    hp: 180,
+    hp: 225,
     speed: 22,
     reward: 22,
     breach: 28,
@@ -138,7 +138,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Bubble-bearer",
     description:
       "Carries a personal shield bubble that absorbs the first 2 incoming hits before damage is dealt. Burst it with disposable shots, then nuke it.",
-    hp: 46,
+    hp: 58,
     speed: 42,
     reward: 9,
     breach: 12,
@@ -153,7 +153,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Binary fission hostile",
     description:
       "Splits into two smaller Grunts on death. Kill it cleanly with splash.",
-    hp: 58,
+    hp: 72,
     speed: 36,
     reward: 14,
     breach: 14,
@@ -167,7 +167,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Signal disruptor",
     description:
       "Suppresses tower fire rate in a small aura. High-priority target.",
-    hp: 34,
+    hp: 42,
     speed: 48,
     reward: 11,
     breach: 10,
@@ -195,7 +195,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Mid-run elite boss",
     description:
       "An elite boss that escorts lesser anomalies. Births a Swarm escort every 5 hits taken, so sustained chip damage spawns more pressure than a single big shot.",
-    hp: 420,
+    hp: 525,
     speed: 22,
     reward: 60,
     breach: 32,
@@ -211,7 +211,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Subterranean infiltrator",
     description:
       "Periodically dives underground, becoming invisible and moving faster until it surfaces closer to the core.",
-    hp: 38,
+    hp: 48,
     speed: 52,
     reward: 16,
     breach: 12,
@@ -225,7 +225,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Tower disabler",
     description:
       "Disables any tower it passes within range of for 3 seconds. Eliminate it before it reaches your defenses.",
-    hp: 30,
+    hp: 38,
     speed: 62,
     reward: 14,
     breach: 9,
@@ -253,7 +253,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Projectile reflector",
     description:
       "Absorbs the first three projectile hits, disabling the attacking tower for 2s each time. Once its mirror charges are depleted it becomes vulnerable.",
-    hp: 45,
+    hp: 56,
     speed: 38,
     reward: 18,
     breach: 11,
@@ -267,7 +267,7 @@ export const enemyDefinitions: Record<EnemyType, EnemyDefinition> = {
     role: "Ranged artillery boss",
     description:
       "Holds near the map edge and launches artillery shells at tower clusters, forcing resilient spacing and long-range pressure.",
-    hp: 620,
+    hp: 775,
     speed: 12,
     reward: 120,
     breach: 38,
