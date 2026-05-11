@@ -1141,6 +1141,11 @@
   background: rgba(244, 67, 54, 0.10);
   border-left-color: #ff5252;
 }
+.ls-tp-hint-ok {
+  color: #9be7a7;
+  background: rgba(76, 175, 80, 0.10);
+  border-left-color: #66bb6a;
+}
 @keyframes ls-jam-flicker {
   0%, 100% { opacity: 0.95; }
   50% { opacity: 0.65; }

@@ -153,6 +153,30 @@ export class TowerPanel {
       this.el.append(list);
     }
 
+    // Reflector requires an in-range Railgun to do anything. Surface this
+    // dependency directly in the panel so players don't think the tower is
+    // bugged when it never fires.
+    if (t.type === "reflector") {
+      // 96 px buffer past the reflector's own range matches GuidanceSystem's
+      // detection radius so the panel hint and onTowerBuilt hint agree.
+      const r = (stats.range || 84) + 96;
+      const r2 = r * r;
+      const hasRailgun = this.game.towers.list.some((other) => {
+        if (other === t || other.type !== "railgun") return false;
+        const dx = other.pos.x - t.pos.x;
+        const dy = other.pos.y - t.pos.y;
+        return dx * dx + dy * dy <= r2;
+      });
+      this.el.append(
+        el("div", {
+          class: hasRailgun ? "ls-tp-hint ls-tp-hint-ok" : "ls-tp-hint ls-tp-hint-warn",
+          text: hasRailgun
+            ? "Railgun in range — beams will redirect through this Reflector."
+            : "Requires Railgun in range — currently idle. Build a Railgun nearby or sell.",
+        })
+      );
+    }
+
     // Targeting mode selector (not for eco towers).
     if (!t.isEco) {
       const modes: { id: TargetMode; label: string; title: string }[] = [
