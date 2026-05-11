@@ -298,6 +298,9 @@ export class StrategicPointSystem {
   private attachSignalNodeCluster(p: StrategicPoint): void {
     const radiusCells = p.radiusCells || SIGNAL_NODE_RADIUS_CELLS;
     const grid = this.game.grid;
+    // Synthetic cluster — no physical cells and not destroyable by enemies
+    // (the StrategicPoint itself tracks health separately). Infinity HP keeps
+    // the relay-vulnerability system from affecting these virtual entries.
     grid.coreClusters.push({
       cells: [],
       center: p.pos,

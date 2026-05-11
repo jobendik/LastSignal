@@ -681,8 +681,8 @@ export class HUD {
       text = `Relay network at maximum capacity (${built}/${max}).`;
       ok = true;
     } else if (game.canDeployRelayCore()) {
-      const vLabel = variant === "hardened" ? "hardened relay" : "relay";
-      text = `${vLabel.charAt(0).toUpperCase() + vLabel.slice(1)} ready — extend signal range for ${cost}CR (R).`;
+      const vLabel = variant === "hardened" ? "Hardened relay" : "Relay";
+      text = `${vLabel} ready — extend signal range for ${cost}CR (R).`;
       ok = true;
     } else if (game.core.waveIndex < 2) {
       text = "Relay cores extend signal range and unlock new build zones.";

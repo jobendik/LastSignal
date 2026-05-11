@@ -28,6 +28,7 @@ import type {
   SpeedMultiplier,
   UpgradeDefinition,
 } from "./Types";
+import { CellKind } from "./Types";
 
 import { AudioSystem } from "../systems/AudioSystem";
 import { loadoutDefinitions } from "../data/loadouts";
@@ -661,7 +662,7 @@ export class Game {
     cluster.destroyed = true;
     // Free the occupied cells so pathing and future relay placement work.
     for (const i of cluster.cells) {
-      if (this.grid.cells[i] === 1 /* CellKind.Core */) this.grid.cells[i] = 0 /* CellKind.Empty */;
+      if (this.grid.cells[i] === CellKind.Core) this.grid.cells[i] = CellKind.Empty;
       const idx = this.grid.coreCells.indexOf(i);
       if (idx !== -1) this.grid.coreCells.splice(idx, 1);
     }

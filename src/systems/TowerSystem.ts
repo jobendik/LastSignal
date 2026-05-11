@@ -894,17 +894,20 @@ export class TowerSystem {
     }
 
     // Relay passive: +5% range per non-primary relay whose coverage contains this tower.
+    // Bonuses are accumulated additively (e.g. two relays = +10%, not compounded).
     const grid = this.game.grid;
     const tc = t.c + 0.5;
     const tr = t.r + 0.5;
+    let relayRangeBonus = 0;
     for (const cluster of grid.coreClusters) {
       if (cluster.isPrimary || cluster.destroyed || cluster.cells.length === 0) continue;
       const dc = tc - cluster.centerCol;
       const dr = tr - cluster.centerRow;
       if (Math.hypot(dc, dr) <= cluster.signalRadiusCells) {
-        range *= 1 + RELAY_PASSIVE_RANGE_BONUS;
+        relayRangeBonus += RELAY_PASSIVE_RANGE_BONUS;
       }
     }
+    if (relayRangeBonus > 0) range *= 1 + relayRangeBonus;
 
     let splashRadius = base.splashRadius * up.mortarSplashMul;
     let chainMax = base.chainMax + (t.type === "tesla" ? up.teslaChainAdd : 0);
