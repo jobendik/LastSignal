@@ -53,8 +53,16 @@ export class AchievementSystem {
       if (sectorId === "sector_void") this.unlock("void_cleared");
       if (sectorId === "sector_06_fractured_expanse") this.unlock("sector_6_cleared");
       if (sectorId === "sector_07_blackout_array") this.unlock("sector_7_cleared");
-      // All 4 main campaign sectors cleared.
-      if (this.game.core.profile.bestSectorCleared >= 4) this.unlock("all_sectors_cleared");
+      // "All 4 campaign sectors cleared" — Note: game:victory fires before
+      // commitProfile updates bestSectorCleared, so we also check whether the
+      // current sector IS Sector 4 (sequential locks guarantee 1-3 were already
+      // cleared to reach it). After the first such run bestSectorCleared >= 4.
+      if (
+        sectorId === "sector_04_hostile_core" ||
+        this.game.core.profile.bestSectorCleared >= 4
+      ) {
+        this.unlock("all_sectors_cleared");
+      }
     });
 
     bus.on("tower:specialized", () => this.unlock("first_specialization"));

@@ -159,7 +159,7 @@ export const achievementDefinitions: AchievementDefinition[] = [
   {
     id: "all_sectors_cleared",
     name: "The Signal Holds",
-    description: "Clear all 4 main campaign sectors.",
+    description: "Clear all 4 main campaign sectors (Sectors 1–4).",
     icon: "★★★★",
     researchReward: 8,
   },
