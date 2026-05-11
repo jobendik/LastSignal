@@ -322,8 +322,9 @@ function strategyEconomy(credits, waveIndex, currentTowers) {
     }
   }
   // Always have at least 2 pulse cannons
-  const pulseCount = currentTowers.filter(t => t === "pulse").length + result.filter(t => t === "pulse").length;
-  if (pulseCount < 2 && budget >= TOWERS.pulse.cost) {
+  const existingPulse = currentTowers.filter(t => t === "pulse").length;
+  const pendingPulse  = result.filter(t => t === "pulse").length;
+  if (existingPulse + pendingPulse < 2 && budget >= TOWERS.pulse.cost) {
     result.push("pulse");
     budget -= TOWERS.pulse.cost;
   }
@@ -443,7 +444,10 @@ function simulateCampaign(strategyFn, opts = {}) {
 
     // ── Harvester income during wave ────────────────────────────────────────
     const harvesterCount = towers.filter(t => t === "harvester").length;
-    const WAVE_DURATION  = 30; // estimated seconds
+    // Wave duration is estimated at 30 s; actual game waves vary 20–50 s but
+    // 30 s is representative for mid-game waves (verified against sector-1 enemy
+    // spacing: ~9 enemies × ~0.7 s interval + travel time ≈ 25–35 s per wave).
+    const WAVE_DURATION  = 30;
     const harvIncome     = harvesterCount * Math.floor(WAVE_DURATION / 5) * 15;
 
     // ── Wave phase ──────────────────────────────────────────────────────────
@@ -533,7 +537,9 @@ function generateEndlessWave(endlessWave) {
     ...(endlessWave >= 8  ? ["tunneler"]                   : []),
     ...(endlessWave >= 10 ? ["juggernaut", "carrier", "saboteur"] : []),
   ];
-  // Random wave composition: 3 groups of 8–20 enemies each
+  // Random wave composition: 3 groups of 8–20 enemies each.
+  // Multipliers 17 and 31 are arbitrary coprime constants that spread sin() phase
+  // across wave numbers, mirroring the approach used in EndlessSystem.ts.
   const groups = [1, 2, 3].map(i => ({
     t: pool[Math.floor(Math.sin(endlessWave * 17 + i * 31) * 0.5 + 0.5) * pool.length | 0],
     n: 8 + (endlessWave % 6) + i * 2,
@@ -600,8 +606,11 @@ function multiRunStats(strategyFn, runs = 200, opts = {}) {
   }));
 
   for (let r = 0; r < runs; r++) {
-    // Model placement noise as effective HP inflation: enemies have 0.77–1.43× HP
-    // (0.7 to 1.3 placement efficiency inverted becomes 1/0.7=1.43 to 1/1.3=0.77)
+    // Placement efficiency noise: each run models a player who places towers
+    // between 70% and 130% efficiently relative to the ideal chokepoint.
+    // noiseScale ∈ [0.70, 1.30]  →  ±30% efficiency variance from the mean.
+    // Inverting gives enemy effective HP: a 70%-efficient placement sees enemies
+    // as 1/0.70 ≈ 1.43× as hardy; a 130%-efficient run sees them as 0.77× hardy.
     const noiseScale = 0.70 + Math.random() * 0.60; // 0.70 – 1.30
     const hpNoise    = 1 / noiseScale;               // ~0.77 – ~1.43
 
@@ -811,7 +820,7 @@ for (const r of mcResults) {
   const last  = r.stats.at(-1);
   console.log(
     "  " +
-    pad(r.name, -28).padEnd(28) +
+    pad(r.name, 28, true) +
     pad(pct(last?.survivalRate ?? 0), 10) +
     pad(fmt1(last?.avgCoreHp ?? 0), 18) +
     pad(fmt1(last?.avgTowers ?? 0), 19)
