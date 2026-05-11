@@ -1,0 +1,369 @@
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║         LAST SIGNAL — GAME BALANCE SIMULATION REPORT                    ║
+║         Sector 1 · Standard Difficulty · 200 Monte-Carlo runs per strategy ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+══════════════════════════════════════════════════════════════════════════════
+  SECTION 1 — WAVE THREAT BUDGET (total enemy EHP and max breach damage)
+══════════════════════════════════════════════════════════════════════════════
+
+   Wave  Enemies  Total EHP  MaxBreach       Hardest enemy
+  ────────────────────────────────────────────────────────
+      1        6         48         24               scout
+      2        9        180         72               grunt
+      3       11        449        118               brute
+      4        9         88         46               scout
+      5       13        234         70             carrier
+      6        6        442         92               brute
+      7       18        336        150               grunt
+      8       17        565        134             carrier
+      9       36        288        144               scout
+     10       14        948        207               brute
+     11       20        679        152             carrier
+     12       31        660        258               grunt
+     13       33       1933        386               brute
+     14       34        400        216             phantom
+     15       61       2397        573          juggernaut
+
+══════════════════════════════════════════════════════════════════════════════
+  SECTION 2 — MINIMUM PULSE TOWERS FOR ZERO BREACHES PER WAVE
+══════════════════════════════════════════════════════════════════════════════
+
+  Sweep: 0 → 60 towers of each type; record first count with all enemies killed.
+  A low number means that wave type is easy to neutralise with a spam strategy.
+
+   Wave  vs Pulse  vs Blaster  vs Mortar  vs Tesla  Credits (Pulse)
+  ─────────────────────────────────────────────────────────────────
+      1         1           1          1         1               20
+      2         1           1          1         1               20
+      3         3           2          1         2               60
+      4         2           2          1         1               40
+      5         2           2          1         2               40
+      6         3           2          1         2               60
+      7         2           2          1         1               40
+      8         2           2          1         2               40
+      9         1           1          1         1               20
+     10         3           2          1         2               60
+     11         2           2          1         2               40
+     12         1           1          1         1               20
+     13         3           2          1         2               60
+     14         2           2          1         1               40
+     15         4           4          2         3               80
+
+══════════════════════════════════════════════════════════════════════════════
+  SECTION 3 — CREDIT ECONOMY BY STRATEGY (single deterministic run)
+══════════════════════════════════════════════════════════════════════════════
+
+  ── No Defense
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Breaches  Credits  CoreHP  Status
+  ──────────────────────────────────────────────────────────
+      1       0         6      285      76
+      2       0         9      335       4
+      3       0        11      395       0 ❌ GAME OVER
+      4       0         0      395       0 ❌ GAME OVER
+      5       0         0      395       0 ❌ GAME OVER
+      6       0         0      395       0 ❌ GAME OVER
+      7       0         0      395       0 ❌ GAME OVER
+      8       0         0      395       0 ❌ GAME OVER
+      9       0         0      395       0 ❌ GAME OVER
+     10       0         0      395       0 ❌ GAME OVER
+     11       0         0      395       0 ❌ GAME OVER
+     12       0         0      395       0 ❌ GAME OVER
+     13       0         0      395       0 ❌ GAME OVER
+     14       0         0      395       0 ❌ GAME OVER
+     15       0         0      395       0 ❌ GAME OVER
+
+  ── Minimal (1 pulse/wave)
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Breaches  Credits  CoreHP  Status
+  ──────────────────────────────────────────────────────────
+      1       1         0      277     100 ✓ perfect
+      2       2         0      343     100 ✓ perfect
+      3       3         0      451     100 ✓ perfect
+      4       4         0      530     100 ✓ perfect
+      5       5         0      629     100 ✓ perfect
+      6       6         0      758     100 ✓ perfect
+      7       7         0      936     100 ✓ perfect
+      8       8         0     1116     100 ✓ perfect
+      9       9         0     1278     100 ✓ perfect
+     10      10         0     1536     100 ✓ perfect
+     11      11         0     1758     100 ✓ perfect
+     12      12         0     2022     100 ✓ perfect
+     13      13         0     2420     100 ✓ perfect
+     14      14         0     2756     100 ✓ perfect
+     15      15         0     3382     100 ✓ perfect
+
+  ── Pulse Spam (all-in each wave)
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Breaches  Credits  CoreHP  Status
+  ──────────────────────────────────────────────────────────
+      1      12         0       57     100 ✓ perfect
+      2      14         0      103     100 ✓ perfect
+      3      19         0      131     100 ✓ perfect
+      4      25         0      110     100 ✓ perfect
+      5      30         0      129     100 ✓ perfect
+      6      36         0      158     100 ✓ perfect
+      7      43         0      216     100 ✓ perfect
+      8      53         0      216     100 ✓ perfect
+      9      63         0      198     100 ✓ perfect
+     10      72         0      296     100 ✓ perfect
+     11      86         0      258     100 ✓ perfect
+     12      98         0      302     100 ✓ perfect
+     13     113         0      420     100 ✓ perfect
+     14     134         0      356     100 ✓ perfect
+     15     151         0      662     100 ✓ perfect
+
+  ── Economy (harvesters first)
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Breaches  Credits  CoreHP  Status
+  ──────────────────────────────────────────────────────────
+      1       2         0      307     100 ✓ perfect
+      2       4         0      493     100 ✓ perfect
+      3       5         3      795      46
+      4      44         0      384      46 ✓ perfect
+      5      63         0      393      46 ✓ perfect
+      6      82         0      432      46 ✓ perfect
+      7     103         0      480      46 ✓ perfect
+      8     127         0      470      46 ✓ perfect
+      9     150         0      462      46 ✓ perfect
+     10     173         0      550      46 ✓ perfect
+     11     200         0      522      46 ✓ perfect
+     12     226         0      556      46 ✓ perfect
+     13     253         0      704      46 ✓ perfect
+     14     288         0      630      46 ✓ perfect
+     15     319         0      926      46 ✓ perfect
+
+  ── Mixed Optimal
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Breaches  Credits  CoreHP  Status
+  ──────────────────────────────────────────────────────────
+      1      12         0       57     100 ✓ perfect
+      2      14         0      103     100 ✓ perfect
+      3      17         0      141     100 ✓ perfect
+      4      21         0      100     100 ✓ perfect
+      5      26         0      119     100 ✓ perfect
+      6      31         0      168     100 ✓ perfect
+      7      34         0      206     100 ✓ perfect
+      8      39         0      206     100 ✓ perfect
+      9      42         0      198     100 ✓ perfect
+     10      51         0      296     100 ✓ perfect
+     11      65         0      258     100 ✓ perfect
+     12      77         0      302     100 ✓ perfect
+     13      92         0      420     100 ✓ perfect
+     14     113         0      356     100 ✓ perfect
+     15     130         0      662     100 ✓ perfect
+
+══════════════════════════════════════════════════════════════════════════════
+  SECTION 4 — MONTE-CARLO STRATEGY COMPARISON (200 runs each, ±30% placement noise)
+══════════════════════════════════════════════════════════════════════════════
+
+  ▸ Strategy: No Defense (Baseline)   (200 runs)   Overall win rate: 0%
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Enemies  Breaches  CoreDmg  CoreHP  Survived
+  ──────────────────────────────────────────────────────────────────────────
+      1     0.0        6       6.0     24.0    76.0      100%
+      2     0.0        9       9.0     72.0     4.0      100%
+      3     0.0       11      11.0    118.0     0.0        0%
+      4     0.0        9       0.0      0.0     0.0        0%
+      5     0.0       13       0.0      0.0     0.0        0%
+      6     0.0        6       0.0      0.0     0.0        0%
+      7     0.0       18       0.0      0.0     0.0        0%
+      8     0.0       17       0.0      0.0     0.0        0%
+      9     0.0       36       0.0      0.0     0.0        0%
+     10     0.0       14       0.0      0.0     0.0        0%
+     11     0.0       20       0.0      0.0     0.0        0%
+     12     0.0       31       0.0      0.0     0.0        0%
+     13     0.0       33       0.0      0.0     0.0        0%
+     14     0.0       34       0.0      0.0     0.0        0%
+     15     0.0       61       0.0      0.0     0.0        0%
+
+  ▸ Strategy: Minimal Defense   (200 runs)   Overall win rate: 100%
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Enemies  Breaches  CoreDmg  CoreHP  Survived
+  ──────────────────────────────────────────────────────────────────────────
+      1     1.0        6       0.0      0.0   100.0      100%
+      2     2.0        9       0.0      0.0   100.0      100%
+      3     3.0       11       0.0      0.0   100.0      100%
+      4     4.0        9       0.0      0.0   100.0      100%
+      5     5.0       13       0.0      0.0   100.0      100%
+      6     6.0        6       0.0      0.0   100.0      100%
+      7     7.0       18       0.0      0.0   100.0      100%
+      8     8.0       17       0.0      0.0   100.0      100%
+      9     9.0       36       0.0      0.0   100.0      100%
+     10    10.0       14       0.0      0.0   100.0      100%
+     11    11.0       20       0.0      0.0   100.0      100%
+     12    12.0       31       0.0      0.0   100.0      100%
+     13    13.0       33       0.0      0.0   100.0      100%
+     14    14.0       34       0.0      0.0   100.0      100%
+     15    15.0       61       0.0      0.0   100.0      100%
+
+  ▸ Strategy: Pulse Spam   (200 runs)   Overall win rate: 100%
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Enemies  Breaches  CoreDmg  CoreHP  Survived
+  ──────────────────────────────────────────────────────────────────────────
+      1    12.0        6       0.0      0.0   100.0      100%
+      2    14.0        9       0.0      0.0   100.0      100%
+      3    19.0       11       0.0      0.0   100.0      100%
+      4    25.0        9       0.0      0.0   100.0      100%
+      5    30.0       13       0.0      0.0   100.0      100%
+      6    36.0        6       0.0      0.0   100.0      100%
+      7    43.0       18       0.0      0.0   100.0      100%
+      8    53.0       17       0.0      0.0   100.0      100%
+      9    63.0       36       0.0      0.0   100.0      100%
+     10    72.0       14       0.0      0.0   100.0      100%
+     11    86.0       20       0.0      0.0   100.0      100%
+     12    98.0       31       0.0      0.0   100.0      100%
+     13   113.0       33       0.0      0.0   100.0      100%
+     14   134.0       34       0.0      0.0   100.0      100%
+     15   151.0       61       0.0      0.0   100.0      100%
+
+  ▸ Strategy: Blaster Spam   (200 runs)   Overall win rate: 100%
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Enemies  Breaches  CoreDmg  CoreHP  Survived
+  ──────────────────────────────────────────────────────────────────────────
+      1     6.0        6       0.0      0.0   100.0      100%
+      2     7.0        9       0.0      0.0   100.0      100%
+      3     9.0       11       0.0      0.0   100.0      100%
+      4    12.0        9       0.0      0.0   100.0      100%
+      5    15.0       13       0.0      0.0   100.0      100%
+      6    18.0        6       0.0      0.0   100.0      100%
+      7    21.0       18       0.0      0.0   100.0      100%
+      8    26.0       17       0.0      0.0   100.0      100%
+      9    31.0       36       0.0      0.0   100.0      100%
+     10    36.0       14       0.0      0.0   100.0      100%
+     11    43.0       20       0.0      0.0   100.0      100%
+     12    49.0       31       0.0      0.0   100.0      100%
+     13    56.0       33       0.0      0.0   100.0      100%
+     14    67.0       34       0.0      0.0   100.0      100%
+     15    75.0       61       0.0      0.0   100.0      100%
+
+  ▸ Strategy: Economy-First   (200 runs)   Overall win rate: 100%
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Enemies  Breaches  CoreDmg  CoreHP  Survived
+  ──────────────────────────────────────────────────────────────────────────
+      1     2.0        6       0.0      0.0   100.0      100%
+      2     4.0        9       0.0      0.0   100.0      100%
+      3     5.0       11       1.2     22.1    77.9      100%
+      4    45.2        9       0.0      0.0    77.9      100%
+      5    64.2       13       0.0      0.0    77.9      100%
+      6    83.2        6       0.0      0.0    77.9      100%
+      7   104.2       18       0.0      0.0    77.9      100%
+      8   127.6       17       0.0      0.0    77.9      100%
+      9   151.2       36       0.0      0.0    77.9      100%
+     10   173.6       14       0.0      0.0    77.9      100%
+     11   201.2       20       0.0      0.0    77.9      100%
+     12   226.6       31       0.0      0.0    77.9      100%
+     13   254.2       33       0.0      0.0    77.9      100%
+     14   289.2       34       0.0      0.0    77.9      100%
+     15   320.2       61       0.0      0.0    77.9      100%
+
+  ▸ Strategy: Mixed Optimal   (200 runs)   Overall win rate: 100%
+  ──────────────────────────────────────────────────────────────────────────
+   Wave  Towers  Enemies  Breaches  CoreDmg  CoreHP  Survived
+  ──────────────────────────────────────────────────────────────────────────
+      1    12.0        6       0.0      0.0   100.0      100%
+      2    14.0        9       0.0      0.0   100.0      100%
+      3    17.0       11       0.0      0.0   100.0      100%
+      4    21.0        9       0.0      0.0   100.0      100%
+      5    26.0       13       0.0      0.0   100.0      100%
+      6    31.0        6       0.0      0.0   100.0      100%
+      7    34.0       18       0.0      0.0   100.0      100%
+      8    39.0       17       0.0      0.0   100.0      100%
+      9    42.0       36       0.0      0.0   100.0      100%
+     10    51.0       14       0.0      0.0   100.0      100%
+     11    65.0       20       0.0      0.0   100.0      100%
+     12    77.0       31       0.0      0.0   100.0      100%
+     13    92.0       33       0.0      0.0   100.0      100%
+     14   113.0       34       0.0      0.0   100.0      100%
+     15   130.0       61       0.0      0.0   100.0      100%
+
+  ── Win-rate summary across all strategies
+  ──────────────────────────────────────────────────────────────────────────
+                      Strategy  Win rate  Avg final CoreHP  Avg towers at end
+  ───────────────────────────────────────────────────────────────────────────
+  No Defense (Baseline)               0%               0.0                0.0
+  Minimal Defense                   100%             100.0               15.0
+  Pulse Spam                        100%             100.0              151.0
+  Blaster Spam                      100%             100.0               75.0
+  Economy-First                     100%              77.9              320.2
+  Mixed Optimal                     100%             100.0              130.0
+
+══════════════════════════════════════════════════════════════════════════════
+  SECTION 5 — ENDLESS-MODE TOWER SCALING ANALYSIS
+══════════════════════════════════════════════════════════════════════════════
+
+  HP scale per endless wave:    +18% per wave (EndlessSystem.ts)
+  Speed scale per endless wave: +4% per wave, capped at +90%
+
+  Table: first endless wave where a breach occurs for N pulse towers
+
+    Pulse towers  Credit cost  Survives campaign Fails at endless wave
+  ────────────────────────────────────────────────────────────────────
+               1           20                 No                     5
+               3           60                Yes                     8
+               5          100                Yes                     8
+               8          160                Yes                     8
+              12          240                Yes                     8
+              16          320                Yes                     8
+              20          400                Yes                     8
+              25          500                Yes                    16
+              30          600                Yes                    16
+              40          800                Yes                    16
+              50         1000                Yes                    16
+
+══════════════════════════════════════════════════════════════════════════════
+  SECTION 6 — BALANCE DIAGNOSIS & RECOMMENDATIONS
+══════════════════════════════════════════════════════════════════════════════
+
+  ┌─ IDENTIFIED BALANCE ISSUES ──────────────────────────────────────────────┐
+
+  1. TOWER SPAM DOMINATES
+     ├─ Starting credits (250) / pulse cost (20) = 12 towers before wave 1.
+     ├─ By wave 3 a spam player has ~19+ towers — well above the zero-breach
+     │  threshold for every wave type through the entire 15-wave campaign.
+     ├─ Pulse-spam campaign win rate (200 runs, ±30% noise): 100%
+     └─ Average towers at final wave: 151.0
+
+  2. NO PER-TOWER DIMINISHING RETURNS
+     ├─ Damage scales linearly with tower count: 2× towers = 2× damage.
+     ├─ There is no overlap penalty, DPS cap, or build-limit for basic towers.
+     └─ Maps large enough to host 40+ towers are trivially cleared.
+
+  3. LATE-WAVE THREAT IS UNDER-TUNED RELATIVE TO ECONOMY
+     ├─ Wave rewards accumulate faster than wave EHP grows.
+     ├─ Players who survived wave 1–3 with excess credits simply buy enough
+     │  towers to one-shot every subsequent enemy type.
+     └─ Endless mode helps but the HP scaling (+18%/wave) is outpaced once
+        the player has 30+ towers on a single path.
+
+  4. PHANTOMS AND TUNNELERS CONTRIBUTE MINIMAL COUNTER-PLAY PRESSURE
+     ├─ Phantom phase immunity (50% damage reduction) is easily overcome by
+     │  having more towers rather than the "correct" tower type.
+     └─ Tunneling / phasing only matters if the DPS budget is tight.
+
+  ├─ SUGGESTED REMEDIES ──────────────────────────────────────────────────────┤
+
+  A. HARD BUILD LIMITS on all basic tower types (pulse: max 6–8, blaster: max 5).
+     Even a limit of 8 pulse cannons forces the player to invest in varied towers.
+
+  B. TOWER DENSITY PENALTY: Towers in the same grid region (e.g., 3×3 cells)
+     share a "signal congestion" cooldown multiplier — e.g., each extra tower
+     in the cluster adds +10% cooldown to all towers in it.
+
+  C. WAVE EHP SCALING: multiply all enemy HP/counts by 1.25–1.40× to better
+     match mid-game tower budgets. Alternatively, reduce starting credits by
+     ~25% (from 250 → 190) to delay the "enough towers" threshold to wave 6+.
+
+  D. ECONOMY RE-BALANCE: increase harvest income cost (harvester: 80 → 100) and
+     reduce the per-wave credit reward by 20–30% to slow tower accumulation.
+
+  E. ENDLESS-MODE RAMPING: increase HP scale factor from 0.18 to 0.25 per wave
+     and add a hard cap on tower count (e.g., 25 total) in endless mode to
+     force the player to sell/upgrade rather than expand indefinitely.
+
+  └───────────────────────────────────────────────────────────────────────────┘
+
+  Simulation complete.
+
