@@ -320,6 +320,35 @@ body.ls-kbd [tabindex]:focus-visible {
   scrollbar-color: #45a29e transparent;
 }
 
+/* Leaderboard panel */
+.ls-leaderboard-panel {
+  border: 1px solid #1e2830;
+  background: rgba(0,0,0,0.3);
+  padding: 12px 14px;
+  margin: 10px 0;
+  max-width: 380px;
+}
+.ls-leaderboard-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #45a29e;
+  margin-bottom: 8px;
+}
+.ls-leaderboard-list {
+  font-size: 11px;
+  color: #6b7078;
+}
+.ls-leaderboard-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px solid #1a2228;
+}
+.ls-leaderboard-row:last-child { border-bottom: none; }
+.ls-lb-rank { color: #45a29e; min-width: 28px; }
+.ls-lb-name { flex: 1; color: #c5c6c7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-lb-score { color: #66fcf1; min-width: 60px; text-align: right; }
+
 /* Buttons */
 .ls-btn {
   background: transparent;

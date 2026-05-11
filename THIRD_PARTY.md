@@ -52,9 +52,9 @@ Their licences are reproduced or summarised below.
 
 ## Audio Assets
 
-<!-- TODO (PROMPT 5): List audio asset sources and licences once audio is added.
-     Include: file name, creator/source, licence, and attribution text. -->
-No audio assets have been added to this release.
+No audio assets have been added to this release. The game uses WebAudio synthesis
+for all music and SFX. Real audio assets are planned for v1.1 — this section will
+be updated at that time with source URLs and licences.
 
 ---
 

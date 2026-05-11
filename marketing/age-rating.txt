@@ -1,0 +1,13 @@
+PEGI 7 / ESRB E10+
+
+Rationale:
+- Cartoon/abstract enemy sprites with no blood or gore
+- Fantasy sci-fi violence (tower projectiles destroying enemy icons)
+- No sexual content
+- No strong language
+- No gambling mechanics
+- No real-money purchases (ad-supported only)
+- Mild threat/tension through enemy invasion narrative
+
+Recommended age gate: 13+ for online features (leaderboards, cloud save)
+EU GDPR age of digital consent: 16+ for telemetry opt-in (handled in consent modal)

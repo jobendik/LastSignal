@@ -29,49 +29,49 @@ What's left is **not on the original 8-item list**. It is the production layer t
 
 These items block the CrazyGames submission, or block any responsible public release. They must all be done.
 
-### 1.1 GDPR/consent gate & privacy compliance ⚠️ BLOCKER
+### 1.1 GDPR/consent gate & privacy compliance ✅ DONE
 - **Why:** CrazyGames submissions are reviewed against GDPR/COPPA. Personalised-ads SDKs must respect a consent decision. Without it, the submission is rejected.
 - **Scope:** Implement a first-load consent modal ("Allow personalised ads? Yes / No"). Persist decision in `localStorage`. Wire decision to the CrazyGames SDK consent API (`sdk.user.addUserChangedListener` / `sdk.banner.requestResponsiveBanner` respect the flag). Add a "Privacy" entry in the main menu that re-opens the modal so users can change their mind.
 - **Required artefacts:** `PRIVACY.md` and a short, plain-English privacy notice rendered inside the game.
 - **Where it touches:** `src/systems/AdsSystem.ts`, new `src/systems/ConsentSystem.ts`, `src/ui/MainMenu.ts`, new `src/ui/ConsentModal.ts`.
 
-### 1.2 Cloud save & profile sync (CrazyGames + public web)
+### 1.2 Cloud save & profile sync (CrazyGames + public web) ✅ DONE
 - **Why:** CrazyGames provides a free cloud-save API. Without it, players lose progress when they clear cookies or switch device. Reviewers flag this.
 - **Scope:** Wrap `PersistenceSystem` with a `CloudSaveAdapter`. On `sdk.user.getUser()` success, fetch remote save; merge with local using a "last-write-wins" rule keyed on `profile.lastPlayedAt`. Fall back silently to localStorage when no SDK / no user.
 - **Where it touches:** `src/systems/PersistenceSystem.ts`, new `src/systems/CloudSaveSystem.ts`, `src/core/Game.ts` startup sequence.
 
-### 1.3 Bundle split & loading screen
+### 1.3 Bundle split & loading screen ✅ DONE
 - **Why:** The current build emits a 604 kB JS chunk (Vite warns at 500 kB). Slow mobile networks see a multi-second white screen. CrazyGames measures TTI and penalises slow loads.
 - **Scope:** Code-split by route (MainMenu / Game / SectorSelect). Lazy-load `src/data/waves.ts`, `src/data/sectors.ts`, `src/data/codex.ts` (the biggest static blobs). Add a real loading screen that drives `sdk.game.sdkGameLoadingStart/Stop()` with actual progress, not just two timestamps.
 - **Target:** Initial JS payload < 200 kB gzipped, full game interactive < 4 s on a mid-range Android device.
 - **Where it touches:** `vite.config.ts` (manualChunks), `src/main.ts`, new `src/ui/LoadingScreen.ts`.
 
-### 1.4 Audio asset pass
+### 1.4 Audio asset pass ⏭️ SKIPPED (no audio assets — v1.1)
 - **Why:** Currently all music and SFX are WebAudio synthesised in `AudioSystem.ts`. The synthesised "BGM" is a rhythmic click — fine for prototyping, not for release.
 - **Scope:** Source 3 royalty-free music loops (calm / wave / boss) and ~15 SFX from a licensed pack (Kenney, Sonniss GDC, or a licensed pack such as ZapSplat Pro). Replace synthesis hooks with HTMLAudio/`<audio>` element streams. Keep synthesis as a fallback. Ensure all assets are < 500 kB total (mp3 64 kbps mono is fine for ambient loops).
 - **Where it touches:** new `public/audio/`, `src/systems/AudioSystem.ts`.
 
-### 1.5 Accessibility minimum bar
+### 1.5 Accessibility minimum bar ✅ DONE
 - **Why:** A11y is a CrazyGames quality signal and a hard requirement for several distribution partners (Poki, etc.).
 - **Scope:** (1) Colourblind-safe palette toggle (deuteranopia and protanopia presets) wired through tower beam colours, enemy outlines, and HUD chips. (2) UI font-scale slider 80–140% in Settings. (3) Full keyboard navigation of MainMenu / SectorSelect / SettingsPanel. (4) Reduce-motion toggle that disables screen shake, particle bursts, and the menu starfield. (5) Pause-on-blur (already partial — verify).
 - **Where it touches:** `src/systems/SettingsSystem.ts`, `src/ui/SettingsPanel.ts`, `src/systems/RenderSystem.ts`, `src/styles/ui.css`.
 
-### 1.6 Telemetry (minimal, privacy-respecting)
+### 1.6 Telemetry (minimal, privacy-respecting) ✅ DONE
 - **Why:** Post-launch tuning is impossible without data. Without "% of players who clear sector 1", balance work is guesswork.
 - **Scope:** A tiny `TelemetrySystem` that records anonymised counters (sector_start, sector_clear, sector_fail, wave_died_on, modifier_picked, tower_built_by_type, average_run_length) and POSTs them in batches to a free endpoint (e.g. Plausible's `/api/event`, Umami self-host, or just buffer-and-print in dev). Respect the consent flag from §1.1.
 - **Where it touches:** new `src/systems/TelemetrySystem.ts`, hooks on `bus.emit("sector:complete"|"sector:failed"|"wave:start"|"tower:built"|...)`.
 
-### 1.7 QA pass: full campaign + endless smoke run
+### 1.7 QA pass: full campaign + endless smoke run 🔲 AWAITING MANUAL PLAY
 - **Why:** Several large feature waves landed back-to-back; the integration risk is real. We need a deliberate human run-through.
 - **Scope:** Play Sectors 1–7 + Void + ≥ 20 endless waves on desktop AND mobile (touch). Record every visible bug. Triage into "ship-blocker" (crash, softlock, broken core flow) and "post-launch". Fix all ship-blockers. Capture screen recordings as evidence for the store page.
 - **Where it touches:** new `qa/playtest-2026-05.md` log, plus targeted bug-fix commits.
 
-### 1.8 Store-page assets & submission package
+### 1.8 Store-page assets & submission package 🔲 IMAGES PENDING (text assets done)
 - **Why:** CrazyGames submission requires icon, banner, screenshots, description, tags, controls, age rating.
 - **Scope:** Produce: 1024×1024 icon, 1920×1080 banner, 4–6 in-game screenshots, 30-second trailer GIF, 500-word description, controls section, tag list, suggested age rating. Verify game runs inside the CrazyGames test harness (file:// + cross-origin checks). Produce `release-checklist.md`.
 - **Where it touches:** new `marketing/`, new `release-checklist.md`.
 
-### 1.9 Legal: privacy policy, ToS, third-party licences
+### 1.9 Legal: privacy policy, ToS, third-party licences ✅ DONE
 - **Why:** Required by ad SDKs and by EU/UK consumer law.
 - **Scope:** A short `PRIVACY.md` (data collected: anonymous gameplay events; ads served by CrazyGames; cloud save via CrazyGames). A short `TERMS.md`. A `THIRD_PARTY.md` listing every dependency + asset + license. Link all three from the main menu.
 
@@ -79,16 +79,17 @@ These items block the CrazyGames submission, or block any responsible public rel
 
 ## 2. High-value, non-blocking (strong-recommend before release)
 
-### 2.1 Standalone-release monetisation (energy gate, starter pack, daily login, gem shop)
+### 2.1 Standalone-release monetisation (energy gate, starter pack, daily login, gem shop) ⏭️ DEFERRED — v1.1
 - **Why:** The CrazyGames track is unblocked by §1.1 + §1.3 already. The full `monetize.md` plan (Signal Power energy, $4.99 Starter Pack, 7-day login streak, gem shop) is the **standalone** track and is per the original design 1–2 weeks of work. It is high-impact for direct-web revenue but is **not** required for CrazyGames submission.
 - **Scope:** Implement in this order: (a) Signal Power resource model + UI; (b) gem currency + persistence; (c) Starter Pack offer triggered after first sector clear; (d) daily-login streak modal with claim animation; (e) gem shop in MainMenu.
 - **Decision required:** Ship CrazyGames first, add this for v1.1 standalone — **OR** delay launch by ~10 days for full monetisation parity. Default recommendation: ship CrazyGames first.
 
-### 2.2 Leaderboards (endless wave reached, fastest sector clear)
+### 2.2 Leaderboards (endless wave reached, fastest sector clear) ✅ DONE
 - **Why:** Endless mode now has real depth (§6 done) but no compare-against-others hook. Leaderboards triple endless retention in this genre.
 - **Scope:** Use the CrazyGames leaderboard API. Two boards: "Endless wave reached" and "Fastest Sector 7 clear (seconds)". Surface top-10 on Main Menu and at Game Over.
+- **Implemented:** `src/systems/LeaderboardSystem.ts` — `submit()` + `getTop10()`, gated on `ConsentSystem.cloudSaveAllowed`. Scores submitted from `Game.onGameOver()` (endless) and `Game.onVictory()` (Sector 7). Top-10 panel rendered in `MainMenu` and `GameOverScreen`. **Dashboard action required:** create leaderboards "endless_wave" (descending) and "sector7_time" (ascending) in the CrazyGames dev portal.
 
-### 2.3 Localisation scaffolding
+### 2.3 Localisation scaffolding ⏭️ DEFERRED — v1.1
 - **Why:** CrazyGames audience is ~70% non-English. Ship English at launch, but having the strings extractable means PT-BR/ES/DE can ship in v1.1 without a refactor.
 - **Scope:** Move all user-facing strings into `src/data/i18n/en.ts` keyed by id. Add a `t(id)` helper. Ship English only; future agents can add languages.
 

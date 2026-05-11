@@ -1,6 +1,7 @@
 import type { Game } from "../core/Game";
 import { el, clear } from "./dom";
 import { sectorObjectives } from "../data/objectives";
+import { BOARD_ENDLESS_WAVE } from "../systems/LeaderboardSystem";
 
 function runGrade(g: Game): string {
   const s = g.core.stats;
@@ -190,6 +191,30 @@ export class GameOverScreen {
       this.el.append(el("div", { class: "ls-stats", html: statsSummary(this.game) }));
       const objs = objectivesSummary(this.game, false);
       if (objs) this.el.append(objs);
+      // Endless leaderboard — show top-10 after an endless run ends.
+      if (this.game.endless.active && this.game.endless.wave > 0 && this.game.leaderboard.isAvailable) {
+        const lbPanel = el("div", { class: "ls-leaderboard-panel" });
+        lbPanel.append(el("div", { class: "ls-leaderboard-title", text: "ENDLESS LEADERBOARD" }));
+        const lbList = el("div", { class: "ls-leaderboard-list", text: "Fetching…" });
+        lbPanel.append(lbList);
+        this.el.append(lbPanel);
+        void this.game.leaderboard.getTop10(BOARD_ENDLESS_WAVE).then((entries) => {
+          if (entries.length === 0) {
+            lbList.textContent = "No scores yet.";
+            return;
+          }
+          lbList.textContent = "";
+          for (const e of entries) {
+            lbList.append(
+              el("div", { class: "ls-leaderboard-row", html:
+                `<span class="ls-lb-rank">#${e.rank}</span>` +
+                `<span class="ls-lb-name">${e.name}</span>` +
+                `<span class="ls-lb-score">${e.score} waves</span>`,
+              }),
+            );
+          }
+        });
+      }
       const row = el("div", { class: "ls-overlay-actions" });
       const retry = el("button", {
         class: "ls-btn ls-btn-primary",

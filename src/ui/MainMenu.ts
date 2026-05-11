@@ -2,6 +2,7 @@ import type { Game } from "../core/Game";
 import type { RunJournalEntry } from "../core/Types";
 import { achievementDefinitions } from "../data/achievements";
 import { el, clear } from "./dom";
+import { BOARD_ENDLESS_WAVE } from "../systems/LeaderboardSystem";
 import privacyText from "../../PRIVACY.md?raw";
 import termsText from "../../TERMS.md?raw";
 import thirdPartyText from "../../THIRD_PARTY.md?raw";
@@ -179,6 +180,31 @@ export class MainMenu {
       }));
     }
     this.el.append(medals);
+
+    // Endless leaderboard panel — shown only when the CrazyGames SDK is available.
+    if (this.game.leaderboard.isAvailable) {
+      const lbPanel = el("div", { class: "ls-leaderboard-panel" });
+      lbPanel.append(el("div", { class: "ls-leaderboard-title", text: "ENDLESS · TOP 10" }));
+      const lbList = el("div", { class: "ls-leaderboard-list", text: "Fetching…" });
+      lbPanel.append(lbList);
+      this.el.append(lbPanel);
+      void this.game.leaderboard.getTop10(BOARD_ENDLESS_WAVE).then((entries) => {
+        if (entries.length === 0) {
+          lbList.textContent = "No scores recorded yet.";
+          return;
+        }
+        lbList.textContent = "";
+        for (const e of entries) {
+          lbList.append(
+            el("div", { class: "ls-leaderboard-row", html:
+              `<span class="ls-lb-rank">#${e.rank}</span>` +
+              `<span class="ls-lb-name">${e.name}</span>` +
+              `<span class="ls-lb-score">${e.score} waves</span>`,
+            }),
+          );
+        }
+      });
+    }
 
     const actions = el("div", { class: "ls-actions" });
     const startBtn = el("button", {

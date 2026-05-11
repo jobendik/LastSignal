@@ -59,6 +59,7 @@ import { StrategicPointSystem } from "../systems/StrategicPointSystem";
 import { MobileSquadSystem } from "../systems/MobileSquadSystem";
 import { GuidanceSystem } from "../systems/GuidanceSystem";
 import { AdsSystem } from "../systems/AdsSystem";
+import { LeaderboardSystem, BOARD_ENDLESS_WAVE, BOARD_S7_TIME } from "../systems/LeaderboardSystem";
 import { CloudSaveSystem } from "../systems/CloudSaveSystem";
 import { ConsentSystem } from "../systems/ConsentSystem";
 
@@ -108,6 +109,7 @@ export class Game {
   squads!: MobileSquadSystem;
   guidance!: GuidanceSystem;
   ads = new AdsSystem();
+  leaderboard = new LeaderboardSystem();
   render!: RenderSystem;
   input!: InputSystem;
   ui!: UIManager;
@@ -829,6 +831,10 @@ export class Game {
     this.audio.sfxLose();
     this.bus.emit("game:over");
     this.commitProfile();
+    // Submit endless score after commitProfile so local best is already saved.
+    if (this.endless.active && this.endless.wave > 0) {
+      void this.leaderboard.submit(BOARD_ENDLESS_WAVE, this.endless.wave);
+    }
   }
 
   onVictory(): void {
@@ -840,6 +846,14 @@ export class Game {
     this.bus.emit("game:victory");
     this.awardResearchOnClear();
     this.commitProfile();
+    // Submit Sector 7 speed-run time after commitProfile.
+    if (this.core.sector?.id === "sector_07_blackout_array") {
+      const durationSec = Math.max(
+        1,
+        Math.round((Date.now() - this.core.stats.startedAt) / 1000),
+      );
+      void this.leaderboard.submit(BOARD_S7_TIME, durationSec);
+    }
   }
 
   private awardResearchOnClear(): void {
