@@ -13,12 +13,17 @@ import { el, clear } from "./dom";
 export class SectorSelect {
   el: HTMLElement;
   private endlessRequested = false;
+  private mode: "sectors" | "loadout" = "sectors";
 
   constructor(private readonly game: Game) {
-    this.el = el("div", { class: "ls-panel ls-sector-select" });
+    this.el = el("div", {
+      class: "ls-panel ls-sector-select",
+      attrs: { role: "region", "aria-label": "Sector select" },
+    });
   }
 
   refresh(): void {
+    this.mode = "sectors";
     clear(this.el);
     this.el.append(
       el("div", { class: "ls-title", text: "Select Sector" }),
@@ -65,7 +70,10 @@ export class SectorSelect {
         lockReason = `Locked — clear Sector ${sectorIndex - 1} first.`;
       }
       const isCleared = sectorIndex <= bestCleared;
-      const card = el("button", { class: "ls-sector-card" });
+      const card = el("button", {
+        class: "ls-sector-card",
+        attrs: { "aria-label": `${s.name}: ${isLocked ? lockReason : "Select sector"}` },
+      });
       if (isLocked) card.classList.add("ls-sector-locked");
       if (isCleared) card.classList.add("ls-sector-cleared");
       card.style.borderColor = isLocked ? "#3a3a3a" : s.accentColor;
@@ -141,6 +149,7 @@ export class SectorSelect {
       const toggle = el("button", {
         class: "ls-btn ls-btn-endless",
         text: this.endlessRequested ? "ENDLESS: ON" : "ENDLESS: OFF",
+        attrs: { "aria-label": "Toggle endless mode" },
       });
       toggle.onclick = () => {
         this.endlessRequested = !this.endlessRequested;
@@ -158,10 +167,13 @@ export class SectorSelect {
 
     const buttons = el("div", { class: "ls-sector-buttons" });
     const back = el("button", { class: "ls-btn ls-btn-ghost", text: "← Back" });
+    back.setAttribute("aria-label", "Back to main menu");
     back.onclick = () => this.game.setState("MAIN_MENU");
     const research = el("button", { class: "ls-btn", text: "RESEARCH" });
+    research.setAttribute("aria-label", "Open research");
     research.onclick = () => this.game.ui.openMeta();
     const codex = el("button", { class: "ls-btn ls-btn-ghost", text: "FIELD MANUAL (H)" });
+    codex.setAttribute("aria-label", "Open field manual");
     codex.title = "Open the codex to read up on systems before launching.";
     codex.onclick = () => this.game.ui.openCodex();
     buttons.append(back, codex, research);
@@ -169,6 +181,7 @@ export class SectorSelect {
   }
 
   private showLoadoutPicker(sector: SectorDefinition): void {
+    this.mode = "loadout";
     clear(this.el);
 
     this.el.append(
@@ -183,6 +196,7 @@ export class SectorSelect {
     this.el.append(grid);
 
     const backBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "← Back to Sectors" });
+    backBtn.setAttribute("aria-label", "Back to sectors");
     backBtn.onclick = () => this.refresh();
     const wrap = el("div", { class: "ls-sector-buttons" });
     wrap.append(backBtn);
@@ -190,7 +204,10 @@ export class SectorSelect {
   }
 
   private buildLoadoutCard(loadout: LoadoutDefinition, sector: SectorDefinition): HTMLElement {
-    const card = el("button", { class: "ls-loadout-card" });
+    const card = el("button", {
+      class: "ls-loadout-card",
+      attrs: { "aria-label": `Select ${loadout.name} loadout for ${sector.name}` },
+    });
     card.style.setProperty("--loadout-color", loadout.accentColor);
     card.style.borderColor = loadout.accentColor;
 
@@ -240,6 +257,7 @@ export class SectorSelect {
     const startBtn = el("button", {
       class: "ls-btn ls-btn-primary",
       text: completed ? "REPLAY TRAINING" : "START TRAINING",
+      attrs: { "aria-label": completed ? "Replay training" : "Start training" },
     });
     startBtn.title =
       "Launch the optional training simulation. Eight short drills. No campaign progress required.";
@@ -251,6 +269,7 @@ export class SectorSelect {
       this.game.beginSector(trainingSector, { endless: false });
     };
     const codexBtn = el("button", { class: "ls-btn ls-btn-ghost", text: "FIELD MANUAL (H)" });
+    codexBtn.setAttribute("aria-label", "Open field manual");
     codexBtn.title = "Open the codex for system reference before starting.";
     codexBtn.onclick = () => this.game.ui.openCodex();
     actions.append(startBtn, codexBtn);
@@ -293,6 +312,7 @@ export class SectorSelect {
     for (const id of difficultyOrder) {
       const def = difficultyDefinitions[id];
       const btn = el("button", { class: "ls-diff-chip" });
+      btn.setAttribute("aria-label", `Select ${def.name} difficulty`);
       btn.style.borderColor = def.accentColor;
       if (id === current) btn.classList.add("active");
       btn.append(
@@ -307,6 +327,15 @@ export class SectorSelect {
     }
     wrap.append(row);
     return wrap;
+  }
+
+  onEscape(): boolean {
+    if (this.mode === "loadout") {
+      this.refresh();
+      return true;
+    }
+    this.game.setState("MAIN_MENU");
+    return true;
   }
 }
 

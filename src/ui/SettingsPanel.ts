@@ -7,9 +7,19 @@ import { el, clear } from "./dom";
 export class SettingsPanel {
   el: HTMLElement;
   constructor(private readonly game: Game) {
-    this.el = el("div", { class: "ls-overlay ls-settings" });
+    this.el = el("div", {
+      class: "ls-overlay ls-settings",
+      attrs: { role: "dialog", "aria-label": "Settings", "aria-modal": "true" },
+    });
+    this.el.addEventListener("keydown", (e) => this.onKeyDown(e));
     this.game.bus.on("consent:changed", () => this.build());
     this.build();
+  }
+
+  focusFirst(): void {
+    window.requestAnimationFrame(() => {
+      this.focusableElements()[0]?.focus();
+    });
   }
 
   private build(): void {
@@ -24,8 +34,23 @@ export class SettingsPanel {
       this.sliderRow("SFX Volume", "sfxVolume", s.sfxVolume),
       this.sliderRow("UI Volume", "uiVolume", s.uiVolume),
       this.checkboxRow("Mute All", "muted", s.muted),
+    );
+
+    form.append(el("div", { class: "ls-form-section", text: "ACCESSIBILITY" }));
+    form.append(
+      this.selectRow("Palette", "palette", s.palette, [
+        ["default", "Default"],
+        ["deuteranopia", "Deuteranopia"],
+        ["protanopia", "Protanopia"],
+        ["highContrast", "High Contrast"],
+      ]),
+      this.uiScaleRow(s.uiScale),
+      this.checkboxRow("Reduce Motion", "reduceMotion", s.reduceMotion || s.reducedMotion),
+      this.checkboxRow("Keyboard Navigation", "keyboardNav", s.keyboardNav)
+    );
+
+    form.append(
       this.checkboxRow("Screen Shake", "screenShake", s.screenShake),
-      this.checkboxRow("Reduced Motion", "reducedMotion", s.reducedMotion),
       this.checkboxRow("Reduced Flashing", "reducedFlashing", s.reducedFlashing),
       this.checkboxRow("Show Damage Numbers", "showDamageNumbers", s.showDamageNumbers),
       this.checkboxRow("Subtitles", "subtitles", s.subtitles),
@@ -83,7 +108,11 @@ export class SettingsPanel {
     );
     const replayRow = el("div", { class: "ls-form-row" });
     replayRow.append(el("span", { class: "ls-form-label", text: "Replay Tutorials" }));
-    const replayBtn = el("button", { class: "ls-btn ls-keybind-btn", text: "RESET" });
+    const replayBtn = el("button", {
+      class: "ls-btn ls-keybind-btn",
+      text: "RESET",
+      attrs: { "aria-label": "Reset tutorial guidance" },
+    });
     replayBtn.title =
       "Forget seen tutorials and mechanic banners so they show again next sector.";
     replayBtn.onclick = () => {
@@ -100,10 +129,44 @@ export class SettingsPanel {
     }
     this.el.append(form);
     const row = el("div", { class: "ls-overlay-actions" });
-    const close = el("button", { class: "ls-btn ls-btn-primary", text: "Close" });
+    const close = el("button", {
+      class: "ls-btn ls-btn-primary",
+      text: "Close",
+      attrs: { "aria-label": "Close settings" },
+    });
     close.onclick = () => this.game.ui.closeSettings();
     row.append(close);
     this.el.append(row);
+  }
+
+  private onKeyDown(e: KeyboardEvent): void {
+    if (!this.el.classList.contains("visible")) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      this.game.ui.closeSettings();
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const focusable = this.focusableElements();
+    if (focusable.length === 0) return;
+    const current = document.activeElement as HTMLElement | null;
+    const idx = current ? focusable.indexOf(current) : -1;
+    const nextIdx = e.shiftKey
+      ? (idx <= 0 ? focusable.length - 1 : idx - 1)
+      : (idx === -1 || idx >= focusable.length - 1 ? 0 : idx + 1);
+    e.preventDefault();
+    focusable[nextIdx]?.focus();
+  }
+
+  private focusableElements(): HTMLElement[] {
+    return Array.from(
+      this.el.querySelectorAll<HTMLElement>(
+        "button, input, select, textarea, [href], [tabindex]:not([tabindex='-1'])"
+      )
+    ).filter((node) => {
+      const disabled = "disabled" in node && Boolean((node as HTMLButtonElement | HTMLInputElement).disabled);
+      return !disabled && node.offsetParent !== null;
+    });
   }
 
   private sliderRow(label: string, key: keyof GameSettings, value: number): HTMLElement {
@@ -191,6 +254,23 @@ export class SettingsPanel {
     return row;
   }
 
+  private uiScaleRow(value: number): HTMLElement {
+    const row = el("label", { class: "ls-form-row" });
+    row.append(el("span", { class: "ls-form-label", text: "UI Scale" }));
+    const input = el("input", {
+      attrs: { type: "range", min: "0.8", max: "1.4", step: "0.05", "aria-label": "UI scale" },
+    }) as HTMLInputElement;
+    input.value = String(value);
+    const valEl = el("span", { class: "ls-form-value", text: `${Math.round(value * 100)}%` });
+    input.oninput = () => {
+      const v = parseFloat(input.value);
+      valEl.textContent = `${Math.round(v * 100)}%`;
+      this.game.settings.update({ uiScale: v });
+    };
+    row.append(input, valEl);
+    return row;
+  }
+
   private privacyRow(): HTMLElement {
     const row = el("div", { class: "ls-form-row ls-privacy-row" });
     row.append(el("span", { class: "ls-form-label", text: "Privacy & data" }));
@@ -198,7 +278,11 @@ export class SettingsPanel {
       class: "ls-form-value ls-consent-state",
       text: this.consentSummary(),
     });
-    const btn = el("button", { class: "ls-btn ls-keybind-btn", text: "OPEN" });
+    const btn = el("button", {
+      class: "ls-btn ls-keybind-btn",
+      text: "OPEN",
+      attrs: { "aria-label": "Open privacy and data settings" },
+    });
     btn.onclick = async () => {
       await ConsentModal.open(this.game.uiRoot, { force: true });
       this.build();
@@ -218,7 +302,11 @@ export class SettingsPanel {
   private keybindRow(action: string, code: string): HTMLElement {
     const row = el("div", { class: "ls-form-row" });
     row.append(el("span", { class: "ls-form-label", text: this.labelForAction(action) }));
-    const btn = el("button", { class: "ls-btn ls-keybind-btn", text: this.prettyCode(code) });
+    const btn = el("button", {
+      class: "ls-btn ls-keybind-btn",
+      text: this.prettyCode(code),
+      attrs: { "aria-label": `Rebind ${this.labelForAction(action)}` },
+    });
     btn.onclick = () => {
       btn.textContent = "PRESS KEY";
       const handler = (ev: KeyboardEvent) => {

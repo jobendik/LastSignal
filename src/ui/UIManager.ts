@@ -124,6 +124,7 @@ export class UIManager {
     this.game.bus.on<{ prev: string; next: string }>("state:changed", (p) => this.onState(p));
     this.game.bus.on("ui:mainMenuConfirm", () => this.game.setState("SECTOR_SELECT"));
     this.game.bus.on("ui:toggleWavePreview", () => this.wavePreview.toggle());
+    this.game.bus.on("ui:esc", () => this.onEscape());
     this.onState({ prev: "BOOT", next: this.game.state });
   }
 
@@ -157,6 +158,7 @@ export class UIManager {
         this.hud.el.classList.add("visible");
         this.buildMenu.el.classList.add("visible");
         this.pauseMenu.el.classList.add("visible");
+        this.pauseMenu.focusFirst();
         break;
       case "REWARD_CHOICE":
         this.hud.el.classList.add("visible");
@@ -181,6 +183,7 @@ export class UIManager {
 
   openSettings(): void {
     this.settingsPanel.el.classList.add("visible");
+    this.settingsPanel.focusFirst();
     this.game.audio.sfxPanel(true);
   }
   closeSettings(): void {
@@ -224,6 +227,28 @@ export class UIManager {
   closeMeta(): void {
     this.metaPanel.el.classList.remove("visible");
     this.game.audio.sfxPanel(false);
+  }
+
+  private onEscape(): void {
+    if (this.settingsPanel.el.classList.contains("visible")) {
+      this.closeSettings();
+      return;
+    }
+    if (this.codexPanel.el.classList.contains("visible")) {
+      this.closeCodex();
+      return;
+    }
+    if (this.metaPanel.el.classList.contains("visible")) {
+      this.closeMeta();
+      return;
+    }
+    if (this.game.state === "PAUSED") {
+      this.game.togglePause();
+      return;
+    }
+    if (this.game.state === "SECTOR_SELECT") {
+      if (!this.sectorSelect.onEscape()) this.game.setState("MAIN_MENU");
+    }
   }
 
   private createCodexPanelHandle(): CodexPanelHandle {

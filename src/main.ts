@@ -148,6 +148,19 @@ function unlockAudio(): void {
 window.addEventListener("pointerdown", unlockAudio);
 window.addEventListener("keydown", unlockAudio);
 
+function keyboardNavEnabled(): boolean {
+  return game?.core.settings.keyboardNav !== false;
+}
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Tab" && keyboardNavEnabled()) {
+    document.body.classList.add("ls-kbd");
+  }
+});
+window.addEventListener("mousemove", () => {
+  document.body.classList.remove("ls-kbd");
+});
+
 // Expose game instance in dev for debugging.
 declare global { interface Window { __game?: Game } }
 

@@ -632,6 +632,7 @@ export class InputSystem {
   }
 
   private onKey(e: KeyboardEvent): void {
+    if (e.defaultPrevented || this.shouldLetDomHandleKey(e)) return;
     const code = e.code;
     const bindings = this.game.core.settings.keyBindings;
     const isBound = (action: string) => code === bindings[action];
@@ -713,7 +714,6 @@ export class InputSystem {
         // can dismiss the Codex without also nuking their tower selection.
         if (this.isHelpOpen()) {
           this.game.ui.closeCodex();
-          this.game.bus.emit("ui:esc");
           break;
         }
         this.clearSelection();
@@ -800,6 +800,25 @@ export class InputSystem {
         }
         break;
     }
+  }
+
+  private shouldLetDomHandleKey(e: KeyboardEvent): boolean {
+    if (e.code === "Tab" && this.isMenuOrOverlayActive()) return true;
+    if (e.code === "Escape") return false;
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    return Boolean(target?.closest("button,input,select,textarea,a,[role='button'],[contenteditable='true']"));
+  }
+
+  private isMenuOrOverlayActive(): boolean {
+    if (this.game.state === "MAIN_MENU" || this.game.state === "SECTOR_SELECT" || this.game.state === "PAUSED") {
+      return true;
+    }
+    const ui = this.game.ui;
+    return Boolean(
+      ui?.settingsPanel.el.classList.contains("visible") ||
+      ui?.codexPanel.el.classList.contains("visible") ||
+      ui?.metaPanel.el.classList.contains("visible")
+    );
   }
 
   private onSpace(): void {

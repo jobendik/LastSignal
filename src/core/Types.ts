@@ -539,6 +539,12 @@ export interface CodexEntry {
 }
 
 // ---------- Settings / stats ----------
+export type AccessibilityPalette =
+  | "default"
+  | "deuteranopia"
+  | "protanopia"
+  | "highContrast";
+
 export interface GameSettings {
   masterVolume: number;
   musicVolume: number;
@@ -546,6 +552,9 @@ export interface GameSettings {
   uiVolume: number;
   muted: boolean;
   screenShake: boolean;
+  /** Canonical accessibility reduce-motion flag. */
+  reduceMotion: boolean;
+  /** Legacy alias kept for older saves and call sites. Mirrors reduceMotion. */
   reducedMotion: boolean;
   reducedFlashing: boolean;
   showDamageNumbers: boolean;
@@ -554,6 +563,9 @@ export interface GameSettings {
   colorblind: boolean;
   highContrast: boolean;
   fontScale: number;
+  palette: AccessibilityPalette;
+  uiScale: number;
+  keyboardNav: boolean;
   graphicsQuality: "low" | "medium" | "high" | "custom";
   /** Individual VFX toggles. Per-effect overrides; default values match the
    *  graphicsQuality preset selected at first run, but the player can disable

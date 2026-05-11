@@ -1,5 +1,6 @@
 import type { Game } from "../core/Game";
 import type { GameSettings } from "../core/Types";
+import { setActivePalette } from "../data/accessibilityPalettes";
 
 /** VFX flag tuple; each preset toggles all of these in lockstep. */
 type VfxFlags = Pick<
@@ -53,6 +54,20 @@ const VFX_PRESETS: Record<"low" | "medium" | "high", VfxFlags> = {
   },
 };
 
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function isPalette(value: unknown): value is GameSettings["palette"] {
+  return (
+    value === "default" ||
+    value === "deuteranopia" ||
+    value === "protanopia" ||
+    value === "highContrast"
+  );
+}
+
 export class SettingsSystem {
   constructor(private readonly game: Game) {}
 
@@ -62,6 +77,21 @@ export class SettingsSystem {
 
   update(patch: Partial<GameSettings>): void {
     let s = { ...this.game.core.settings, ...patch };
+    if ("reduceMotion" in patch || "reducedMotion" in patch) {
+      const reduceMotion = patch.reduceMotion ?? patch.reducedMotion ?? false;
+      s.reduceMotion = reduceMotion;
+      s.reducedMotion = reduceMotion;
+    }
+    if ("uiScale" in patch) {
+      const uiScale = Number(s.uiScale);
+      s.uiScale = Number.isFinite(uiScale) ? clamp(uiScale, 0.8, 1.4) : 1;
+    }
+    if ("palette" in patch && !isPalette(s.palette)) {
+      s.palette = "default";
+    }
+    if ("keyboardNav" in patch) {
+      s.keyboardNav = s.keyboardNav !== false;
+    }
     // Apply preset when graphicsQuality changes (unless caller already set custom flags).
     if ("graphicsQuality" in patch && patch.graphicsQuality && patch.graphicsQuality !== "custom") {
       const preset = VFX_PRESETS[patch.graphicsQuality];
@@ -90,10 +120,13 @@ export class SettingsSystem {
   }
 
   applyVisualSettings(s: GameSettings = this.game.core.settings): void {
+    setActivePalette(s.palette);
+    document.documentElement.style.setProperty("--ls-ui-scale", String(s.uiScale));
     const root = this.game.uiRoot;
     root.style.setProperty("--ls-font-scale", String(s.fontScale));
+    root.style.setProperty("--ls-ui-scale", String(s.uiScale));
     root.classList.toggle("ls-high-contrast", s.highContrast);
-    root.classList.toggle("ls-reduced-motion", s.reducedMotion);
+    root.classList.toggle("ls-reduced-motion", s.reduceMotion || s.reducedMotion);
     // Treat "custom" as low for the global CSS dim/disable hooks (those are
     // mostly for animation-cost reductions; the renderer reads VFX flags
     // directly for fine-grained control).
@@ -103,5 +136,7 @@ export class SettingsSystem {
     root.classList.toggle("ls-quality-custom", s.graphicsQuality === "custom");
     // Body-level toggle for the global CSS scanlines overlay (main.css).
     document.body.classList.toggle("ls-no-scanlines", !s.vfxScanlines);
+    document.body.classList.toggle("ls-keyboard-nav", s.keyboardNav);
+    if (!s.keyboardNav) document.body.classList.remove("ls-kbd");
   }
 }

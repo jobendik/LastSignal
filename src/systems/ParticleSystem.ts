@@ -4,6 +4,7 @@ import { FloatingText } from "../entities/FloatingText";
 import { DamageZone } from "../entities/DamageZone";
 import { FLOATING_TEXT_CAP, PARTICLE_CAP } from "../core/Config";
 import { rnd } from "../core/Random";
+import { paletteColor, paletteIdForColor } from "../data/accessibilityPalettes";
 
 export interface LightningFX {
   points: { x: number; y: number }[];
@@ -30,6 +31,7 @@ export interface BeamFX {
   toX: number;
   toY: number;
   color: string;
+  paletteId?: string;
   life: number;
   maxLife: number;
   active: boolean;
@@ -107,7 +109,7 @@ export class ParticleSystem {
   }
 
   spawnCreditOrbs(x: number, y: number, count = 2): void {
-    if (this.game.core.settings.reducedMotion) return;
+    if (this.reduceMotionEnabled()) return;
     for (let i = 0; i < count; i++) {
       const angle = -Math.PI / 2 + (i - (count - 1) / 2) * 0.55;
       const speed = rnd(50, 80);
@@ -135,7 +137,7 @@ export class ParticleSystem {
     opts: { speed?: number; life?: number; size?: number; gravity?: number; angle?: number } = {}
   ): void {
     if (this.particles.length > PARTICLE_CAP) return;
-    const finalCount = Math.max(1, Math.ceil(count * this.effectBudgetFactor()));
+    const finalCount = this.particleCount(count);
     for (let i = 0; i < finalCount; i++) {
       if (this.particles.length >= PARTICLE_CAP) break;
       this.particles.push(this.acquireParticle(x, y, color, {
@@ -200,7 +202,7 @@ export class ParticleSystem {
     y2: number,
     color: string,
     life = 0.18,
-    opts: { kind?: "standard" | "railgun"; width?: number } = {}
+    opts: { kind?: "standard" | "railgun"; width?: number; paletteId?: string } = {}
   ): void {
     this.beams.push({
       fromX: x1,
@@ -208,6 +210,7 @@ export class ParticleSystem {
       toX: x2,
       toY: y2,
       color,
+      paletteId: opts.paletteId ?? paletteIdForColor(color),
       life,
       maxLife: life,
       active: true,
@@ -218,8 +221,12 @@ export class ParticleSystem {
 
   spawnImpactBurst(x: number, y: number, angle: number, color: string, intensity = 1): void {
     if (this.particles.length > PARTICLE_CAP) return;
-    const reduced = this.game.core.settings.reducedFlashing || this.game.core.settings.reducedMotion;
-    const count = reduced ? 2 : Math.max(3, Math.round(5 * intensity * this.effectBudgetFactor()));
+    const reduced = this.game.core.settings.reducedFlashing || this.reduceMotionEnabled();
+    const count = this.reduceMotionEnabled()
+      ? this.particleCount(5 * intensity)
+      : reduced
+      ? 2
+      : Math.max(3, Math.round(5 * intensity * this.effectBudgetFactor()));
     const palette = [color, "#ffffff", "#ffeb3b"];
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= PARTICLE_CAP) break;
@@ -236,14 +243,18 @@ export class ParticleSystem {
   }
 
   spawnMortarExplosion(x: number, y: number, radius: number, color: string): void {
-    const reduced = this.game.core.settings.reducedFlashing || this.game.core.settings.reducedMotion;
+    const reduced = this.game.core.settings.reducedFlashing || this.reduceMotionEnabled();
     this.spawnRing(x, y, radius * 0.55, "#ffffff", reduced ? 0.18 : 0.14);
     if (!reduced) {
       this.spawnRing(x, y, radius * 0.9, color, 0.26);
       this.spawnRing(x, y, radius * 1.18, "#ffb300", 0.4);
     }
 
-    const count = reduced ? 6 : Math.ceil(18 * this.effectBudgetFactor());
+    const count = this.reduceMotionEnabled()
+      ? this.particleCount(18)
+      : reduced
+      ? 6
+      : Math.ceil(18 * this.effectBudgetFactor());
     const palette = [color, "#ffb300", "#6d4c41", "#ffffff"];
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= PARTICLE_CAP) break;
@@ -270,7 +281,7 @@ export class ParticleSystem {
 
   spawnInwardBurst(x: number, y: number, color: string, count = 10, radius = 18): void {
     if (this.particles.length > PARTICLE_CAP) return;
-    const finalCount = Math.max(2, Math.ceil(count * this.effectBudgetFactor()));
+    const finalCount = this.particleCount(count);
     for (let i = 0; i < finalCount; i++) {
       if (this.particles.length >= PARTICLE_CAP) break;
       const angle = (i / count) * Math.PI * 2 + rnd(-0.18, 0.18);
@@ -286,13 +297,26 @@ export class ParticleSystem {
   }
 
   spawnScreenFlash(color = "#ffffff", life = 0.28, alpha = 0.65): void {
-    const reduce = this.game.core.settings.reducedFlashing || this.game.core.settings.reducedMotion;
+    const reduce = this.game.core.settings.reducedFlashing || this.reduceMotionEnabled();
     const finalAlpha = reduce ? Math.min(alpha, 0.12) : alpha;
     this.screenFlashes.push({ color, alpha: finalAlpha, life, maxLife: life, active: true });
   }
 
+  private reduceMotionEnabled(): boolean {
+    const s = this.game.core.settings;
+    return s.reduceMotion || s.reducedMotion;
+  }
+
+  private particleCount(count: number): number {
+    const factor = this.effectBudgetFactor();
+    const scaled = this.reduceMotionEnabled()
+      ? Math.floor(count * factor)
+      : Math.ceil(count * factor);
+    return Math.max(1, scaled);
+  }
+
   private effectBudgetFactor(): number {
-    if (this.game.core.settings.reducedMotion) return 0.35;
+    if (this.reduceMotionEnabled()) return 0.25;
     // Honour the explicit user-facing density slider first.
     const density = this.game.core.settings.vfxParticleDensity;
     if (density != null) return Math.max(0.15, Math.min(1, density));
@@ -352,14 +376,14 @@ export class ParticleSystem {
   spawnFlameJet(x: number, y: number, angle: number, range: number, coneHalf: number): void {
     if (this.particles.length > PARTICLE_CAP) return;
     const flameColors = ["#ff6e40", "#ff9100", "#ffb300", "#ff3d00", "#ff6e40"];
-    const count = 7;
+    const count = this.particleCount(7);
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= PARTICLE_CAP) break;
       const spread = rnd(-coneHalf, coneHalf);
       const a = angle + spread;
       const speed = rnd(range * 0.6, range * 1.1);
       const life = rnd(0.06, 0.13);
-      const color = flameColors[Math.floor(Math.random() * flameColors.length)]!;
+      const color = paletteColor("flamer", flameColors[Math.floor(Math.random() * flameColors.length)]!);
       const p = new Particle(x, y, color, { angle: a, speed, life, size: rnd(3, 6) });
       p.gravity = 20;
       this.particles.push(p);

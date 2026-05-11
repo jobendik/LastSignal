@@ -9,6 +9,7 @@ import { ABANDONED_TURRET_RANGE, HARDENED_RELAY_SIGNAL_RADIUS_CELLS, TILE_SIZE, 
 import { towerDefinitions } from "../data/towers";
 import type { TowerType, StrategicPointState, StrategicPointType } from "../core/Types";
 import type { StrategicPoint } from "../entities/StrategicPoint";
+import { paletteColor } from "../data/accessibilityPalettes";
 
 /** Canvas 2D render pipeline with ordered layers. */
 export class RenderSystem {
@@ -101,8 +102,14 @@ export class RenderSystem {
 
   render(): void {
     const ctx = this.game.ctx;
-    const quality = this.game.core.settings.graphicsQuality;
-    const reducedMotion = this.game.core.settings.reducedMotion;
+    const settings = this.game.core.settings;
+    const quality = settings.graphicsQuality;
+    const reducedMotion = settings.reduceMotion || settings.reducedMotion;
+    if (reducedMotion && (this.game.core.shake > 0 || this.game.core.shakeRot > 0)) {
+      this.game.core.shake = 0;
+      this.game.core.shakeRot = 0;
+      this.game.core.shakeDecay = 30;
+    }
     const dpr = this.dpr;
     const cam = this.game.camera;
     this.previousFrameCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -117,7 +124,7 @@ export class RenderSystem {
     const shake = this.game.core.shake;
     const shakeRot = this.game.core.shakeRot;
     let shakeOffX = 0, shakeOffY = 0, shakeRotVal = 0;
-    if (this.game.core.settings.screenShake && !reducedMotion && (shake > 0.01 || shakeRot > 0.001)) {
+    if (settings.screenShake && !reducedMotion && (shake > 0.01 || shakeRot > 0.001)) {
       const dir = this.game.core.shakeDir;
       const rand = (Math.random() - 0.5);
       shakeOffX = dir.x * shake * 0.6 * rand + (Math.random() - 0.5) * shake * 0.4;
@@ -130,11 +137,10 @@ export class RenderSystem {
     // sector-select screens — otherwise stale terrain/towers/enemies from
     // the previous run leak through the overlay.
     if (this.game.state === "MAIN_MENU" || this.game.state === "SECTOR_SELECT" || !this.game.core.sector) {
-      if (this.game.state === "MAIN_MENU") this.drawMainMenuAmbience(ctx);
+      if (this.game.state === "MAIN_MENU" && !reducedMotion) this.drawMainMenuAmbience(ctx);
       this.drawScreenFlashes(ctx);
       return;
     }
-    const settings = this.game.core.settings;
     const allowVfx = !settings.reducedFlashing && !reducedMotion;
     if (settings.vfxPhosphor && allowVfx) {
       this.drawPhosphorPersistence(ctx);
@@ -266,7 +272,7 @@ export class RenderSystem {
         t.pos.x,
         t.pos.y,
         28 + fireGlow * 34,
-        hexToRgb(t.def.color),
+        hexToRgb(paletteColor(t.type, t.def.color)),
         0.15 + fireGlow * 0.32
       );
     }
@@ -274,7 +280,7 @@ export class RenderSystem {
     // Projectile glow (brightest light source).
     for (const p of this.game.projectiles.list) {
       const radius = p.kind === "mortar" ? 18 : 12;
-      addLight(p.pos.x, p.pos.y, radius, hexToRgb(p.color), 0.6);
+      addLight(p.pos.x, p.pos.y, radius, hexToRgb(paletteColor(p.ownerType, p.color)), 0.6);
     }
 
     // Muzzle flash lights (brief and bright).
@@ -453,13 +459,14 @@ export class RenderSystem {
   private drawMuzzleFlashes(ctx: CanvasRenderingContext2D): void {
     for (const m of this.game.particles.muzzleFlashes) {
       const a = m.life / m.maxLife;
+      const color = paletteColor(undefined, m.color);
       ctx.save();
       ctx.translate(m.x, m.y);
       ctx.rotate(m.angle);
       ctx.globalAlpha = a;
       ctx.shadowBlur = 14;
-      ctx.shadowColor = m.color;
-      ctx.fillStyle = m.color;
+      ctx.shadowColor = color;
+      ctx.fillStyle = color;
       ctx.beginPath();
       ctx.moveTo(4, 0);
       ctx.lineTo(22 * a + 10, -5 * a);
@@ -499,7 +506,10 @@ export class RenderSystem {
     ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
 
     // Twinkling star field — color-tinted per sector.
-    const elapsed = this.game.time.elapsed;
+    const menuMotionPaused =
+      this.game.state === "MAIN_MENU" &&
+      (this.game.core.settings.reduceMotion || this.game.core.settings.reducedMotion);
+    const elapsed = menuMotionPaused ? 0 : this.game.time.elapsed;
     ctx.shadowBlur = 0;
     const starColor = `rgb(${Math.round(180 + ar * 0.25)}, ${Math.round(180 + ag * 0.25)}, ${Math.round(180 + ab * 0.25)})`;
     for (const s of this.stars) {
@@ -1667,9 +1677,10 @@ export class RenderSystem {
     ctx.globalAlpha = enemyAlpha;
 
     const frozen = e.freezeFxTimer > 0;
+    const outlineColor = paletteColor(e.type, e.color);
     const bodyColor = frozen ? "#d8fbff" : e.color;
     ctx.shadowBlur = e.isBoss ? 18 : 8;
-    ctx.shadowColor = frozen ? "#80d8ff" : e.color;
+    ctx.shadowColor = frozen ? "#80d8ff" : outlineColor;
     ctx.fillStyle = bodyColor;
 
     const lodSimple =
@@ -1679,6 +1690,9 @@ export class RenderSystem {
       ctx.beginPath();
       ctx.arc(0, 0, e.size, 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = outlineColor;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
       ctx.restore();
       return;
     }
@@ -1694,7 +1708,7 @@ export class RenderSystem {
           const tx = Math.cos(tailAngle) * tailLen;
           const ty = Math.sin(tailAngle) * tailLen;
           const grad = ctx.createLinearGradient(0, 0, tx, ty);
-          grad.addColorStop(0, e.color);
+          grad.addColorStop(0, outlineColor);
           grad.addColorStop(1, "transparent");
           ctx.save();
           ctx.globalAlpha = 0.55;
@@ -1702,7 +1716,7 @@ export class RenderSystem {
           ctx.lineWidth = e.size * 0.9;
           ctx.lineCap = "round";
           ctx.shadowBlur = 6;
-          ctx.shadowColor = e.color;
+          ctx.shadowColor = outlineColor;
           ctx.beginPath();
           ctx.moveTo(0, 0);
           ctx.lineTo(tx, ty);
@@ -1804,7 +1818,7 @@ export class RenderSystem {
           const shimR = e.size + 3 + rOff;
           ctx.save();
           ctx.globalAlpha = (e.isPhased ? 0.9 : 0.45) - ri * 0.12;
-          ctx.strokeStyle = ri === 0 ? "#ffffff" : ri === 1 ? e.color : "#b39ddb";
+          ctx.strokeStyle = ri === 0 ? "#ffffff" : ri === 1 ? outlineColor : "#b39ddb";
           ctx.lineWidth = 1.5 - ri * 0.3;
           ctx.setLineDash([4, 4]);
           ctx.lineDashOffset = phase * 8;
@@ -1851,7 +1865,7 @@ export class RenderSystem {
           const hpA = Math.max(0.25, seg.hp / seg.maxHp);
           ctx.save();
           ctx.globalAlpha = 0.35 + hpA * 0.45;
-          ctx.fillStyle = si % 2 === 0 ? e.color : "#ff8a80";
+          ctx.fillStyle = si % 2 === 0 ? outlineColor : "#ff8a80";
           ctx.shadowBlur = 10;
           ctx.shadowColor = ctx.fillStyle as string;
           ctx.beginPath();
@@ -1861,9 +1875,9 @@ export class RenderSystem {
         }
         // Multi-segment rotating rings.
         const ringData = [
-          { r: e.size * 1.85, speed: 0.7, segs: 6, gap: 0.22, color: e.color },
+          { r: e.size * 1.85, speed: 0.7, segs: 6, gap: 0.22, color: outlineColor },
           { r: e.size * 2.4, speed: -0.45, segs: 4, gap: 0.35, color: "#ffffff" },
-          { r: e.size * 3.0, speed: 0.3, segs: 8, gap: 0.18, color: e.color },
+          { r: e.size * 3.0, speed: 0.3, segs: 8, gap: 0.18, color: outlineColor },
         ];
         for (const ring of ringData) {
           ctx.save();
@@ -2063,6 +2077,17 @@ export class RenderSystem {
       }
     }
 
+    ctx.save();
+    ctx.globalAlpha = e.isBoss ? 0.92 : 0.72;
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = e.isBoss ? 2.6 : 1.4;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = outlineColor;
+    ctx.beginPath();
+    ctx.arc(0, 0, e.size + 2.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
     // Battle damage marks — persistent visual scars from specific damage types.
     if (e.burnMark) {
       ctx.save();
@@ -2197,7 +2222,7 @@ export class RenderSystem {
 
     // Slow halo.
     if (e.slowTimer > 0) {
-      ctx.strokeStyle = frozen ? "#b3f5ff" : "#9c27b0";
+      ctx.strokeStyle = frozen ? "#b3f5ff" : paletteColor("stasis", "#9c27b0");
       ctx.setLineDash([2, 3]);
       ctx.beginPath();
       ctx.arc(0, 0, e.size + 6, 0, Math.PI * 2);
@@ -2596,6 +2621,7 @@ export class RenderSystem {
 
   private drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile): void {
     ctx.save();
+    const color = paletteColor(p.ownerType, p.color);
 
     if (p.kind === "mortar") {
       // Parabolic arc: progress 0→1 over the shell's lifetime.
@@ -2621,8 +2647,8 @@ export class RenderSystem {
       // Arc-elevated shell with glow.
       ctx.globalAlpha = 1;
       ctx.shadowBlur = 14;
-      ctx.shadowColor = p.color;
-      ctx.fillStyle = p.color;
+      ctx.shadowColor = color;
+      ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(ax, ay, 5, 0, Math.PI * 2);
       ctx.fill();
@@ -2641,10 +2667,10 @@ export class RenderSystem {
       for (let i = 1; i < p.trail.length; i++) {
         const a = (i / p.trail.length) * 0.55;
         ctx.globalAlpha = a;
-        ctx.strokeStyle = p.color;
+        ctx.strokeStyle = color;
         ctx.lineWidth = 1.5;
         ctx.shadowBlur = 4;
-        ctx.shadowColor = p.color;
+        ctx.shadowColor = color;
         ctx.beginPath();
         ctx.moveTo(p.trail[i - 1]!.x, p.trail[i - 1]!.y);
         ctx.lineTo(p.trail[i]!.x, p.trail[i]!.y);
@@ -2655,14 +2681,14 @@ export class RenderSystem {
     // Head. Bullet classes get distinct silhouettes for quick readability.
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 10;
-    ctx.shadowColor = p.color;
+    ctx.shadowColor = color;
 
     if (p.ownerType === "blaster") {
       const ang = Math.atan2(p.lastDir.y, p.lastDir.x);
       ctx.save();
       ctx.translate(p.pos.x, p.pos.y);
       ctx.rotate(ang);
-      ctx.fillStyle = p.color;
+      ctx.fillStyle = color;
       ctx.fillRect(-5, -1.6, 10, 3.2);
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(2, -0.8, 4, 1.6);
@@ -2670,7 +2696,7 @@ export class RenderSystem {
     } else if (p.ownerType === "pulse") {
       const progress = p.maxLife > 0 ? 1 - p.life / p.maxLife : 0;
       const ringRadius = 3 + (progress % 0.28) * 18;
-      ctx.strokeStyle = p.color;
+      ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(p.pos.x, p.pos.y, ringRadius, 0, Math.PI * 2);
@@ -2681,7 +2707,7 @@ export class RenderSystem {
       ctx.arc(p.pos.x, p.pos.y, 1.4, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      ctx.fillStyle = p.color;
+      ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(p.pos.x, p.pos.y, 3, 0, Math.PI * 2);
       ctx.fill();
@@ -2700,13 +2726,14 @@ export class RenderSystem {
     for (const b of this.game.particles.beams) {
       ctx.save();
       const a = b.life / b.maxLife;
+      const color = paletteColor(b.paletteId, b.color);
       if (b.kind === "railgun") {
         ctx.globalCompositeOperation = "screen";
         ctx.globalAlpha = a * 0.5;
-        ctx.strokeStyle = b.color;
+        ctx.strokeStyle = color;
         ctx.lineWidth = b.width * 1.9;
         ctx.shadowBlur = 26;
-        ctx.shadowColor = b.color;
+        ctx.shadowColor = color;
         ctx.beginPath();
         ctx.moveTo(b.fromX, b.fromY);
         ctx.lineTo(b.toX, b.toY);
@@ -2722,10 +2749,10 @@ export class RenderSystem {
         ctx.lineTo(b.toX, b.toY);
         ctx.stroke();
       } else {
-        ctx.strokeStyle = b.color;
+        ctx.strokeStyle = color;
         ctx.lineWidth = 2 + a * 3;
         ctx.shadowBlur = 10;
-        ctx.shadowColor = b.color;
+        ctx.shadowColor = color;
         ctx.beginPath();
         ctx.moveTo(b.fromX, b.fromY);
         ctx.lineTo(b.toX, b.toY);
@@ -2741,14 +2768,15 @@ export class RenderSystem {
       if (Math.random() < 0.2) continue;
       const progress = l.life / l.maxLife;
       const flicker = 0.7 + Math.random() * 0.3;
+      const color = paletteColor(undefined, l.color);
       ctx.save();
       ctx.globalAlpha = progress * flicker;
 
       // Outer glow pass.
-      ctx.strokeStyle = l.color;
+      ctx.strokeStyle = color;
       ctx.lineWidth = progress * 6;
       ctx.shadowBlur = 18;
-      ctx.shadowColor = l.color;
+      ctx.shadowColor = color;
       ctx.beginPath();
       ctx.moveTo(l.points[0]!.x, l.points[0]!.y);
       for (let i = 1; i < l.points.length; i++) ctx.lineTo(l.points[i]!.x, l.points[i]!.y);
@@ -2770,8 +2798,9 @@ export class RenderSystem {
 
   private drawRings(ctx: CanvasRenderingContext2D): void {
     for (const r of this.game.particles.rings) {
+      const color = paletteColor(undefined, r.color);
       ctx.save();
-      ctx.strokeStyle = r.color;
+      ctx.strokeStyle = color;
       ctx.lineWidth = (r.life / r.maxLife) * 6;
       ctx.globalAlpha = r.life / r.maxLife;
       ctx.beginPath();

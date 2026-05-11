@@ -18,6 +18,19 @@ interface SaveProfileOptions {
   remote?: boolean;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function isPalette(value: unknown): value is GameSettings["palette"] {
+  return (
+    value === "default" ||
+    value === "deuteranopia" ||
+    value === "protanopia" ||
+    value === "highContrast"
+  );
+}
+
 export const defaultSettings: GameSettings = {
   masterVolume: 0.8,
   musicVolume: 0.25,
@@ -25,6 +38,7 @@ export const defaultSettings: GameSettings = {
   uiVolume: 0.7,
   muted: false,
   screenShake: true,
+  reduceMotion: false,
   reducedMotion: false,
   reducedFlashing: false,
   showDamageNumbers: true,
@@ -33,6 +47,9 @@ export const defaultSettings: GameSettings = {
   colorblind: false,
   highContrast: false,
   fontScale: 1,
+  palette: "default",
+  uiScale: 1,
+  keyboardNav: true,
   graphicsQuality: "high",
   // Per-effect VFX toggles. Default to the "high" preset (everything on).
   vfxScanlines: true,
@@ -129,10 +146,23 @@ export class PersistenceSystem {
       const raw = localStorage.getItem(SETTINGS_KEY);
       if (!raw) return { ...defaultSettings };
       const parsed = JSON.parse(raw) as Partial<GameSettings>;
-      return {
+      const merged = {
         ...defaultSettings,
         ...parsed,
         keyBindings: { ...defaultSettings.keyBindings, ...(parsed.keyBindings ?? {}) },
+      };
+      const reduceMotion = parsed.reduceMotion ?? parsed.reducedMotion ?? defaultSettings.reduceMotion;
+      const palette = isPalette(merged.palette) ? merged.palette : defaultSettings.palette;
+      const uiScale = typeof merged.uiScale === "number" && Number.isFinite(merged.uiScale)
+        ? clamp(merged.uiScale, 0.8, 1.4)
+        : defaultSettings.uiScale;
+      return {
+        ...merged,
+        reduceMotion,
+        reducedMotion: reduceMotion,
+        palette,
+        uiScale,
+        keyboardNav: merged.keyboardNav !== false,
       };
     } catch {
       return { ...defaultSettings };

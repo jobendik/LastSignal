@@ -65,7 +65,10 @@ function runEntryCard(entry: RunJournalEntry): HTMLElement {
 export class MainMenu {
   el: HTMLElement;
   constructor(private readonly game: Game) {
-    this.el = el("div", { class: "ls-panel ls-mainmenu" });
+    this.el = el("div", {
+      class: "ls-panel ls-mainmenu",
+      attrs: { role: "region", "aria-label": "Main menu" },
+    });
   }
   refresh(): void {
     clear(this.el);
@@ -120,25 +123,45 @@ export class MainMenu {
     this.el.append(medals);
 
     const actions = el("div", { class: "ls-actions" });
-    const startBtn = el("button", { class: "ls-btn ls-btn-primary", text: "START MISSION" });
+    const startBtn = el("button", {
+      class: "ls-btn ls-btn-primary",
+      text: "START MISSION",
+      attrs: { "aria-label": "Start mission" },
+    });
     startBtn.onclick = () => this.game.setState("SECTOR_SELECT");
     actions.append(startBtn);
 
-    const codexBtn = el("button", { class: "ls-btn", text: "FIELD MANUAL" });
+    const codexBtn = el("button", {
+      class: "ls-btn",
+      text: "FIELD MANUAL",
+      attrs: { "aria-label": "Open field manual" },
+    });
     codexBtn.title =
       "Open the field manual / codex. Reference for every system, control, and threat. (H or ?)";
     codexBtn.onclick = () => this.game.ui.openCodex();
     actions.append(codexBtn);
 
-    const researchBtn = el("button", { class: "ls-btn", text: "RESEARCH" });
+    const researchBtn = el("button", {
+      class: "ls-btn",
+      text: "RESEARCH",
+      attrs: { "aria-label": "Open research" },
+    });
     researchBtn.onclick = () => this.game.ui.openMeta();
     actions.append(researchBtn);
 
-    const dailyBtn = el("button", { class: "ls-btn", text: "DAILY" });
+    const dailyBtn = el("button", {
+      class: "ls-btn",
+      text: "DAILY",
+      attrs: { "aria-label": "Start daily challenge" },
+    });
     dailyBtn.onclick = () => this.game.startDailyChallenge();
     actions.append(dailyBtn);
 
-    const settingsBtn = el("button", { class: "ls-btn", text: "SETTINGS" });
+    const settingsBtn = el("button", {
+      class: "ls-btn",
+      text: "SETTINGS",
+      attrs: { "aria-label": "Open settings" },
+    });
     settingsBtn.onclick = () => this.game.ui.openSettings();
     actions.append(settingsBtn);
 
@@ -148,7 +171,7 @@ export class MainMenu {
       "Hotkeys: <span>1-6</span> build, <span>U</span> upgrade, <span>S</span> sell, <span>R</span> relay deploy, <span>Y</span> command tier, <span>F1-F4</span> squads, <span>E</span> retask, <span>Q</span> evac, <span>Space</span> start wave, <span>Tab</span> wave preview, <span>P</span> pause, <span>+/-</span> speed, <span>H/?</span> codex." }));
 
     // Play glitch animation on title (skip if reduce motion is on).
-    if (!this.game.core.settings.reducedMotion) {
+    if (!(this.game.core.settings.reduceMotion || this.game.core.settings.reducedMotion)) {
       window.setTimeout(() => glitchTitle(titleEl), 120);
     }
   }
