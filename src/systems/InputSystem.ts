@@ -179,7 +179,7 @@ export class InputSystem {
         // / select again.
         this.touchPanning = true;
       }
-    }, 450);
+    }, 360);
   }
 
   private onTouchMove(e: TouchEvent): void {
