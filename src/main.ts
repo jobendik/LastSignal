@@ -41,6 +41,11 @@ let game: Game | null = null;
 // Portrait phones are very tall relative to the fixed 1024x704 game view.
 // Allow mild side-cropping to reclaim gameplay height without changing render aspect.
 const MOBILE_PORTRAIT_OVERDRAW_FACTOR = 1.25;
+// Read a CSS custom property as px from <body>; fallback if unset/invalid.
+const cssPx = (name: string, fallback = 0): number => {
+  const value = Number.parseFloat(getComputedStyle(document.body).getPropertyValue(name));
+  return Number.isFinite(value) ? value : fallback;
+};
 
 // ──────────────────────────────────────────────────────────
 // Mobile / touch device detection.
@@ -87,11 +92,6 @@ document.addEventListener("gesturechange", (e) => e.preventDefault());
 // Resize canvas to fit viewport while preserving aspect ratio.
 function fit(): void {
   applyDeviceClasses();
-  // Read a CSS custom property as px from <body>; fallback if unset/invalid.
-  const cssPx = (name: string, fallback = 0): number => {
-    const value = Number.parseFloat(getComputedStyle(document.body).getPropertyValue(name));
-    return Number.isFinite(value) ? value : fallback;
-  };
   // On mobile we want the game to fill the screen edge-to-edge so the play
   // area is as large as possible. On desktop we keep a small breathing-room
   // margin around the CRT box.
@@ -116,8 +116,8 @@ function fit(): void {
   const widthScale = availW / VIEW_WIDTH;
   const heightScale = availH / VIEW_HEIGHT;
   const containScale = Math.min(widthScale, heightScale);
-  const maxPortraitOverdrawScale = widthScale * MOBILE_PORTRAIT_OVERDRAW_FACTOR;
-  const portraitScale = Math.min(heightScale, Math.max(containScale, maxPortraitOverdrawScale));
+  const widthOverdrawScale = widthScale * MOBILE_PORTRAIT_OVERDRAW_FACTOR;
+  const portraitScale = Math.max(containScale, Math.min(heightScale, widthOverdrawScale));
   const scale = isMobile && portrait
     // In portrait, allow modest side-cropping so the gameplay window isn't a tiny strip.
     ? portraitScale
