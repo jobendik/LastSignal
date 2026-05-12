@@ -43,6 +43,7 @@ export class MobileShell {
   private settingsBtn = el("button", { class: "ls-mhud-btn", text: "⚙" });
   private moreBtn = el("button", { class: "ls-mhud-btn", text: "☰" });
   private cancelModeBtn = el("button", { class: "ls-mhud-btn warning", text: "✕" });
+  private empBtn = el("button", { class: "ls-mhud-btn warning", text: "EMP" });
 
   // Bottom action bar elements.
   private speedBtn = el("button", { class: "ls-mabar-speed", text: "1×" });
@@ -141,13 +142,17 @@ export class MobileShell {
 
     this.moreBtn.title = "More commands: repair, EMP, relay, command tier, codex.";
     this.moreBtn.onclick = () => this.toggleMoreMenu();
+    this.empBtn.title = "Core EMP (combat quick action).";
+    this.empBtn.onclick = () => {
+      if (this.game.activateCoreAbility()) this.haptic([10, 30, 10]);
+    };
 
     this.settingsBtn.title = "Settings.";
     this.settingsBtn.onclick = () => this.game.ui.openSettings();
     this.cancelModeBtn.title = "Cancel current placement mode.";
     this.cancelModeBtn.onclick = () => this.cancelArmed();
 
-    btnRow.append(this.startWaveBtn, this.cancelModeBtn, this.pauseBtn, this.moreBtn, this.settingsBtn);
+    btnRow.append(this.startWaveBtn, this.empBtn, this.cancelModeBtn, this.pauseBtn, this.moreBtn, this.settingsBtn);
 
     this.mhud.append(credStat, coreStat, waveStat, this.statusEl, btnRow);
   }
@@ -698,6 +703,7 @@ export class MobileShell {
     const tick = () => {
       this.updateCreditsDisplay();
       this.refreshStartWave();
+      this.refreshEmpQuickAction();
       this.refreshStatusText();
       this.reflectModeFlags();
       this.refreshTabAlerts();
@@ -775,6 +781,17 @@ export class MobileShell {
     const isCombat = this.game.state === "WAVE_ACTIVE";
     this.mhud.classList.toggle("combat-priority", isCombat);
     this.mhud.classList.toggle("compact", window.innerWidth <= 390);
+  }
+
+  private refreshEmpQuickAction(): void {
+    const c = this.game.core;
+    const cd = c.coreAbilityCooldown;
+    const show = this.game.state === "WAVE_ACTIVE";
+    const ready = show && cd <= 0 && this.game.enemies.list.length > 0;
+    this.empBtn.classList.toggle("visible", show);
+    this.empBtn.classList.toggle("primary", ready);
+    this.empBtn.textContent = show ? (cd > 0 ? `EMP ${Math.ceil(cd)}s` : "EMP") : "EMP";
+    this.empBtn.title = ready ? "Core EMP ready." : "Core EMP on cooldown.";
   }
 
   /** Lights up dots on the build/squad tabs when something interesting is happening there. */

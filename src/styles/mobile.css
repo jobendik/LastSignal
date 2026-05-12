@@ -470,8 +470,8 @@ body.ls-mobile .ls-mabar { display: flex; }
   left: 0;
   right: 0;
   bottom: calc(var(--ls-m-bottom-h) + var(--ls-m-safe-bottom));
-  max-height: 42vh;
-  max-height: 42dvh;
+  max-height: 44vh;
+  max-height: 44dvh;
   background: var(--ls-m-bg-solid);
   border-top: 1px solid var(--ls-m-border);
   border-bottom: 1px solid var(--ls-m-border);
@@ -1065,9 +1065,19 @@ body.ls-mobile .ls-msheet { display: flex; }
 }
 .ls-mmore-group {
   margin: 8px 0 4px;
+  padding: 0 12px;
   font-size: 9px;
   letter-spacing: 1.8px;
   color: var(--ls-m-text-dim);
+}
+
+body.ls-mobile.ls-landscape .ls-mdrawer {
+  max-height: 54vh;
+  max-height: 54dvh;
+}
+body.ls-mobile.ls-portrait .ls-mdrawer {
+  max-height: 44vh;
+  max-height: 44dvh;
 }
 .ls-mmore-btn {
   display: flex;

@@ -30,6 +30,7 @@
 | Build drawer | Tap bottom build bar or swipe up |
 | Upgrade / Sell | Tap tower → action sheet slides up |
 | Start wave | Tap LAUNCH button (top bar) |
+| Core EMP | Tap EMP button (top bar, during active wave) |
 | Pause | Tap pause icon (top right) |
 | Pan camera | Drag |
 | Zoom | Pinch |
