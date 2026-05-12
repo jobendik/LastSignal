@@ -752,6 +752,8 @@ export interface RunModifier {
   towerCostMul?: number;
   /** Cooldown multiplier on towers (< 1 = shorter cooldown = faster fire). */
   towerCooldownMul?: number;
+  /** Multiplier on all tower damage output. */
+  towerDamageMul?: number;
   /** If true, harvesters produce no passive income. */
   harvestDisabled?: boolean;
   /** Multiplier applied to harvester income (stacks with upgrade aggregate). */

@@ -40,6 +40,15 @@ export class GuidanceOverlay {
   refresh(): void {
     const guide = this.game.guidance;
     if (!guide) return;
+    const isMobile = document.body.classList.contains("ls-mobile");
+    const isWaveActive = this.game.state === "WAVE_ACTIVE";
+    if (isMobile && isWaveActive) {
+      // Combat on mobile gets a single surface at a time to avoid occlusion.
+      this.renderTutorial(guide.activeTutorial);
+      this.renderBanner(guide.activeTutorial ? null : guide.activeBanner);
+      this.renderHint(guide.activeTutorial || guide.activeBanner ? null : guide.activeHint);
+      return;
+    }
     this.renderTutorial(guide.activeTutorial);
     this.renderBanner(guide.activeBanner);
     this.renderHint(guide.activeHint);

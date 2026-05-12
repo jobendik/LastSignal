@@ -103,7 +103,7 @@ body.ls-mobile {
   inset: 0;
   overscroll-behavior: none;
   touch-action: none;
-  --ls-font-scale: 1.05;
+  --ls-font-scale: 1;
 }
 
 /* Soften CRT scanline overlay on mobile so it doesn't drown small text. */
@@ -211,6 +211,17 @@ body.ls-mobile .ls-mhud { display: flex; }
   text-overflow: ellipsis;
   max-width: 130px;
 }
+.ls-mhud.compact .ls-mhud-status {
+  max-width: 92px;
+  font-size: 9px;
+}
+.ls-mhud.combat-priority .ls-mhud-credits,
+.ls-mhud.combat-priority .ls-mhud-wave {
+  opacity: 0.78;
+}
+.ls-mhud.combat-priority .ls-mhud-btn:last-child {
+  display: none;
+}
 
 /* Top-bar icon buttons (pause / more / settings). */
 .ls-mhud-btn {
@@ -238,6 +249,7 @@ body.ls-mobile .ls-mhud { display: flex; }
 }
 .ls-mhud-btn.warning { color: var(--ls-m-warning); border-color: rgba(255, 179, 0, 0.4); }
 .ls-mhud-btn.warning:active { background: rgba(255, 179, 0, 0.18); }
+.ls-mhud-btn.warning:not(.visible) { display: none; }
 .ls-mhud-btn.primary {
   color: var(--ls-m-warning);
   border-color: var(--ls-m-warning);
@@ -458,8 +470,8 @@ body.ls-mobile .ls-mabar { display: flex; }
   left: 0;
   right: 0;
   bottom: calc(var(--ls-m-bottom-h) + var(--ls-m-safe-bottom));
-  max-height: 50vh;
-  max-height: 50dvh;
+  max-height: 42vh;
+  max-height: 42dvh;
   background: var(--ls-m-bg-solid);
   border-top: 1px solid var(--ls-m-border);
   border-bottom: 1px solid var(--ls-m-border);
@@ -483,7 +495,7 @@ body.ls-mobile .ls-mdrawer { display: flex; }
 
 /* Drag handle bar at the top of the drawer. */
 .ls-mdrawer-handle {
-  height: 18px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -511,8 +523,8 @@ body.ls-mobile .ls-mdrawer { display: flex; }
 .ls-mdrawer-cats::-webkit-scrollbar { display: none; }
 .ls-mdrawer-cat {
   flex: 0 0 auto;
-  min-width: 56px;
-  height: 32px;
+  min-width: 52px;
+  height: 30px;
   padding: 0 10px;
   background: rgba(8, 12, 18, 0.7);
   border: 1px solid var(--ls-m-border-dim);
@@ -537,7 +549,7 @@ body.ls-mobile .ls-mdrawer { display: flex; }
   flex: 1 1 auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 4px 8px 12px;
+  padding: 2px 8px 10px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
@@ -562,12 +574,12 @@ body.ls-mobile .ls-mdrawer { display: flex; }
 /* Single tower / squad card. */
 .ls-mcard {
   position: relative;
-  min-height: 76px;
+  min-height: 70px;
   background: rgba(10, 14, 20, 0.85);
   border: 1px solid var(--ls-m-border-dim);
   border-left-width: 3px;
   border-radius: 2px;
-  padding: 8px 10px;
+  padding: 7px 9px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -587,7 +599,7 @@ body.ls-mobile .ls-mdrawer { display: flex; }
   box-shadow: 0 0 10px rgba(102, 252, 241, 0.35);
 }
 .ls-mcard.drone {
-  min-height: 78px;
+  min-height: 72px;
 }
 .ls-mcard.disabled {
   opacity: 0.45;
@@ -1050,6 +1062,12 @@ body.ls-mobile .ls-msheet { display: flex; }
   letter-spacing: 2px;
   padding: 8px 12px 4px;
   border-bottom: 1px solid var(--ls-m-border-dim);
+}
+.ls-mmore-group {
+  margin: 8px 0 4px;
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  color: var(--ls-m-text-dim);
 }
 .ls-mmore-btn {
   display: flex;

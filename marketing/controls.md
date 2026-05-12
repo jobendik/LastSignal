@@ -29,8 +29,8 @@
 | Place / select tower | Tap grid node |
 | Build drawer | Tap bottom build bar or swipe up |
 | Upgrade / Sell | Tap tower → action sheet slides up |
-| Start wave | Tap LAUNCH button (bottom right) |
+| Start wave | Tap LAUNCH button (top bar) |
 | Pause | Tap pause icon (top right) |
 | Pan camera | Drag |
 | Zoom | Pinch |
-| Open menu | Tap hamburger icon |
+| Open command menu | Tap hamburger icon (top bar) |

@@ -38,10 +38,11 @@ export class MobileShell {
   private coreTextEl = el("div", { class: "ls-mhud-core-text", text: "100/100" });
   private waveEl = el("span", { text: "0/0" });
   private statusEl = el("span", { class: "ls-mhud-status", text: "" });
-  private startWaveBtn = el("button", { class: "ls-mhud-start ls-mhud-btn", text: "START" });
+  private startWaveBtn = el("button", { class: "ls-mhud-start ls-mhud-btn", text: "LAUNCH" });
   private pauseBtn = el("button", { class: "ls-mhud-btn", text: "❚❚" });
   private settingsBtn = el("button", { class: "ls-mhud-btn", text: "⚙" });
-  private moreBtn = el("button", { class: "ls-mhud-btn", text: "⋯" });
+  private moreBtn = el("button", { class: "ls-mhud-btn", text: "☰" });
+  private cancelModeBtn = el("button", { class: "ls-mhud-btn warning", text: "✕" });
 
   // Bottom action bar elements.
   private speedBtn = el("button", { class: "ls-mabar-speed", text: "1×" });
@@ -143,8 +144,10 @@ export class MobileShell {
 
     this.settingsBtn.title = "Settings.";
     this.settingsBtn.onclick = () => this.game.ui.openSettings();
+    this.cancelModeBtn.title = "Cancel current placement mode.";
+    this.cancelModeBtn.onclick = () => this.cancelArmed();
 
-    btnRow.append(this.startWaveBtn, this.pauseBtn, this.moreBtn, this.settingsBtn);
+    btnRow.append(this.startWaveBtn, this.cancelModeBtn, this.pauseBtn, this.moreBtn, this.settingsBtn);
 
     this.mhud.append(credStat, coreStat, waveStat, this.statusEl, btnRow);
   }
@@ -213,6 +216,7 @@ export class MobileShell {
   private refreshMoreMenu(): void {
     clear(this.mmore);
     this.mmore.append(el("div", { class: "ls-mmore-title", text: "COMMAND" }));
+    this.mmore.append(el("div", { class: "ls-mmore-group", text: "TACTICAL" }));
 
     const game = this.game;
     const c = game.core;
@@ -299,6 +303,7 @@ export class MobileShell {
       },
     }));
 
+    this.mmore.append(el("div", { class: "ls-mmore-group", text: "STRATEGIC" }));
     // CODEX
     this.mmore.append(this.moreButton({
       label: "FIELD MANUAL",
@@ -308,14 +313,15 @@ export class MobileShell {
       onClick: () => { game.ui.openCodex(); this.closeMoreMenu(); },
     }));
 
-    // RESEARCH (only outside of an active sector context — safe to open during planning)
-    this.mmore.append(this.moreButton({
-      label: "RESEARCH",
-      sub: "Spend research points (next run)",
-      cost: `${c.profile.researchPoints} RP`,
-      enabled: true,
-      onClick: () => { game.ui.openMeta(); this.closeMoreMenu(); },
-    }));
+    if (game.state !== "WAVE_ACTIVE") {
+      this.mmore.append(this.moreButton({
+        label: "RESEARCH",
+        sub: "Spend research points (next run)",
+        cost: `${c.profile.researchPoints} RP`,
+        enabled: true,
+        onClick: () => { game.ui.openMeta(); this.closeMoreMenu(); },
+      }));
+    }
   }
 
   private moreButton(opts: {
@@ -545,10 +551,12 @@ export class MobileShell {
     clear(this.confirmSlot);
     if (!kind) {
       this.mabar.classList.remove("armed");
+      this.cancelModeBtn.classList.remove("visible");
       this.ghostHint.classList.remove("visible", "invalid");
       return;
     }
     this.mabar.classList.add("armed");
+    this.cancelModeBtn.classList.add("visible");
 
     const cancelBtn = el("button", { class: "ls-mabar-cancel", text: "✕ CANCEL" });
     cancelBtn.onclick = () => this.cancelArmed();
@@ -749,9 +757,9 @@ export class MobileShell {
     if (show) {
       const cd = this.game.waves.planningCountdown;
       if (cd > 0) {
-        this.startWaveBtn.textContent = `START (${Math.ceil(cd)}s)`;
+        this.startWaveBtn.textContent = `LAUNCH (${Math.ceil(cd)}s)`;
       } else {
-        this.startWaveBtn.textContent = "START";
+        this.startWaveBtn.textContent = "LAUNCH";
       }
     }
   }
@@ -764,6 +772,9 @@ export class MobileShell {
     else if (this.game.state === "WAVE_COMPLETE") text = "WAVE CLEAR";
     else if (this.game.state === "PAUSED") text = "PAUSED";
     if (this.statusEl.textContent !== text) this.statusEl.textContent = text;
+    const isCombat = this.game.state === "WAVE_ACTIVE";
+    this.mhud.classList.toggle("combat-priority", isCombat);
+    this.mhud.classList.toggle("compact", window.innerWidth <= 390);
   }
 
   /** Lights up dots on the build/squad tabs when something interesting is happening there. */
