@@ -84,32 +84,38 @@ document.addEventListener("gesturechange", (e) => e.preventDefault());
 // Resize canvas to fit viewport while preserving aspect ratio.
 function fit(): void {
   applyDeviceClasses();
+  const cssPx = (name: string, fallback = 0): number => {
+    const value = Number.parseFloat(getComputedStyle(document.body).getPropertyValue(name));
+    return Number.isFinite(value) ? value : fallback;
+  };
   // On mobile we want the game to fill the screen edge-to-edge so the play
   // area is as large as possible. On desktop we keep a small breathing-room
   // margin around the CRT box.
   //
   // On mobile we reserve only the persistent HUD bars so the canvas is as
-  // large as possible. The build drawer slides up as an overlay when opened,
-  // so it does NOT need reserved canvas space — only the always-visible top
-  // bar (--ls-m-top-h: 48 px) and bottom action bar (--ls-m-bottom-h: 56 px)
-  // are subtracted. The estimates include a generous buffer for iOS
-  // safe-area-insets (status bar / home indicator) which we cannot read
-  // directly from JS: portrait adds ~62 px for the status bar notch, landscape
-  // adds a smaller ~8 px bottom buffer.
+  // large as possible. The build drawer is an overlay, so only the persistent
+  // top/bottom bars are reserved, using the same CSS vars that render the bars.
   let availW: number;
   let availH: number;
+  let portrait = false;
   if (isMobile) {
-    const portrait = window.innerHeight >= window.innerWidth;
-    const hudReserve   = portrait ? 110 : 56;  // top bar (48 px) + safe-area-top (~62 px portrait, ~8 px landscape)
-    const buildReserve = portrait ?  92 : 80;  // action bar (56 px) + safe-area-bottom (~34 px portrait, ~21 px landscape + buffer)
+    portrait = window.innerHeight >= window.innerWidth;
+    const topReserve = cssPx("--ls-m-top-h", portrait ? 44 : 42) + cssPx("--ls-m-safe-top");
+    const bottomReserve = cssPx("--ls-m-bottom-h", portrait ? 52 : 50) + cssPx("--ls-m-safe-bottom");
     availW = window.innerWidth;
-    availH = Math.max(120, window.innerHeight - hudReserve - buildReserve);
+    availH = Math.max(120, window.innerHeight - topReserve - bottomReserve);
   } else {
     const margin = 16;
     availW = window.innerWidth - margin * 2;
     availH = window.innerHeight - margin * 2;
   }
-  const scale = Math.min(availW / VIEW_WIDTH, availH / VIEW_HEIGHT);
+  const widthScale = availW / VIEW_WIDTH;
+  const heightScale = availH / VIEW_HEIGHT;
+  const containScale = Math.min(widthScale, heightScale);
+  const scale = isMobile && portrait
+    // In portrait, allow a modest width overdraw so the play area isn't a tiny strip.
+    ? Math.min(heightScale, Math.max(containScale, widthScale * 1.25))
+    : containScale;
   const dpr = window.devicePixelRatio || 1;
   const backingW = VIEW_WIDTH * dpr;
   const backingH = VIEW_HEIGHT * dpr;
