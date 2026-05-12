@@ -38,6 +38,7 @@ const gameCanvas = canvas!;
 const gameUiRoot = uiRoot!;
 const loadingScreen = new LoadingScreen(appRoot);
 let game: Game | null = null;
+const MOBILE_PORTRAIT_OVERDRAW_FACTOR = 1.25;
 
 // ──────────────────────────────────────────────────────────
 // Mobile / touch device detection.
@@ -113,8 +114,8 @@ function fit(): void {
   const heightScale = availH / VIEW_HEIGHT;
   const containScale = Math.min(widthScale, heightScale);
   const scale = isMobile && portrait
-    // In portrait, allow a modest width overdraw so the play area isn't a tiny strip.
-    ? Math.min(heightScale, Math.max(containScale, widthScale * 1.25))
+    // In portrait, allow modest side-cropping so the gameplay window isn't a tiny strip.
+    ? Math.min(heightScale, Math.max(containScale, widthScale * MOBILE_PORTRAIT_OVERDRAW_FACTOR))
     : containScale;
   const dpr = window.devicePixelRatio || 1;
   const backingW = VIEW_WIDTH * dpr;
