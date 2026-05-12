@@ -118,7 +118,7 @@ export const towerDefinitions: Record<TowerType, TowerDefinition> = {
     role: "Short-range sweep",
     description:
       "Emits a continuous flame cone. Melts Swarm and Scout waves at short range.",
-    cost: 70,
+    cost: 80,
     range: 74,
     damage: 1.2,
     cooldown: 0.09,

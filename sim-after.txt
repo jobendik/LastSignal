@@ -2,7 +2,7 @@
 ══════════════════════════════════════════════════════════════════════════════
   LAST SIGNAL — FULL BALANCE SIM SUITE  (running 7 of 7 tests)
 ══════════════════════════════════════════════════════════════════════════════
-  Node v25.9.0  ·  2026-05-11T21:39:26.913Z
+  Node v25.9.0  ·  2026-05-11T22:38:01.740Z
   Args: --runs=1000
 
 ══════════════════════════════════════════════════════════════════════════════
@@ -19,5 +19,615 @@
   Strategy                         Recruit          Standard           Veteran         Nightmare
   ──────────────────────────────────────────────────────────────────────────────────────────────
   No Defense                          0% ☠              0% ☠              0% ☠              0% ☠
-  Minimal (1 pulse/wave)             85% ~              0% ☠              0% ☠              0% ☠
-  Pulse Spam                        100% ✓             59% ~              7% ☠              0% ☠
+  Minimal (1 pulse/wave)             84% ~              0% ☠              0% ☠              0% ☠
+  Pulse Spam                        100% ✓             87% ~             23% ✗              0% ☠
+  Blaster Spam                      100% ✓            100% ✓             91% ✓             36% ✗
+  Flamer Spam                       100% ✓            100% ✓            100% ✓             55% ~
+  Economy-First                     100% ✓              0% ☠              0% ☠              0% ☠
+  Mixed Optimal                     100% ✓             96% ✓             54% ~              5% ☠
+
+  ── Flags
+  ──────────────────────────────────────────────────────────────────────────
+  ⚠  "No Defense" wins <15% on Standard → likely too hard for casual players
+  ⚠  "No Defense" wins <50% on Recruit → Recruit is not beginner-friendly
+  ⚠  "Minimal (1 pulse/wave)" wins <15% on Standard → likely too hard for casual players
+  ⚠  "Economy-First" wins <15% on Standard → likely too hard for casual players
+
+  ── Per-wave survival: Mixed Optimal on Nightmare
+  ──────────────────────────────────────────────────────────────────────────
+
+    Wave  Survived  AvgCoreHP  AvgBreaches  WaveName
+  ────────────────────────────────────────────────────────────
+       1      100%       55.0          0.0  First Contact
+       2      100%       52.7          0.3  Signal Pressure
+       3      100%       52.7          0.0  Iron Wall
+       4      100%       52.7          0.0  Phase Echo
+       5      100%       52.7          0.0  Carrier Breach
+       6      100%       52.7          0.0  Weaver Escort
+       7      100%       52.7          0.0  Ghost Column
+       8       71%        0.7          3.0  Silence Protocol
+       9       71%        0.7          0.0  Nest Splitters
+      10       71%        0.7          0.0  Blitz Swarm
+      11       71%        0.7          0.0  Armored Ghosts
+      12       71%        0.7          0.0  Carrier Tide
+      13       71%        0.7          0.0  Repair Swarm
+      14       67%        0.7          0.1  Crushing Mass
+      15       67%        0.7          0.0  Fractured Reality
+      16        5%        0.0          7.4  The Gauntlet ← hard checkpoint
+
+  ✓ Test 1 completed in 4.1s
+
+══════════════════════════════════════════════════════════════════════════════
+  ▶  Test 02 / 7 — Tower Efficiency
+══════════════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════════════
+  TEST 02 — TOWER COST-EFFICIENCY ANALYSIS
+══════════════════════════════════════════════════════════════════════════════
+
+  ── Effective DPS per tower (at base speed, no slow)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Tower          Cost     DPS  DPS/Credit  Range  Notes
+  ──────────────────────────────────────────────────────────────────────
+  pulse            20     6.3      0.3125    112  
+  blaster          40     9.6      0.2396     88  
+  mortar           80    10.1      0.1265    165  AoE
+  tesla            90    17.5      0.1944    102  Chain
+  railgun         150    16.2      0.1077    260  
+  flamer           80    13.3      0.1667     74  
+
+  ── DPS/Credit outlier flags
+  ──────────────────────────────────────────────────────────────────────────
+  All combat towers within 2.5× of each other. Looks balanced.
+
+  ── Damage dealt by 1 tower to 1 enemy (no slow) — heat map
+  ──────────────────────────────────────────────────────────────────────────
+
+  Enemy \ Tower      pulse   blaster    mortar     tesla   railgun    flamer
+  ──────────────────────────────────────────────────────────────────────────
+  scout                ✓18       ✓21       ✓44       ✓56      ✓126       ✓25  ← best: railgun
+  grunt                ✓30       ✓35       ✓87       ✓84      ✓210       ✓40  ← best: railgun
+  brute                ·41       ½48      ✓111      ✓107      ✓250       ½56  ← best: railgun
+  weaver               ✓33       ✓38       ✓87       ✓84      ✓210       ✓44  ← best: railgun
+  phantom              ✓24       ✓29       ✓65       ✓70      ✓168       ✓32  ← best: railgun
+  carrier              ½65       ½77      ✓157      ✓164      ✓416       ½90  ← best: railgun
+  sprinter             ✓12       ✓14       ✓44       ✓28       ✓84       ✓16  ← best: railgun
+  juggernaut           ·46       ·54      ½107      ½118      ✓294       ·63  ← best: railgun
+  shielder             ½27       ½30       ✓65       ✓74      ✓158       ½36  ← best: railgun
+  splitter             ½39       ½47      ✓109      ✓112      ✓252       ½55  ← best: railgun
+  jammer               ½30       ✓36       ✓87       ✓84      ✓210       ✓42  ← best: railgun
+  swarm                ✓21       ✓24       ✓65       ✓56      ✓126       ✓28  ← best: railgun
+  tunneler             ½27       ½33       ✓65       ✓70      ✓168       ✓38  ← best: railgun
+  saboteur             ½24       ½28       ✓65       ✓70      ✓168       ✓32  ← best: railgun
+  cache                ½15       ½17       ✓44       ✓42      ✓126       ½20  ← best: railgun
+  mirror               ½21       ½24       ✓54       ✓56      ✓126       ½28  ← best: railgun
+
+  Legend: ✓=kills  ½=half HP  ·=less than half
+
+  ── Shots-to-kill (single tower, no slow, standard difficulty)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Enemy              HP  Armor   pulse blaster  mortar   tesla railgun  flamer
+  ────────────────────────────────────────────────────────────────────────────
+  scout               8     0%       3       7       1       2       1       7
+  grunt              20     0%       7      18       2       3       1      17
+  brute              82    15%      33      84       7      14       3      81
+  weaver             28     0%      10      25       2       4       1      24
+  phantom            16     0%       6      14       2       3       1      14
+  carrier           124    10%      46     120      10      20       4     115
+  sprinter            6     0%       2       6       1       1       1       5
+  juggernaut        180    30%      86     224      18      37       7     215
+  shielder           46    25%      21      54       5       9       2      52
+  splitter           58     0%      20      51       4       9       2      49
+  jammer             34     0%      12      30       3       5       1      29
+  swarm               3     0%       1       3       1       1       1       3
+  tunneler           38     0%      13      34       3       6       1      32
+  saboteur           30     0%      10      27       2       5       1      25
+  cache              22     0%       8      20       2       4       1      19
+  mirror             35    50%      24      61       5      10       2      59
+
+  ── Credits-per-kill (1 tower, at standard kill rate)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Higher = tower needs more copies (or is expensive) to kill this enemy.
+
+  Tower          Cost     scout     grunt     brute    weaver   phantom   carrier  sprinter  juggerna  shielder  splitter    jammer     swarm  tunneler  saboteur     cache    mirror
+  ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  pulse            20        20        20        40        20        20        38        20        78        34        30        23        20        28        25        29        33
+  blaster          40        40        40        68        40        40        65        40       133        61        49        40        40        46        43        51        58
+  mortar           80        80        80        80        80        80        80        80       135        80        80        80        80        80        80        80        80
+  tesla            90        90        90        90        90        90        90        90       138        90        90        90        90        90        90        90        90
+  railgun         150       150       150       150       150       150       150       150       150       150       150       150       150       150       150       150       150
+  flamer           80        80        80       117        80        80       111        80       229       102        84        80        80        80        80        86        99
+
+  ── Slow synergy — damage increase from pairing slow + combat (stasis + mortar)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Slow+Combat pair             scout     grunt     brute    weaver   phantom   carrier  sprinter juggernau
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────
+  stasis+mortar                +150%      +75%     +100%     +100%     +100%     +125%      +50%     +129%
+  stasis+tesla                  +75%     +100%     +111%     +117%     +100%     +123%     +150%     +117%
+  stasis+pulse                 +117%     +110%     +119%     +118%     +125%     +117%     +100%     +118%
+  snare+mortar                 +150%     +100%     +117%     +125%     +133%     +150%      +50%     +157%
+  snare+pulse                  +150%     +140%     +144%     +136%     +150%     +146%     +125%     +145%
+  barrier+mortar                +50%      +25%      +33%      +50%      +33%      +50%       +0%      +57%
+
+  ── Key upgrade effects on representative towers
+  ──────────────────────────────────────────────────────────────────────────
+
+  Overclock (+10% fire rate)
+  Tower            grunt       brute  juggernaut
+  pulse             +10%        +13%         +9%
+  mortar             +0%         +0%        +14%
+  railgun            +0%        +14%        +10%
+
+  Plasma Metallurgy (+15% dmg)
+  Tower            grunt       brute  juggernaut
+  pulse             +15%        +15%        +15%
+  mortar            +15%        +15%        +15%
+  railgun           +15%        +15%        +15%
+
+  Calibrated Optics (+12 range)
+  Tower            grunt       brute  juggernaut
+  pulse             +10%        +13%         +9%
+  mortar             +0%         +0%        +14%
+  railgun            +0%         +0%         +0%
+
+  Advanced Arsenal (+20% dmg)
+  Tower            grunt       brute  juggernaut
+  pulse             +20%        +20%        +20%
+  mortar            +20%        +20%        +20%
+  railgun           +20%        +20%        +20%
+
+  Overclock+Plasma (+10%+15%)
+  Tower            grunt       brute  juggernaut
+  pulse             +26%        +29%        +25%
+  mortar            +15%        +15%        +31%
+  railgun           +15%        +31%        +26%
+
+  ✓ Test 2 completed in 0.0s
+
+══════════════════════════════════════════════════════════════════════════════
+  ▶  Test 03 / 7 — Research Delta
+══════════════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════════════
+  TEST 03 — RESEARCH NODE DELTA ANALYSIS
+══════════════════════════════════════════════════════════════════════════════
+
+  ── Baseline: Mixed / Standard — win rate: 96%, avg final core: 40.9
+  ──────────────────────────────────────────────────────────────────────────
+
+  ── Win-rate delta per research node (Standard difficulty, Mixed strategy)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Node                    Tier  Cost  WinRate   Δ Win%  Avg Core HP  Effect
+  ────────────────────────────────────────────────────────────────────────────────
+  Logistics I                1     3      82%  ↓13.6pp         35.3  startingCreditsAdd:40
+  Reinforced Core            1     4     100%   ↑4.1pp         75.5  coreIntegrityAdd:35
+  Logistics II               2     5      44%  ↓51.8pp         19.4  startingCreditsAdd:75
+  Calibrated Optics          2     4      95%   ↓1.4pp         29.3  towerRangeAdd:12
+  Plasma Metallurgy          2     6     100%   ↑4.1pp         45.6  towerDamageMul:1.2
+  Deep Mining                2     5      95%   ≈0.6pp         40.7  harvesterIncomeMul:1.25
+  Bountyful Hunt             2     4      81%  ↓14.7pp         32.2  rewardMul:1.15
+  Fortified Signal           2     6     100%   ↑4.1pp        110.9  coreIntegrityAdd:70
+  Advanced Arsenal           3     9     100%   ↑4.1pp         46.0  towerDamageMul:1.3
+  Precision Optics           3     7      35%  ↓61.1pp         16.0  towerRangeAdd:20
+  Deep Reserves              3     8      96%   ≈0.3pp         40.9  harvesterIncomeMul:1.25
+  Supply Chain               3     7      81%  ↓14.5pp         32.3  rewardMul:1.15
+  Logistics III              3     8      46%  ↓49.8pp         20.1  startingCreditsAdd:75
+
+  ── Flags
+  ──────────────────────────────────────────────────────────────────────────
+  ⚠  "Logistics I" (Tier 1) HURTS win rate (-14pp) — check data
+  ⚠  "Logistics II" (Tier 2) HURTS win rate (-52pp) — check data
+  ⚠  "Calibrated Optics" (Tier 2, cost 4) has <2pp delta — near-useless in Standard
+  ⚠  "Deep Mining" (Tier 2, cost 5) has <2pp delta — near-useless in Standard
+  ⚠  "Bountyful Hunt" (Tier 2) HURTS win rate (-15pp) — check data
+  ⚠  "Precision Optics" (Tier 3) HURTS win rate (-61pp) — check data
+  ⚠  "Deep Reserves" (Tier 3, cost 8) has <2pp delta — near-useless in Standard
+  ⚠  "Supply Chain" (Tier 3) HURTS win rate (-15pp) — check data
+  ⚠  "Logistics III" (Tier 3) HURTS win rate (-50pp) — check data
+  ⚠  Tier 3 research nodes have LOWER average impact than Tier 1 — progression may feel unrewarding
+
+  ── Best nodes per difficulty tier
+  ──────────────────────────────────────────────────────────────────────────
+
+  Standard (baseline 96%)
+  Node                      Δ Win%
+  Reinforced Core           ↑4.0pp
+  Plasma Metallurgy         ↑4.0pp
+  Fortified Signal          ↑4.0pp
+  Advanced Arsenal          ↑4.0pp
+  Deep Reserves             ≈0.2pp
+
+  Veteran (baseline 56%)
+  Node                      Δ Win%
+  Advanced Arsenal         ↑36.8pp
+  Plasma Metallurgy        ↑25.8pp
+  Fortified Signal         ↑25.2pp
+  Reinforced Core          ↑12.6pp
+  Bountyful Hunt           ≈-0.8pp
+
+  Nightmare (baseline 5%)
+  Node                      Δ Win%
+  Advanced Arsenal         ↑48.8pp
+  Plasma Metallurgy        ↑35.0pp
+  Bountyful Hunt            ≈0.3pp
+  Deep Mining               ≈0.1pp
+  Deep Reserves            ≈-0.3pp
+
+  ── Delta-per-science-point ranking (Standard, Mixed)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Node                    Tier  Cost   Δ Win%   Δ/Point
+  ───────────────────────────────────────────────────────
+  Reinforced Core            1     4   +4.1pp      1.03
+  Plasma Metallurgy          2     6   +4.1pp      0.68
+  Fortified Signal           2     6   +4.1pp      0.68
+  Advanced Arsenal           3     9   +4.1pp      0.46
+  Deep Reserves              3     8   +0.3pp      0.04
+
+  ✓ Test 3 completed in 17.6s
+
+══════════════════════════════════════════════════════════════════════════════
+  ▶  Test 04 / 7 — Modifier Stress
+══════════════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════════════
+  TEST 04 — MODIFIER STRESS TEST
+══════════════════════════════════════════════════════════════════════════════
+
+  ── Debuff × Difficulty win-rate matrix (Mixed Optimal, 1000 runs)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Debuff                         Recruit    Standard     Veteran   Nightmare
+  ──────────────────────────────────────────────────────────────────────────
+  HAUNTED SIGNAL                   100%✓        71%~        20%✗         0%☠
+  RESOURCE SCARCITY                100%✓        96%✓        56%~         3%☠
+  HARDENED CARAPACE                100%✓        46%✗        14%✗         0%☠
+  TURBULENT FLOW                   100%✓       100%✓        72%~        31%✗
+  BLEEDING SIGNAL                   52%~         7%☠         0%☠         0%☠
+  BRITTLE WALLS                    100%✓        95%✓        47%✗         0%☠
+  INFLATION                        100%✓        89%~        84%~        11%✗
+  HEAVY HULL                       100%✓        20%✗         0%☠         0%☠
+  ECONOMY DROUGHT                  100%✓        95%✓        55%~         5%☠
+  DESPERATE FOE                    100%✓        80%~        30%✗         0%☠
+  DEGRADED FIRING                  100%✓        73%~        17%✗         0%☠
+  RATIONED SUPPLY                  100%✓       100%✓        74%~        10%✗
+
+  ── Buff-with-downside × Difficulty win-rate matrix (Mixed Optimal)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Modifier                       Recruit    Standard     Veteran   Nightmare
+  ──────────────────────────────────────────────────────────────────────────
+  SIGNAL BOOST                     100%✓       100%✓        67%~         3%☠
+  OVERCLOCK                        100%✓       100%✓       100%✓        62%~
+  DARK MATTER                      100%✓        60%~         0%☠         0%☠
+  CREDIT OVERFLOW                  100%✓       100%✓        68%~         7%☠
+  RAPID RESPONSE                   100%✓       100%✓        93%✓         0%☠
+  BOUNTY TARGETS                   100%✓        37%✗         0%☠         0%☠
+  SUPPLY LINE                      100%✓        97%✓        75%~        11%✗
+  CRYSTAL RUSH                     100%✓       100%✓        65%~         5%☠
+  REINFORCED HULL                  100%✓        84%~        18%✗         0%☠
+  GLASS CANNON                     100%✓        70%~        12%✗         0%☠
+  BLOOD FOR BOUNTY                 100%✓        41%✗         2%☠         0%☠
+  ASCENDANT WAVES                  100%✓        69%~         4%☠         0%☠
+
+  ── Flags
+  ──────────────────────────────────────────────────────────────────────────
+  ⚠  [DEBUFF] "HAUNTED SIGNAL" on Nightmare is completely unwinnable — extreme difficulty spike
+  ⚠  [DEBUFF] "HARDENED CARAPACE" on Nightmare is completely unwinnable — extreme difficulty spike
+  ⚠  [DEBUFF] "BLEEDING SIGNAL" makes Standard unwinnable (7%) with Mixed Optimal
+  ⚠  [DEBUFF] "BLEEDING SIGNAL" on Nightmare is completely unwinnable — extreme difficulty spike
+  ⚠  [DEBUFF] "BRITTLE WALLS" on Nightmare is completely unwinnable — extreme difficulty spike
+  ⚠  [DEBUFF] "HEAVY HULL" on Nightmare is completely unwinnable — extreme difficulty spike
+  ⚠  [DEBUFF] "DESPERATE FOE" on Nightmare is completely unwinnable — extreme difficulty spike
+  ⚠  [DEBUFF] "DEGRADED FIRING" on Nightmare is completely unwinnable — extreme difficulty spike
+  ⚠  [BUFF-MIXED] "SIGNAL BOOST" keeps >97% win rate on Standard — tradeoff may be too safe
+  ⚠  [BUFF-MIXED] "OVERCLOCK" keeps >97% win rate on Standard — tradeoff may be too safe
+  ⚠  [BUFF-MIXED] "CREDIT OVERFLOW" keeps >97% win rate on Standard — tradeoff may be too safe
+  ⚠  [BUFF-MIXED] "RAPID RESPONSE" keeps >97% win rate on Standard — tradeoff may be too safe
+  ⚠  [BUFF-MIXED] "CRYSTAL RUSH" keeps >97% win rate on Standard — tradeoff may be too safe
+
+  ── Worst double-debuff combos on Veteran difficulty
+  ──────────────────────────────────────────────────────────────────────────
+
+  Debuff A              Debuff B                Win Rate
+  ────────────────────────────────────────────────────────
+  HAUNTED SIGNAL        HARDENED CARAPACE             0% ← UNWINNABLE
+  ⚠  Double debuff "HAUNTED SIGNAL" + "HARDENED CARAPACE" is unwinnable on Veteran
+  HAUNTED SIGNAL        BLEEDING SIGNAL               0% ← UNWINNABLE
+  ⚠  Double debuff "HAUNTED SIGNAL" + "BLEEDING SIGNAL" is unwinnable on Veteran
+  HAUNTED SIGNAL        HEAVY HULL                    0% ← UNWINNABLE
+  ⚠  Double debuff "HAUNTED SIGNAL" + "HEAVY HULL" is unwinnable on Veteran
+  HAUNTED SIGNAL        DESPERATE FOE                 0% ← UNWINNABLE
+  ⚠  Double debuff "HAUNTED SIGNAL" + "DESPERATE FOE" is unwinnable on Veteran
+  HAUNTED SIGNAL        DEGRADED FIRING               0% ← UNWINNABLE
+  ⚠  Double debuff "HAUNTED SIGNAL" + "DEGRADED FIRING" is unwinnable on Veteran
+  HARDENED CARAPACE     BLEEDING SIGNAL               0% ← UNWINNABLE
+  ⚠  Double debuff "HARDENED CARAPACE" + "BLEEDING SIGNAL" is unwinnable on Veteran
+  HARDENED CARAPACE     HEAVY HULL                    0% ← UNWINNABLE
+  ⚠  Double debuff "HARDENED CARAPACE" + "HEAVY HULL" is unwinnable on Veteran
+  HARDENED CARAPACE     DESPERATE FOE                 0% ← UNWINNABLE
+  ⚠  Double debuff "HARDENED CARAPACE" + "DESPERATE FOE" is unwinnable on Veteran
+
+  ── Effective enemy HP under modifier combinations (brute vs. Standard)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Combo                              Base HP    Eff HP   Armor  Multiplier
+  ──────────────────────────────────────────────────────────────────────────
+  Baseline                              82.0      82.0   15.0%       ×1.00
+  Heavy Hull                            82.0     131.2   15.0%       ×1.60
+  Hardened Carapace                     82.0      82.0   35.0%       ×1.31
+  Nightmare diff                        82.0     172.2   15.0%       ×2.10
+  Nightmare + Heavy Hull                82.0     275.5   15.0%       ×3.36
+  Nightmare + Hardened + Heal           82.0     198.2   35.0%       ×3.16
+
+  ✓ Test 4 completed in 32.1s
+
+══════════════════════════════════════════════════════════════════════════════
+  ▶  Test 05 / 7 — Multi-Sector Chain
+══════════════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════════════
+  TEST 05 — MULTI-SECTOR CAMPAIGN CHAIN
+══════════════════════════════════════════════════════════════════════════════
+
+  ── Single-run sector trace: Mixed / Standard / No Research
+  ──────────────────────────────────────────────────────────────────────────
+
+  Sector                              Win?  FinalHP  FinalCr  TotalBr  TotalDmg
+  ──────────────────────────────────────────────────────────────────────────────
+  Sector 1 — Broken Relay                ✓       46     2338        3        54
+  Sector 2 — Crystal Scar                ✓       46     5024        3        54
+  Sector 3 — Phantom Gate                ✓       73     7921        3        27
+  Sector 4 — Hostile Core                ✗        0     8657        9       132
+
+  ── Per-sector win rate by research bundle (1000 runs each)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Sector                   No Research  Tier 1 Bundl  Tier 2 Econ   Tier 2 Comba  Tier 3 Max (
+  ────────────────────────────────────────────────────────────────────────────────────────────
+  sector1                         96%✓         100%✓          61%~         100%✓           0%✗
+  sector2                        100%✓         100%✓          75%~         100%✓          29%✗
+  sector3                        100%✓         100%✓         100%✓         100%✓         100%✓
+  sector4                         24%✗          67%~          26%✗          72%~          27%✗
+
+  ── Flags
+  ──────────────────────────────────────────────────────────────────────────
+  ⚠  sector1 has >90% win rate with no research — may be too easy for veterans
+  ⚠  sector2 has >90% win rate with no research — may be too easy for veterans
+  ⚠  sector3 has >90% win rate with no research — may be too easy for veterans
+  ⚠  sector4 is very hard without research (24%) — may feel punishing for new players
+  ⚠  sector4: "Tier 2 Combat (Plasma Metallurgy + Calibrated Optics)" adds +49pp — research creates large power gap
+  ⚠  sector4 is a steep difficulty spike vs. previous sector (−76pp)
+
+  ── Credit carry-over analysis (Mixed / Standard)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Simulates a player carrying credits from S1→S2→S3→S4.
+  Shows whether earlier performance gates later sectors.
+
+  → Average S4 end credits: 9275   S4 win rate: 23%
+
+  → Average S4 end credits: 9243   S4 win rate: 22%
+
+  → Average S4 end credits: 9309   S4 win rate: 25%
+
+  ✓ Test 5 completed in 19.1s
+
+══════════════════════════════════════════════════════════════════════════════
+  ▶  Test 06 / 7 — Endless Ceiling
+══════════════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════════════
+  TEST 06 — ENDLESS MODE CEILING
+══════════════════════════════════════════════════════════════════════════════
+
+  ── First-breach wave per composition (Endless mode)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Composition                                 Cost  Breach@W  HP×scale       Culprit  Verdict
+  ──────────────────────────────────────────────────────────────────────────────────────────
+  Pulse ×20 (cheap baseline)                   400         8      2.8×      overlord  early collapse
+  Pulse ×40 (full spam)                        800        16      4.7×     leviathan  mid-game ceiling
+  Pulse ×60 (extreme spam)                    1200        16      4.7×     leviathan  mid-game ceiling
+  Blaster ×30                                 1200        16      4.7×     leviathan  mid-game ceiling
+  Mixed ×30 (stasis+mortar+tesla+pulse)       1630        24      6.8×     leviathan  strong build
+  Mixed ×50 (optimized endgame)               2650        40     10.9×     leviathan  strong build
+  Railgun ×3 + Pulse ×30 (railgun-anchored)    1050        16      4.7×     leviathan  mid-game ceiling
+  Flamer ×40 (fire DPS focus)                 3200        16      4.7×     leviathan  mid-game ceiling
+  Mortar ×20 (AoE ceiling)                    1800        24      6.8×     leviathan  strong build
+  Max Economy (16 harvesters + combat)        1310        16      4.7×     leviathan  mid-game ceiling
+
+  ── Theoretical DPS cap vs endless enemy HP scaling (juggernaut as benchmark)
+  ──────────────────────────────────────────────────────────────────────────
+
+  Wave  HP×   Jugg EHP    Pulse×40 dmg  Mortar×20 dmg  Railgun×3 dmg
+  ──────────────────────────────────────────────────────────────────────
+      1   1.2×          314         1764✓          2132✓794✓
+      5   2.1×          540         1512✓          1827✓706✓
+     10   3.2×          823         1344✓          1523✓617✗
+     15   4.4×         1137         1176✓          1523✓529✗
+     20   5.7×         1471         1008✗          1218✗529✗
+     25   7.0×         1805         1008✗          1218✗441✗
+     30   8.3×         2139         1008✗          1218✗441✗
+     40  10.9×         2808         1008✗          1218✗441✗
+     50  13.5×         3477         1008✗          1218✗441✗
+
+  ── Speed-class threat analysis (sprinter, scout — endless wave 20)
+  ──────────────────────────────────────────────────────────────────────────
+
+  These enemies outrun coverage even with many towers.
+
+  Enemy         Base spd  EW20 spd  P×40 kill?  B×30 kill?  F×40 kill?
+  ────────────────────────────────────────────────────────────────────
+  scout               82       148           ✓           ✓           ✓
+  sprinter           130       234           ✓           ✓           ✓
+  phantom             61       110           ✓           ✓           ✓
+
+  ── Flags
+  ──────────────────────────────────────────────────────────────────────────
+  ⚠  "Pulse ×20 (cheap baseline)" collapses by wave 8 — may need at least a baseline of combat towers
+
+  Best build:  "Mixed ×50 (optimized endgame)" → survives to wave 40
+  Worst build: "Pulse ×20 (cheap baseline)" → breaches at wave 8
+
+  ✓ Test 6 completed in 0.0s
+
+══════════════════════════════════════════════════════════════════════════════
+  ▶  Test 07 / 7 — Credit Trap
+══════════════════════════════════════════════════════════════════════════════
+
+══════════════════════════════════════════════════════════════════════════════
+  TEST 07 — CREDIT TRAP ANALYSIS
+══════════════════════════════════════════════════════════════════════════════
+
+  ── Credit state per wave — Standard difficulty
+  ──────────────────────────────────────────────────────────────────────────
+
+  Desert = can't afford cheapest tower (<20cr)
+  Poverty = only cheapest towers available (20–79cr)
+  Mid     = can afford mortars/stasis (80–149cr)
+  Rich    = can afford railgun+ (150cr+)
+
+     WaveWave Name                                            pulseSpam                                 economy                                   mixed
+                                   Desert      Poor       Mid      Rich    Desert      Poor       Mid      Rich    Desert      Poor       Mid      Rich
+  ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+        1First Contact                 0%      100%        0%        0%        0%        0%        0%      100%        0%        0%        0%      100%
+        2Signal Pressure               0%        0%      100%        0%        0%        0%        0%      100%        0%        0%        0%      100%
+        3Iron Wall                     0%        0%      100%        0%        0%        0%        0%      100%        0%        0%      100%        0%
+        4Phase Echo                    0%        0%      100%        0%        0%        0%        0%      100%        0%        0%      100%        0%
+        5Carrier Breach                0%        0%        0%      100%        0%        0%        0%      100%        0%        0%      100%        0%
+        6Weaver Escort                 0%        0%        0%      100%        0%        0%        0%      100%        0%        0%      100%        0%
+        7Ghost Column                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+        8Silence Protocol              0%        0%        0%      100%        0%        0%        0%      100%        0%        0%      100%        0%
+        9Nest Splitters                0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       10Blitz Swarm                   0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       11Armored Ghosts                0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       12Carrier Tide                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       13Repair Swarm                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       14Crushing Mass                 0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       15Fractured Reality             0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       16The Gauntlet                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+
+  ── Credit state per wave — Veteran difficulty
+  ──────────────────────────────────────────────────────────────────────────
+
+  Desert = can't afford cheapest tower (<20cr)
+  Poverty = only cheapest towers available (20–79cr)
+  Mid     = can afford mortars/stasis (80–149cr)
+  Rich    = can afford railgun+ (150cr+)
+
+     WaveWave Name                                            pulseSpam                                 economy                                   mixed
+                                   Desert      Poor       Mid      Rich    Desert      Poor       Mid      Rich    Desert      Poor       Mid      Rich
+  ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+        1First Contact                 0%      100%        0%        0%        0%        0%        0%      100%        0%        0%        0%      100%
+        2Signal Pressure               0%        0%      100%        0%        0%        0%        0%      100%        0%        0%        0%      100%
+        3Iron Wall                     0%        0%      100%        0%        0%        0%        0%      100%        0%        0%      100%        0%
+        4Phase Echo                    0%        0%      100%        0%        0%        0%        0%      100%        0%        0%      100%        0%
+        5Carrier Breach                0%        0%        0%      100%        0%        0%        0%      100%        0%        0%      100%        0%
+        6Weaver Escort                 0%        0%        0%      100%        0%        0%        0%      100%        0%        0%      100%        0%
+        7Ghost Column                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+        8Silence Protocol              0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+        9Nest Splitters                0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       10Blitz Swarm                   0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       11Armored Ghosts                0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       12Carrier Tide                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       13Repair Swarm                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       14Crushing Mass                 0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       15Fractured Reality             0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       16The Gauntlet                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+
+  ── Credit state per wave — Nightmare difficulty
+  ──────────────────────────────────────────────────────────────────────────
+
+  Desert = can't afford cheapest tower (<20cr)
+  Poverty = only cheapest towers available (20–79cr)
+  Mid     = can afford mortars/stasis (80–149cr)
+  Rich    = can afford railgun+ (150cr+)
+
+     WaveWave Name                                            pulseSpam                                 economy                                   mixed
+                                   Desert      Poor       Mid      Rich    Desert      Poor       Mid      Rich    Desert      Poor       Mid      Rich
+  ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+        1First Contact                 0%      100%        0%        0%        0%        0%        0%      100%        0%        0%        0%      100%
+        2Signal Pressure               0%        0%      100%        0%        0%        0%        0%      100%        0%        0%        0%      100%
+        3Iron Wall                     0%        0%      100%        0%        0%        0%        0%      100%        0%        0%      100%        0%
+        4Phase Echo                    0%        0%      100%        0%        0%        0%        0%      100%        0%        0%      100%        0%
+        5Carrier Breach                0%        0%        0%      100%        0%        0%        0%      100%        0%        0%      100%        0%
+        6Weaver Escort                 0%        0%        0%      100%        0%        0%        0%      100%        0%        0%      100%        0%
+        7Ghost Column                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+        8Silence Protocol              0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+        9Nest Splitters                0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       10Blitz Swarm                   0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       11Armored Ghosts                0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       12Carrier Tide                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       13Repair Swarm                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       14Crushing Mass                 0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       15Fractured Reality             0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+       16The Gauntlet                  0%        0%        0%      100%        0%        0%        0%      100%        0%        0%        0%      100%
+
+  ── Aggregate credit trap statistics per strategy × difficulty
+  ──────────────────────────────────────────────────────────────────────────
+
+  Strategy        Difficulty  Waves Desert  Waves Poverty  Dead Weight  Notes
+  ───────────────────────────────────────────────────────────────────────────
+  pulseSpam         Standard            0%             6%       2828cr  ⚠ credits unused
+  economy           Standard            0%             0%       1448cr  ⚠ credits unused
+  mixed             Standard            0%             0%       2335cr  ⚠ credits unused
+  pulseSpam          Veteran            0%             6%       2815cr  ⚠ credits unused
+  economy            Veteran            0%             0%        855cr  ⚠ credits unused
+  mixed              Veteran            0%             0%       2632cr  ⚠ credits unused
+  pulseSpam        Nightmare            0%             6%       2358cr  ⚠ credits unused
+  economy          Nightmare            0%             0%        733cr  ⚠ credits unused
+  mixed            Nightmare            0%             0%       1763cr  ⚠ credits unused
+
+  ── Decision availability per wave (Standard, Mixed strategy)
+  ──────────────────────────────────────────────────────────────────────────
+
+     Wave  No Option  1–3 Options  4+ Options  Wave Name
+  ────────────────────────────────────────────────────────────
+        1         0%           0%        100%  First Contact
+        2         0%           0%        100%  Signal Pressure
+        3         0%           0%        100%  Iron Wall
+        4         0%           0%        100%  Phase Echo
+        5         0%           0%        100%  Carrier Breach
+        6         0%           0%        100%  Weaver Escort
+        7         0%           0%        100%  Ghost Column
+        8         0%           0%        100%  Silence Protocol
+        9         0%           0%        100%  Nest Splitters
+       10         0%           0%        100%  Blitz Swarm
+       11         0%           0%        100%  Armored Ghosts
+       12         0%           0%        100%  Carrier Tide
+       13         0%           0%        100%  Repair Swarm
+       14         0%           0%        100%  Crushing Mass
+       15         0%           0%        100%  Fractured Reality
+       16         0%           0%        100%  The Gauntlet
+
+  ── Flags
+  ──────────────────────────────────────────────────────────────────────────
+  No severe credit traps detected.
+
+  ── Economy strategy: harvester break-even analysis
+  ──────────────────────────────────────────────────────────────────────────
+
+  Harvester costs 60cr. Each harvester earns 15cr every 5s during ~30s waves.
+  Income per wave per harvester: ~90cr
+  Break-even: 1 wave (60cr cost → 90cr back)
+  On a 16-wave run: 1 harvester earns ~1440cr total, net +1380cr
+
+  Economy strategy survival rate (Standard, 30 runs): 0%
+
+  Economy vs Pulse Spam (1000 runs, Standard):
+    Economy  win rate: 0%
+    PulseSpam win rate: 85%
+  ⚠  Economy strategy is 85pp worse than Pulse Spam — harvester investment may not pay off fast enough
+
+  ✓ Test 7 completed in 5.2s
+
+══════════════════════════════════════════════════════════════════════════════
+  DONE: 7 passed, 0 failed  (78.2s total)
+══════════════════════════════════════════════════════════════════════════════
+

@@ -52,7 +52,7 @@ export const TOWERS = {
   tesla:     { cost:  90, range: 102, damage:  7.00, cd: 0.80, combat: true, chainMul: 2.0 },
   harvester: { cost:  45, range:   0, damage:  0,    cd: 5.00, isEco: true,  income: 17 },
   railgun:   { cost: 150, range: 260, damage: 42.00, cd: 2.60, combat: true, buildLimit: 3 },
-  flamer:    { cost:  70, range:  74, damage:  1.20, cd: 0.09, combat: true },
+  flamer:    { cost:  80, range:  74, damage:  1.20, cd: 0.09, combat: true },
   barrier:   { cost:  90, range: 120, damage:  0,    cd: 0.60, slow: true,  slowFactor: 0.65 },
   amplifier: { cost: 110, range:  48, damage:  0,    cd: 99999 },
   snare:     { cost:  65, range: 118, damage:  0,    cd: 2.40, slow: true,  slowFactor: 0.40 },
@@ -73,11 +73,11 @@ export const DIFFICULTIES = {
   },
   veteran: {
     id: "veteran", label: "Veteran",
-    enemyHpMul: 1.65, enemySpeedMul: 1.15, rewardMul: 1.1, coreIntegrityMul: 0.80,
+    enemyHpMul: 1.55, enemySpeedMul: 1.15, rewardMul: 1.1, coreIntegrityMul: 0.80,
   },
   nightmare: {
     id: "nightmare", label: "Nightmare",
-    enemyHpMul: 2.40, enemySpeedMul: 1.30, rewardMul: 1.1, coreIntegrityMul: 0.55,
+    enemyHpMul: 2.10, enemySpeedMul: 1.25, rewardMul: 1.1, coreIntegrityMul: 0.55,
   },
 };
 
@@ -102,16 +102,16 @@ export const DEBUFFS = [
 export const BUFFS_MIXED = [
   { id: "signal_boost",    name: "SIGNAL BOOST",      coreMul: 1.30 },
   { id: "overclock",       name: "OVERCLOCK",          towerCooldownMul: 0.75, towerCostMul: 1.25 },
-  { id: "dark_matter",     name: "DARK MATTER",        enemyHpMul: 1.55, enemyRewardMul: 1.40 },
+  { id: "dark_matter",     name: "DARK MATTER",        enemyHpMul: 1.40, enemyRewardMul: 1.40, towerCooldownMul: 0.85 },
   { id: "credit_flood",    name: "CREDIT OVERFLOW",    harvesterIncomeMul: 2.00, towerCostMul: 1.25 },
-  { id: "rapid_response",  name: "RAPID RESPONSE",     towerCooldownMul: 0.70, coreMul: 0.85 },
-  { id: "bounty_targets",  name: "BOUNTY TARGETS",     enemyHpMul: 1.70, enemyRewardMul: 1.60 },
+  { id: "rapid_response",  name: "RAPID RESPONSE",     towerCooldownMul: 0.70, coreMul: 0.75 },
+  { id: "bounty_targets",  name: "BOUNTY TARGETS",     enemyHpMul: 1.40, enemyRewardMul: 1.60, towerCostMul: 0.9 },
   { id: "supply_line",     name: "SUPPLY LINE",        harvesterIncomeMul: 1.50, towerCostMul: 1.10 },
   { id: "crystal_rush",    name: "CRYSTAL RUSH",       harvesterIncomeMul: 1.75, enemySpeedMul: 1.15 },
-  { id: "reinforced_hull", name: "REINFORCED HULL",    coreMul: 1.50, enemyHpMul: 1.25 },
+  { id: "reinforced_hull", name: "REINFORCED HULL",    coreMul: 1.50, enemyHpMul: 1.35 },
   { id: "glass_cannon",   name: "GLASS CANNON",      towerCostMul: 0.75, towerDamageMul: 1.20, coreMul: 0.75 },
-  { id: "blood_bounty",    name: "BLOOD FOR BOUNTY",   enemyRewardMul: 1.50, enemyHealPerSec: 2 },
-  { id: "ascendant_wave",  name: "ASCENDANT WAVES",    enemyArmorAdd: 0.22, enemyRewardMul: 1.40 },
+  { id: "blood_bounty",    name: "BLOOD FOR BOUNTY",   enemyRewardMul: 1.50, enemyHealPerSec: 1.0, towerCooldownMul: 0.9 },
+  { id: "ascendant_wave",  name: "ASCENDANT WAVES",    enemyArmorAdd: 0.15, enemyRewardMul: 1.40, towerDamageMul: 1.15 },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -241,7 +241,7 @@ export const PATH_LENGTH = 390;
 // Real maps have finite buildable cells; without this cap, "spam" strategies
 // stack unlimited towers and trivially win every difficulty. Tuned to match
 // the buildable footprint of Sector 1 along its primary lane.
-export const MAX_COMBAT_TOWERS = 20;
+export const MAX_COMBAT_TOWERS = 22;
 // Estimated wave duration in seconds (used for harvester income calculation)
 export const WAVE_DURATION_SECS = 30;
 // Silence wave model: fraction of enemies that auto-breach while towers are offline
@@ -459,6 +459,12 @@ export function simulateCampaign(strategyFn, opts = {}) {
                        * (TOWERS.harvester.income ?? 15) * harvesterIncomeMul;
 
     // ── Per-tower per-wave shot budget (caps spam compositions) ────────────
+    // Each tower has a finite total shot budget per wave (= wave_duration / cd).
+    // Enemies drain that budget as they pass; later enemies in a wave receive
+    // diminishing fire if the wave is large. Combined with the MAX_COMBAT_TOWERS
+    // placement cap, this prevents trivial spam wins.
+    const waveDef   = wavesArr[wi];
+    const enemyList = waveEnemyList(waveDef);
     const shotsRemaining = towers.map(t => {
       const tDef = TOWERS[t];
       if (!tDef?.combat) return 0;
@@ -466,9 +472,7 @@ export function simulateCampaign(strategyFn, opts = {}) {
       return WAVE_DURATION_SECS / cd;
     });
 
-    // ── Wave phase ──────────────────────────────────────────────────────────
-    const waveDef   = wavesArr[wi];
-    const enemyList = waveEnemyList(waveDef);
+    // ── Wave phase ───────────────────────────────────────────────────
     let breaches = 0, coreDmg = 0, killCredits = 0;
 
     // Silence wave: first SILENCE_BREACH_FRACTION of enemies auto-breach
@@ -665,28 +669,36 @@ export const strategies = {
     fn: (credits, waveIndex, currentTowers, { towerCostMul = 1 } = {}) => {
       const result = []; let budget = credits;
       const has   = t => currentTowers.includes(t) || result.includes(t);
+      const cnt   = t => currentTowers.filter(x => x === t).length + result.filter(x => x === t).length;
       const cost  = t => TOWERS[t].cost * towerCostMul;
 
+      // Wave 1-2: rush 4-5 pulses for early wave coverage
       if (waveIndex <= 1) {
-        while (budget >= cost("pulse")) { result.push("pulse"); budget -= cost("pulse"); }
+        while (budget >= cost("pulse") && cnt("pulse") < 5) {
+          result.push("pulse"); budget -= cost("pulse");
+        }
         return result;
       }
-      if (!has("stasis") && budget >= cost("stasis")) {
+
+      // Wave 3+: layer specials, then a mortar for splash, then flamer for swarm,
+      // then teslas for chain damage, then a railgun for elites.
+      // Buy cheaper combat first (pulse) to fill out coverage as funds allow.
+      if (waveIndex >= 2 && !has("stasis") && budget >= cost("stasis")) {
         result.push("stasis"); budget -= cost("stasis");
       }
-      if (!has("mortar") && budget >= cost("mortar")) {
+      if (waveIndex >= 2 && !has("mortar") && budget >= cost("mortar")) {
         result.push("mortar"); budget -= cost("mortar");
       }
-      // Add 2 flamers for swarm clearing (waves 3+)
-      if (waveIndex >= 3 && currentTowers.filter(t => t === "flamer").length < 2 && budget >= cost("flamer")) {
+      if (waveIndex >= 3 && cnt("flamer") < 2 && budget >= cost("flamer")) {
         result.push("flamer"); budget -= cost("flamer");
       }
-      if (waveIndex >= 4 && currentTowers.filter(t => t === "tesla").length < 2 && budget >= cost("tesla")) {
+      if (waveIndex >= 3 && cnt("tesla") < 2 && budget >= cost("tesla")) {
         result.push("tesla"); budget -= cost("tesla");
       }
-      if (waveIndex >= 5 && !has("railgun") && budget >= cost("railgun")) {
+      if (waveIndex >= 5 && cnt("railgun") < 1 && budget >= cost("railgun")) {
         result.push("railgun"); budget -= cost("railgun");
       }
+      // Fill remaining budget with cheap pulses (the workhorse)
       while (budget >= cost("pulse")) { result.push("pulse"); budget -= cost("pulse"); }
       return result;
     },
