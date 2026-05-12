@@ -22,9 +22,10 @@ export class Camera {
   mapW = 0;
   mapH = 0;
 
-  /** Viewport logical size (the canvas logical dimensions). */
-  readonly viewW = VIEW_WIDTH;
-  readonly viewH = VIEW_HEIGHT;
+  /** Viewport logical size (the canvas logical dimensions).
+   * Updated by resizeViewport() when the canvas backing changes (e.g. portrait mobile). */
+  viewW = VIEW_WIDTH;
+  viewH = VIEW_HEIGHT;
 
   /** Pan speed in px/s at zoom 1. */
   panSpeed = 600;
@@ -69,8 +70,10 @@ export class Camera {
       this.targetX = this.x;
       this.targetY = this.y;
     } else {
-      // Large map — start zoomed out to show most of the map, centered on focus point.
-      this.zoom = Math.max(this.minZoom, Math.min(1.0, fitZoom * 1.1));
+      // Large map — start at a zoom that shows the full map edge-to-edge
+      // in the tighter dimension.  Avoid the old * 1.1 over-zoom which would
+      // crop whichever axis is width-constrained (common on portrait mobile).
+      this.zoom = Math.max(this.minZoom, Math.min(1.0, fitZoom));
       this.targetZoom = this.zoom;
       this.x = focusX;
       this.y = focusY;
@@ -185,6 +188,20 @@ export class Camera {
   /** Whether this camera is in auto-fit mode (small map, no user panning). */
   get isAutoFit(): boolean {
     return this.autoFit;
+  }
+
+  /**
+   * Called when the canvas backing dimensions change (e.g. rotating to portrait
+   * on mobile). Updates the logical viewport size and re-fits the camera to the
+   * current map if one is loaded.
+   */
+  resizeViewport(w: number, h: number): void {
+    this.viewW = w;
+    this.viewH = h;
+    if (this.mapW > 0 && this.mapH > 0) {
+      // Re-compute fit zoom with the new viewport dimensions.
+      this.init(this.mapW, this.mapH, this.x, this.y);
+    }
   }
 
   /** The screen-space offset to apply as ctx.translate before drawing. */

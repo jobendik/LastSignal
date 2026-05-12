@@ -5,7 +5,7 @@ import { Tower } from "../entities/Tower";
 import type { Drone } from "../entities/Drone";
 import type { Projectile } from "../entities/Projectile";
 import type { Squad } from "../entities/Squad";
-import { ABANDONED_TURRET_RANGE, HARDENED_RELAY_SIGNAL_RADIUS_CELLS, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "../core/Config";
+import { ABANDONED_TURRET_RANGE, HARDENED_RELAY_SIGNAL_RADIUS_CELLS, TILE_SIZE } from "../core/Config";
 import { towerDefinitions } from "../data/towers";
 import type { TowerType, StrategicPointState, StrategicPointType } from "../core/Types";
 import type { StrategicPoint } from "../entities/StrategicPoint";
@@ -32,36 +32,61 @@ export class RenderSystem {
   /** Cached device pixel ratio — updated by notifyResize() when the window resizes. */
   dpr = window.devicePixelRatio || 1;
 
+  /** Logical viewport width (canvas CSS pixels = camera viewport). */
+  private get vw(): number { return this.game.camera.viewW; }
+  /** Logical viewport height (canvas CSS pixels = camera viewport). */
+  private get vh(): number { return this.game.camera.viewH; }
+
+  /**
+   * Call when the canvas backing dimensions change (e.g. portrait ↔ landscape on mobile).
+   * Resizes all offscreen canvases to match the new logical viewport and re-generates
+   * the star field.  Camera.resizeViewport() should be called first so this.vw/vh are
+   * already updated.
+   */
+  resizeViewport(): void {
+    const w = this.vw;
+    const h = this.vh;
+    this.lightCanvas.width = w;
+    this.lightCanvas.height = h;
+    this.previousFrameCanvas.width = w;
+    this.previousFrameCanvas.height = h;
+    this.distortionCanvas.width = w;
+    this.distortionCanvas.height = h;
+    // terrainCache is sized per-map, not per-viewport — leave it alone.
+    this.generateStars(w, h);
+    this.terrainCacheDirty = true;
+  }
+
   constructor(private readonly game: Game) {
     this.lightCanvas = document.createElement("canvas");
-    this.lightCanvas.width  = VIEW_WIDTH;
-    this.lightCanvas.height = VIEW_HEIGHT;
+    this.lightCanvas.width  = this.vw;
+    this.lightCanvas.height = this.vh;
     this.lightCtx = this.lightCanvas.getContext("2d")!;
     this.previousFrameCanvas = document.createElement("canvas");
-    this.previousFrameCanvas.width = VIEW_WIDTH;
-    this.previousFrameCanvas.height = VIEW_HEIGHT;
+    this.previousFrameCanvas.width = this.vw;
+    this.previousFrameCanvas.height = this.vh;
     this.previousFrameCtx = this.previousFrameCanvas.getContext("2d")!;
     this.noiseCanvas = document.createElement("canvas");
     this.noiseCanvas.width = 256;
     this.noiseCanvas.height = 256;
     this.distortionCanvas = document.createElement("canvas");
-    this.distortionCanvas.width = VIEW_WIDTH;
-    this.distortionCanvas.height = VIEW_HEIGHT;
+    this.distortionCanvas.width = this.vw;
+    this.distortionCanvas.height = this.vh;
     this.distortionCtx = this.distortionCanvas.getContext("2d")!;
     this.terrainCache = document.createElement("canvas");
-    this.terrainCache.width = VIEW_WIDTH;
-    this.terrainCache.height = VIEW_HEIGHT;
+    this.terrainCache.width = this.vw;
+    this.terrainCache.height = this.vh;
     this.generateNoiseTexture();
-    this.generateStars(VIEW_WIDTH, VIEW_HEIGHT);
+    this.generateStars(this.vw, this.vh);
     this.game.bus.on("tower:built", (t: unknown) => this.markEntityDirty(t));
     this.game.bus.on("tower:sold", (t: unknown) => this.markEntityDirty(t));
-    this.game.bus.on("credits:changed", () => this.markDirty(0, 0, VIEW_WIDTH, 80));
+    this.game.bus.on("credits:changed", () => this.markDirty(0, 0, this.vw, 80));
   }
 
   /** Call when a new sector loads to force terrain re-bake next frame. */
   invalidateTerrainCache(): void {
     this.terrainCacheDirty = true;
-    this.markDirty(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    this.markDirty(0, 0, this.vw, this.vh);
   }
 
   private markDirty(x: number, y: number, w: number, h: number): void {
@@ -75,7 +100,7 @@ export class RenderSystem {
     this.markDirty(maybe.pos.x - 90, maybe.pos.y - 90, 180, 180);
   }
 
-  private generateStars(w = VIEW_WIDTH, h = VIEW_HEIGHT): void {
+  private generateStars(w: number, h: number): void {
     this.stars = [];
     for (let i = 0; i < 120; i++) {
       this.stars.push({
@@ -113,11 +138,11 @@ export class RenderSystem {
     const dpr = this.dpr;
     const cam = this.game.camera;
     this.previousFrameCtx.setTransform(1, 0, 0, 1, 0, 0);
-    this.previousFrameCtx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-    this.previousFrameCtx.drawImage(ctx.canvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    this.previousFrameCtx.clearRect(0, 0, this.vw, this.vh);
+    this.previousFrameCtx.drawImage(ctx.canvas, 0, 0, this.vw, this.vh);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.clearRect(0, 0, this.vw, this.vh);
     this.dirtyRects.length = 0;
 
     // Screen shake: directional bias toward impact + rotational component.
@@ -149,7 +174,7 @@ export class RenderSystem {
     // ---- BEGIN CAMERA TRANSFORM (world-space) ----
     ctx.save();
     // Apply shake in screen-space, then camera.
-    ctx.translate(VIEW_WIDTH / 2 + shakeOffX, VIEW_HEIGHT / 2 + shakeOffY);
+    ctx.translate(this.vw / 2 + shakeOffX, this.vh / 2 + shakeOffY);
     if (shakeRotVal !== 0) ctx.rotate(shakeRotVal);
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
@@ -199,8 +224,8 @@ export class RenderSystem {
       // Draw light canvas in world-space — we need to invert the camera to blit screen-sized texture.
       ctx.translate(cam.x, cam.y);
       ctx.scale(1 / cam.zoom, 1 / cam.zoom);
-      ctx.translate(-VIEW_WIDTH / 2, -VIEW_HEIGHT / 2);
-      ctx.drawImage(this.lightCanvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+      ctx.translate(-this.vw / 2, -this.vh / 2);
+      ctx.drawImage(this.lightCanvas, 0, 0, this.vw, this.vh);
       ctx.restore();
     }
     this.drawDarknessMode(ctx);
@@ -229,7 +254,7 @@ export class RenderSystem {
 
   private buildLightLayer(): void {
     const lc = this.lightCtx;
-    lc.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    lc.clearRect(0, 0, this.vw, this.vh);
     lc.globalCompositeOperation = "source-over";
 
     const addLight = (x: number, y: number, radius: number, color: string, alpha: number) => {
@@ -314,9 +339,9 @@ export class RenderSystem {
     // Scanlines: alternating dark rows with slight brightness variation.
     if (s.vfxScanlines) {
       ctx.fillStyle = "#000";
-      for (let y = 0; y < VIEW_HEIGHT; y += 3) {
+      for (let y = 0; y < this.vh; y += 3) {
         ctx.globalAlpha = 0.08 + Math.sin(y * 0.1 + t * 0.3) * 0.015;
-        ctx.fillRect(0, y, VIEW_WIDTH, 1);
+        ctx.fillRect(0, y, this.vw, 1);
       }
     }
 
@@ -325,18 +350,18 @@ export class RenderSystem {
       ctx.globalAlpha = 1;
       const vigIntensity = 0.5 + (this.game.core.coreIntegrity / this.game.core.coreMax < 0.3 ? Math.sin(t * 3) * 0.08 : 0);
       const vg = ctx.createRadialGradient(
-        VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH * 0.3,
-        VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH * 0.78
+        this.vw / 2, this.vh / 2, this.vw * 0.3,
+        this.vw / 2, this.vh / 2, this.vw * 0.78
       );
       vg.addColorStop(0, "rgba(0,0,0,0)");
       vg.addColorStop(1, `rgba(0,0,0,${vigIntensity.toFixed(2)})`);
       ctx.fillStyle = vg;
-      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+      ctx.fillRect(0, 0, this.vw, this.vh);
     }
 
     // Phosphor persistence band: slow vertical drift with soft glow.
     if (s.vfxPhosphor) {
-      const bandY = (Math.sin(t * 0.55) * 0.5 + 0.5) * (VIEW_HEIGHT - 40);
+      const bandY = (Math.sin(t * 0.55) * 0.5 + 0.5) * (this.vh - 40);
       const grd = ctx.createLinearGradient(0, bandY - 12, 0, bandY + 40);
       grd.addColorStop(0,   "rgba(102, 252, 241, 0)");
       grd.addColorStop(0.3, "rgba(102, 252, 241, 0.05)");
@@ -344,14 +369,14 @@ export class RenderSystem {
       grd.addColorStop(1,   "rgba(102, 252, 241, 0)");
       ctx.globalAlpha = 1;
       ctx.fillStyle = grd;
-      ctx.fillRect(0, bandY - 12, VIEW_WIDTH, 52);
+      ctx.fillRect(0, bandY - 12, this.vw, 52);
     }
 
     // Occasional random flicker.
     if (s.vfxFlicker && Math.random() < 0.015) {
       ctx.globalAlpha = Math.random() * 0.04;
       ctx.fillStyle = "#66fcf1";
-      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+      ctx.fillRect(0, 0, this.vw, this.vh);
     }
 
     if (s.vfxFilmGrain) this.drawFilmGrain(ctx);
@@ -422,7 +447,7 @@ export class RenderSystem {
     ctx.save();
     ctx.globalAlpha = 0.11;
     ctx.globalCompositeOperation = "screen";
-    ctx.drawImage(this.previousFrameCanvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.drawImage(this.previousFrameCanvas, 0, 0, this.vw, this.vh);
     ctx.restore();
   }
 
@@ -435,7 +460,7 @@ export class RenderSystem {
     ctx.globalAlpha = 0.08;
     ctx.translate(-ox, -oy);
     ctx.fillStyle = pattern;
-    ctx.fillRect(0, 0, VIEW_WIDTH + this.noiseCanvas.width, VIEW_HEIGHT + this.noiseCanvas.height);
+    ctx.fillRect(0, 0, this.vw + this.noiseCanvas.width, this.vh + this.noiseCanvas.height);
     ctx.restore();
   }
 
@@ -447,12 +472,12 @@ export class RenderSystem {
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.globalAlpha = 0.055;
-    ctx.drawImage(this.previousFrameCanvas, -offset, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.drawImage(this.previousFrameCanvas, -offset, 0, this.vw, this.vh);
     ctx.restore();
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.globalAlpha = 0.045;
-    ctx.drawImage(this.previousFrameCanvas, offset, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.drawImage(this.previousFrameCanvas, offset, 0, this.vw, this.vh);
     ctx.restore();
   }
 
@@ -497,13 +522,13 @@ export class RenderSystem {
 
     // Background gradient: dark center, sector-tinted edge.
     const bg = ctx.createRadialGradient(
-      VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 80,
-      VIEW_WIDTH / 2, VIEW_HEIGHT / 2, VIEW_WIDTH / 1.1
+      this.vw / 2, this.vh / 2, 80,
+      this.vw / 2, this.vh / 2, this.vw / 1.1
     );
     bg.addColorStop(0, "rgba(10, 14, 20, 1)");
     bg.addColorStop(1, `rgba(${Math.round(ar * 0.04)}, ${Math.round(ag * 0.04)}, ${Math.round(ab * 0.06)}, 1)`);
     ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.fillRect(0, 0, this.vw, this.vh);
 
     // Twinkling star field — color-tinted per sector.
     const menuMotionPaused =
@@ -1685,7 +1710,7 @@ export class RenderSystem {
 
     const lodSimple =
       this.game.core.settings.graphicsQuality === "low" ||
-      (!e.isBoss && Math.hypot(e.pos.x - VIEW_WIDTH / 2, e.pos.y - VIEW_HEIGHT / 2) > 360);
+      (!e.isBoss && Math.hypot(e.pos.x - this.vw / 2, e.pos.y - this.vh / 2) > 360);
     if (lodSimple) {
       ctx.beginPath();
       ctx.arc(0, 0, e.size, 0, Math.PI * 2);
@@ -2920,7 +2945,7 @@ export class RenderSystem {
       ctx.save();
       ctx.globalAlpha = a;
       ctx.fillStyle = f.color;
-      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+      ctx.fillRect(0, 0, this.vw, this.vh);
       ctx.restore();
     }
   }
@@ -2932,7 +2957,7 @@ export class RenderSystem {
 
     const pct = Math.max(0, Math.min(1, w.planningCountdown / w.planningDuration));
     const secs = Math.ceil(w.planningCountdown);
-    const cx = VIEW_WIDTH / 2;
+    const cx = this.vw / 2;
     const cy = 28;
     const R = 20;
     const start = -Math.PI / 2;
@@ -3695,8 +3720,8 @@ export class RenderSystem {
     }
 
     // Big centered countdown text.
-    const cx = VIEW_WIDTH / 2;
-    const cy = VIEW_HEIGHT / 2 - 30;
+    const cx = this.vw / 2;
+    const cy = this.vh / 2 - 30;
     ctx.globalAlpha = 0.88 * fade;
     ctx.fillStyle = "#7c4dff";
     ctx.font = `bold ${14}px Courier New`;
@@ -3733,7 +3758,7 @@ export class RenderSystem {
         ctx.fillStyle = "rgba(255,255,255,0.7)";
         ctx.font = "9px Courier New";
         ctx.textAlign = "center";
-        ctx.fillText("KILL ZONE [K]", VIEW_WIDTH / 2, VIEW_HEIGHT - 8);
+        ctx.fillText("KILL ZONE [K]", this.vw / 2, this.vh - 8);
         ctx.restore();
       }
       return;
@@ -3787,8 +3812,8 @@ export class RenderSystem {
         const angle = Math.PI + (Math.random() - 0.5) * 0.8; // mostly left
         const speed = 18 + Math.random() * 24;
         this.menuGhosts.push({
-          x: VIEW_WIDTH + Math.random() * 200,
-          y: 60 + Math.random() * (VIEW_HEIGHT - 120),
+          x: this.vw + Math.random() * 200,
+          y: 60 + Math.random() * (this.vh - 120),
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           r: 4 + Math.random() * 6,
@@ -3811,9 +3836,9 @@ export class RenderSystem {
       if (g.trail.length > 14) g.trail.shift();
 
       // Wrap around when off-screen.
-      if (g.x < -60 || g.y < -60 || g.y > VIEW_HEIGHT + 60) {
-        g.x = VIEW_WIDTH + 40 + Math.random() * 80;
-        g.y = 60 + Math.random() * (VIEW_HEIGHT - 120);
+      if (g.x < -60 || g.y < -60 || g.y > this.vh + 60) {
+        g.x = this.vw + 40 + Math.random() * 80;
+        g.y = 60 + Math.random() * (this.vh - 120);
         g.trail = [];
       }
 
@@ -3845,10 +3870,10 @@ export class RenderSystem {
     // Drift data streams: faint diagonal lines moving from bottom-right to top-left.
     const t = this.game.time.elapsed;
     for (let i = 0; i < 4; i++) {
-      const phase = (t * 22 + i * 55) % (VIEW_WIDTH + VIEW_HEIGHT);
-      const x1 = VIEW_WIDTH - phase;
-      const y1 = VIEW_HEIGHT;
-      const x2 = x1 + VIEW_HEIGHT * 0.6;
+      const phase = (t * 22 + i * 55) % (this.vw + this.vh);
+      const x1 = this.vw - phase;
+      const y1 = this.vh;
+      const x2 = x1 + this.vh * 0.6;
       const y2 = 0;
       ctx.globalAlpha = 0.06 + 0.04 * Math.sin(t * 2 + i);
       ctx.strokeStyle = "#66fcf1";
@@ -3866,23 +3891,23 @@ export class RenderSystem {
   private applyBarrelDistortion(ctx: CanvasRenderingContext2D): void {
     // Approximate CRT barrel distortion: blit the current canvas to a temp buffer,
     // then redraw it via stepped horizontal strips with per-strip x-offset = barrel curve.
-    this.distortionCtx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-    this.distortionCtx.drawImage(ctx.canvas, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-    ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    this.distortionCtx.clearRect(0, 0, this.vw, this.vh);
+    this.distortionCtx.drawImage(ctx.canvas, 0, 0, this.vw, this.vh);
+    ctx.clearRect(0, 0, this.vw, this.vh);
 
     const stripH = 4; // pixels per strip — tradeoff between quality and performance
     const strength = 1.8; // max horizontal pixel shift at screen edges
-    for (let y = 0; y < VIEW_HEIGHT; y += stripH) {
+    for (let y = 0; y < this.vh; y += stripH) {
       // Normalized vertical position: -1 at top, +1 at bottom.
-      const ny = (y / VIEW_HEIGHT) * 2 - 1;
+      const ny = (y / this.vh) * 2 - 1;
       // Horizontal barrel curve: offset is proportional to ny^2 (parabolic).
       // At center ny=0, no shift; at edges ny=±1, max shift inward.
       const xShift = strength * ny * ny; // always inward (positive = nudge inward from edges)
-      const drawWidth = VIEW_WIDTH - xShift * 2;
+      const drawWidth = this.vw - xShift * 2;
       ctx.drawImage(
         this.distortionCanvas,
-        0, y, VIEW_WIDTH, Math.min(stripH, VIEW_HEIGHT - y),
-        xShift, y, drawWidth, Math.min(stripH, VIEW_HEIGHT - y)
+        0, y, this.vw, Math.min(stripH, this.vh - y),
+        xShift, y, drawWidth, Math.min(stripH, this.vh - y)
       );
     }
   }
@@ -4052,7 +4077,7 @@ export class RenderSystem {
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.font = "10px Courier New";
     ctx.textAlign = "left";
-    ctx.fillText("THREAT MAP [H]", 8, VIEW_HEIGHT - 8);
+    ctx.fillText("THREAT MAP [H]", 8, this.vh - 8);
     ctx.restore();
   }
 
@@ -4109,8 +4134,8 @@ export class RenderSystem {
     const ROWS = grid.rows;
     const mapW = 180;
     const mapH = Math.round(mapW * (ROWS / COLS));
-    const mx = VIEW_WIDTH - mapW - 8;
-    const my = VIEW_HEIGHT - mapH - 8;
+    const mx = this.vw - mapW - 8;
+    const my = this.vh - mapH - 8;
     const tileW = mapW / COLS;
     const tileH = mapH / ROWS;
 

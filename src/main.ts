@@ -38,9 +38,6 @@ const gameCanvas = canvas!;
 const gameUiRoot = uiRoot!;
 const loadingScreen = new LoadingScreen(appRoot);
 let game: Game | null = null;
-// Portrait phones are very tall relative to the fixed 1024x704 game view.
-// Keep strict aspect-fit on mobile to prevent perceived stretching/cropping artifacts.
-const MOBILE_PORTRAIT_OVERDRAW_FACTOR = 1;
 // Read a CSS custom property as px from <body>; fallback if unset/invalid.
 const cssPx = (name: string, fallback = 0): number => {
   const value = Number.parseFloat(getComputedStyle(document.body).getPropertyValue(name));
@@ -90,48 +87,78 @@ document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("gesturechange", (e) => e.preventDefault());
 
 // Resize canvas to fit viewport while preserving aspect ratio.
+// On portrait mobile the canvas backing is resized to fill the available area
+// directly (portrait-native resolution), so the Camera auto-fits the map into
+// the tall viewport instead of letterboxing a landscape canvas.
 function fit(): void {
   applyDeviceClasses();
-  // On mobile we want the game to fill the screen edge-to-edge so the play
-  // area is as large as possible. On desktop we keep a small breathing-room
-  // margin around the CRT box.
-  //
-  // On mobile we reserve only the persistent HUD bars so the canvas is as
-  // large as possible. The build drawer is an overlay, so only the persistent
-  // top/bottom bars are reserved, using the same CSS vars that render the bars.
-  let availW: number;
-  let availH: number;
+  const dpr = window.devicePixelRatio || 1;
   let portrait = false;
   if (isMobile) {
     portrait = window.innerHeight >= window.innerWidth;
     const topReserve = cssPx("--ls-m-top-h", portrait ? 44 : 42) + cssPx("--ls-m-safe-top");
     const bottomReserve = cssPx("--ls-m-bottom-h", portrait ? 52 : 50) + cssPx("--ls-m-safe-bottom");
-    availW = window.innerWidth;
-    availH = Math.max(120, window.innerHeight - topReserve - bottomReserve);
+    if (portrait) {
+      // Portrait mobile: canvas fills the full available area so ~88% of the
+      // screen height is game instead of <35%.  The Camera recalculates its
+      // fit-zoom to show the entire map within this portrait viewport.
+      const logicalW = Math.max(120, window.innerWidth);
+      const logicalH = Math.max(120, window.innerHeight - topReserve - bottomReserve);
+      const backingW = Math.round(logicalW * dpr);
+      const backingH = Math.round(logicalH * dpr);
+      if (gameCanvas.width !== backingW || gameCanvas.height !== backingH) {
+        gameCanvas.width = backingW;
+        gameCanvas.height = backingH;
+      }
+      gameCanvas.style.width = `${logicalW}px`;
+      gameCanvas.style.height = `${logicalH}px`;
+      if (game) {
+        game.render.dpr = dpr;
+        game.camera.resizeViewport(logicalW, logicalH);
+        game.render.resizeViewport();
+      }
+      return;
+    }
+    // Landscape mobile: contain-fit within available area (same as desktop path).
+    const availW = window.innerWidth;
+    const availH = Math.max(120, window.innerHeight - topReserve - bottomReserve);
+    const scale = Math.min(availW / VIEW_WIDTH, availH / VIEW_HEIGHT);
+    const backingW = Math.round(VIEW_WIDTH * dpr);
+    const backingH = Math.round(VIEW_HEIGHT * dpr);
+    if (gameCanvas.width !== backingW || gameCanvas.height !== backingH) {
+      gameCanvas.width = backingW;
+      gameCanvas.height = backingH;
+    }
+    if (game) {
+      game.render.dpr = dpr;
+      if (game.camera.viewW !== VIEW_WIDTH || game.camera.viewH !== VIEW_HEIGHT) {
+        game.camera.resizeViewport(VIEW_WIDTH, VIEW_HEIGHT);
+        game.render.resizeViewport();
+      }
+    }
+    gameCanvas.style.width = `${Math.floor(VIEW_WIDTH * scale)}px`;
+    gameCanvas.style.height = `${Math.floor(VIEW_HEIGHT * scale)}px`;
   } else {
     const margin = 16;
-    availW = window.innerWidth - margin * 2;
-    availH = window.innerHeight - margin * 2;
+    const availW = window.innerWidth - margin * 2;
+    const availH = window.innerHeight - margin * 2;
+    const scale = Math.min(availW / VIEW_WIDTH, availH / VIEW_HEIGHT);
+    const backingW = Math.round(VIEW_WIDTH * dpr);
+    const backingH = Math.round(VIEW_HEIGHT * dpr);
+    if (gameCanvas.width !== backingW || gameCanvas.height !== backingH) {
+      gameCanvas.width = backingW;
+      gameCanvas.height = backingH;
+    }
+    if (game) {
+      game.render.dpr = dpr;
+      if (game.camera.viewW !== VIEW_WIDTH || game.camera.viewH !== VIEW_HEIGHT) {
+        game.camera.resizeViewport(VIEW_WIDTH, VIEW_HEIGHT);
+        game.render.resizeViewport();
+      }
+    }
+    gameCanvas.style.width = `${Math.floor(VIEW_WIDTH * scale)}px`;
+    gameCanvas.style.height = `${Math.floor(VIEW_HEIGHT * scale)}px`;
   }
-  const widthScale = availW / VIEW_WIDTH;
-  const heightScale = availH / VIEW_HEIGHT;
-  const containScale = Math.min(widthScale, heightScale);
-  const widthOverdrawScale = widthScale * MOBILE_PORTRAIT_OVERDRAW_FACTOR;
-  const portraitScale = Math.max(containScale, Math.min(heightScale, widthOverdrawScale));
-  const scale = isMobile && portrait
-    // In portrait, allow modest side-cropping so the gameplay window isn't a tiny strip.
-    ? portraitScale
-    : containScale;
-  const dpr = window.devicePixelRatio || 1;
-  const backingW = VIEW_WIDTH * dpr;
-  const backingH = VIEW_HEIGHT * dpr;
-  if (gameCanvas.width !== backingW || gameCanvas.height !== backingH) {
-    gameCanvas.width = backingW;
-    gameCanvas.height = backingH;
-  }
-  if (game) game.render.dpr = dpr;
-  gameCanvas.style.width = `${Math.floor(VIEW_WIDTH * scale)}px`;
-  gameCanvas.style.height = `${Math.floor(VIEW_HEIGHT * scale)}px`;
 }
 fit();
 window.addEventListener("resize", fit);
