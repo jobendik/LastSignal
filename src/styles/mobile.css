@@ -35,8 +35,8 @@ body.ls-mobile {
   --ls-m-text: #c5c6c7;
   --ls-m-text-dim: #8a9099;
   --ls-m-text-bright: #ffffff;
-  --ls-m-top-h: 48px;
-  --ls-m-bottom-h: 56px;
+  --ls-m-top-h: 44px;
+  --ls-m-bottom-h: 52px;
   --ls-m-safe-top: env(safe-area-inset-top, 0px);
   --ls-m-safe-bottom: env(safe-area-inset-bottom, 0px);
   --ls-m-safe-left: env(safe-area-inset-left, 0px);
@@ -80,6 +80,7 @@ body.ls-mobile #game-container {
   height: 100vh;
   height: 100dvh;
   padding: 0;
+  overflow: hidden;
   background: #03050a;
 }
 body.ls-mobile canvas#ls-canvas,
@@ -228,8 +229,8 @@ body.ls-mobile .ls-mhud { display: flex; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
-  height: 40px;
+  min-width: 38px;
+  height: 38px;
   padding: 0 10px;
   background: rgba(8, 12, 18, 0.7);
   border: 1px solid var(--ls-m-border-dim);
@@ -261,7 +262,7 @@ body.ls-mobile .ls-mhud { display: flex; }
 /* Mobile-specific: start-wave button takes priority real-estate when shown. */
 .ls-mhud-start {
   padding: 0 14px;
-  height: 40px;
+  height: 38px;
   background: rgba(255, 179, 0, 0.15);
   border: 1px solid var(--ls-m-warning);
   color: var(--ls-m-warning);
@@ -288,7 +289,7 @@ body.ls-mobile .ls-mhud { display: flex; }
   left: 0;
   right: 0;
   height: calc(var(--ls-m-bottom-h) + var(--ls-m-safe-bottom));
-  padding: 6px calc(8px + var(--ls-m-safe-right)) calc(6px + var(--ls-m-safe-bottom)) calc(8px + var(--ls-m-safe-left));
+  padding: 4px calc(8px + var(--ls-m-safe-right)) calc(4px + var(--ls-m-safe-bottom)) calc(8px + var(--ls-m-safe-left));
   background: linear-gradient(to top, rgba(4, 7, 12, 0.98) 60%, rgba(4, 7, 12, 0.75) 100%);
   border-top: 1px solid var(--ls-m-border);
   z-index: 55;
@@ -302,7 +303,7 @@ body.ls-mobile .ls-mhud { display: flex; }
 body.ls-mobile .ls-mabar { display: flex; }
 
 .ls-mabar-speed {
-  height: 44px;
+  height: 42px;
   min-width: 56px;
   padding: 0 12px;
   background: rgba(8, 12, 18, 0.85);
@@ -333,7 +334,7 @@ body.ls-mobile .ls-mabar { display: flex; }
 /* Tab toggle: BUILD | SQUAD — single rounded element split in two. */
 .ls-mabar-tabs {
   flex: 1 1 auto;
-  height: 44px;
+  height: 42px;
   display: flex;
   background: rgba(8, 12, 18, 0.85);
   border: 1px solid var(--ls-m-border-dim);
@@ -405,7 +406,7 @@ body.ls-mobile .ls-mabar { display: flex; }
 .ls-mabar-confirm,
 .ls-mabar-cancel {
   flex: 1 1 50%;
-  height: 44px;
+  height: 42px;
   border: 1px solid;
   background: rgba(8, 12, 18, 0.9);
   font-family: inherit;
@@ -1429,8 +1430,8 @@ body.ls-mobile .ls-meta-node.available:hover {
 /* Landscape phone — shorter drawer / sheet, smaller cards. */
 @media (orientation: landscape) and (max-height: 500px) {
   body.ls-mobile {
-    --ls-m-top-h: 48px;
-    --ls-m-bottom-h: 56px;
+    --ls-m-top-h: 42px;
+    --ls-m-bottom-h: 50px;
   }
   body.ls-mobile .ls-mdrawer {
     max-height: 65vh;

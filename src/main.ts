@@ -38,6 +38,14 @@ const gameCanvas = canvas!;
 const gameUiRoot = uiRoot!;
 const loadingScreen = new LoadingScreen(appRoot);
 let game: Game | null = null;
+// Portrait phones are very tall relative to the fixed 1024x704 game view.
+// Allow mild side-cropping to reclaim gameplay height without changing render aspect.
+const MOBILE_PORTRAIT_OVERDRAW_FACTOR = 1.25;
+// Read a CSS custom property as px from <body>; fallback if unset/invalid.
+const cssPx = (name: string, fallback = 0): number => {
+  const value = Number.parseFloat(getComputedStyle(document.body).getPropertyValue(name));
+  return Number.isFinite(value) ? value : fallback;
+};
 
 // ──────────────────────────────────────────────────────────
 // Mobile / touch device detection.
@@ -89,27 +97,31 @@ function fit(): void {
   // margin around the CRT box.
   //
   // On mobile we reserve only the persistent HUD bars so the canvas is as
-  // large as possible. The build drawer slides up as an overlay when opened,
-  // so it does NOT need reserved canvas space — only the always-visible top
-  // bar (--ls-m-top-h: 48 px) and bottom action bar (--ls-m-bottom-h: 56 px)
-  // are subtracted. The estimates include a generous buffer for iOS
-  // safe-area-insets (status bar / home indicator) which we cannot read
-  // directly from JS: portrait adds ~62 px for the status bar notch, landscape
-  // adds a smaller ~8 px bottom buffer.
+  // large as possible. The build drawer is an overlay, so only the persistent
+  // top/bottom bars are reserved, using the same CSS vars that render the bars.
   let availW: number;
   let availH: number;
+  let portrait = false;
   if (isMobile) {
-    const portrait = window.innerHeight >= window.innerWidth;
-    const hudReserve   = portrait ? 110 : 56;  // top bar (48 px) + safe-area-top (~62 px portrait, ~8 px landscape)
-    const buildReserve = portrait ?  92 : 80;  // action bar (56 px) + safe-area-bottom (~34 px portrait, ~21 px landscape + buffer)
+    portrait = window.innerHeight >= window.innerWidth;
+    const topReserve = cssPx("--ls-m-top-h", portrait ? 44 : 42) + cssPx("--ls-m-safe-top");
+    const bottomReserve = cssPx("--ls-m-bottom-h", portrait ? 52 : 50) + cssPx("--ls-m-safe-bottom");
     availW = window.innerWidth;
-    availH = Math.max(120, window.innerHeight - hudReserve - buildReserve);
+    availH = Math.max(120, window.innerHeight - topReserve - bottomReserve);
   } else {
     const margin = 16;
     availW = window.innerWidth - margin * 2;
     availH = window.innerHeight - margin * 2;
   }
-  const scale = Math.min(availW / VIEW_WIDTH, availH / VIEW_HEIGHT);
+  const widthScale = availW / VIEW_WIDTH;
+  const heightScale = availH / VIEW_HEIGHT;
+  const containScale = Math.min(widthScale, heightScale);
+  const widthOverdrawScale = widthScale * MOBILE_PORTRAIT_OVERDRAW_FACTOR;
+  const portraitScale = Math.max(containScale, Math.min(heightScale, widthOverdrawScale));
+  const scale = isMobile && portrait
+    // In portrait, allow modest side-cropping so the gameplay window isn't a tiny strip.
+    ? portraitScale
+    : containScale;
   const dpr = window.devicePixelRatio || 1;
   const backingW = VIEW_WIDTH * dpr;
   const backingH = VIEW_HEIGHT * dpr;

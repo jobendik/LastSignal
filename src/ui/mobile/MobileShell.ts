@@ -780,7 +780,7 @@ export class MobileShell {
     if (this.statusEl.textContent !== text) this.statusEl.textContent = text;
     const isCombat = this.game.state === "WAVE_ACTIVE";
     this.mhud.classList.toggle("combat-priority", isCombat);
-    this.mhud.classList.toggle("compact", window.innerWidth <= 390);
+    this.mhud.classList.toggle("compact", window.innerWidth <= 430);
   }
 
   private refreshEmpQuickAction(): void {
