@@ -39,8 +39,8 @@ const gameUiRoot = uiRoot!;
 const loadingScreen = new LoadingScreen(appRoot);
 let game: Game | null = null;
 // Portrait phones are very tall relative to the fixed 1024x704 game view.
-// Allow mild side-cropping to reclaim gameplay height without changing render aspect.
-const MOBILE_PORTRAIT_OVERDRAW_FACTOR = 1.25;
+// Keep strict aspect-fit on mobile to prevent perceived stretching/cropping artifacts.
+const MOBILE_PORTRAIT_OVERDRAW_FACTOR = 1;
 // Read a CSS custom property as px from <body>; fallback if unset/invalid.
 const cssPx = (name: string, fallback = 0): number => {
   const value = Number.parseFloat(getComputedStyle(document.body).getPropertyValue(name));

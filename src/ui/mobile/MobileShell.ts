@@ -689,10 +689,6 @@ export class MobileShell {
       this.refreshSpeed();
       this.refreshStartWave();
       this.refreshTabAlerts();
-      // Default-open the build drawer the very first time the player enters PLANNING in a sector.
-      if (next === "PLANNING" && this.game.core.waveIndex === 0 && !this.drawer.isOpen) {
-        this.drawer.open("build");
-      }
     }
   }
 
