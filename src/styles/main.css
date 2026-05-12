@@ -86,13 +86,16 @@ body.ls-mobile #game-container {
   height: 100dvh; /* dynamic viewport — accounts for iOS bottom bar */
   padding: 0;
 }
+/* Note: mobile.css (loaded after this file) overrides these with values derived
+   from --ls-m-top-h and --ls-m-bottom-h CSS custom properties for consistency.
+   These are kept as safe fallbacks only. */
 body.ls-portrait.ls-mobile #game-container {
-  padding-top: 96px;
-  padding-bottom: 32vh;
+  padding-top: 110px;
+  padding-bottom: 92px;
 }
 body.ls-landscape.ls-mobile #game-container {
   padding-top: 56px;
-  padding-bottom: 30vh;
+  padding-bottom: 80px;
 }
 body.ls-mobile {
   /* iOS Safari sometimes allows a rubber-band scroll even with overflow:hidden;

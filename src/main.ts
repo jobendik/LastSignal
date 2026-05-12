@@ -88,19 +88,20 @@ function fit(): void {
   // area is as large as possible. On desktop we keep a small breathing-room
   // margin around the CRT box.
   //
-  // On mobile the HUD top bar (≈ 96 px tall, more in portrait when buttons
-  // wrap) and the build-menu bottom drawer (≈ 32 vh in portrait) overlay
-  // the screen, so we shrink the available area by their reserved height
-  // before fitting the canvas. That way the canvas slots cleanly in between
-  // and the player can see the whole map without HUD chrome covering it.
+  // On mobile we reserve only the persistent HUD bars so the canvas is as
+  // large as possible. The build drawer slides up as an overlay when opened,
+  // so it does NOT need reserved canvas space — only the always-visible top
+  // bar (--ls-m-top-h: 48 px) and bottom action bar (--ls-m-bottom-h: 56 px)
+  // are subtracted. The estimates include a generous buffer for iOS
+  // safe-area-insets (status bar / home indicator) which we cannot read
+  // directly from JS: portrait adds ~62 px for the status bar notch, landscape
+  // adds a smaller ~8 px bottom buffer.
   let availW: number;
   let availH: number;
   if (isMobile) {
     const portrait = window.innerHeight >= window.innerWidth;
-    const hudReserve = portrait ? 110 : 64;          // top HUD bar
-    const buildReserve = portrait
-      ? Math.round(window.innerHeight * 0.32) + 8    // bottom drawer (32vh + gutter)
-      : Math.round(window.innerHeight * 0.30) + 8;
+    const hudReserve   = portrait ? 110 : 56;  // top bar (48 px) + safe-area-top
+    const buildReserve = portrait ?  92 : 80;  // action bar (56 px) + safe-area-bottom
     availW = window.innerWidth;
     availH = Math.max(120, window.innerHeight - hudReserve - buildReserve);
   } else {
