@@ -100,8 +100,8 @@ function fit(): void {
   let availH: number;
   if (isMobile) {
     const portrait = window.innerHeight >= window.innerWidth;
-    const hudReserve   = portrait ? 110 : 56;  // top bar (48 px) + safe-area-top
-    const buildReserve = portrait ?  92 : 80;  // action bar (56 px) + safe-area-bottom
+    const hudReserve   = portrait ? 110 : 56;  // top bar (48 px) + safe-area-top (~62 px portrait, ~8 px landscape)
+    const buildReserve = portrait ?  92 : 80;  // action bar (56 px) + safe-area-bottom (~34 px portrait, ~21 px landscape + buffer)
     availW = window.innerWidth;
     availH = Math.max(120, window.innerHeight - hudReserve - buildReserve);
   } else {
